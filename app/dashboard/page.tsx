@@ -68,6 +68,14 @@ const accessCards = [
     packageType: "any",
     title: "My Profile",
   },
+  {
+  description: "Draw, write and complete worksheets online.",
+  href: "/worksheet",
+  icon: BookOpenCheck,
+  lockedText: "",
+  packageType: "any",
+  title: "Worksheet Canvas",
+},
 ] as const;
 
 export default function DashboardPage() {
@@ -231,6 +239,7 @@ export default function DashboardPage() {
                   <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">{card.lockedText}</p>
                 </article>
               );
+              
             }
 
             return (
