@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "KG Blank Space";
+  src: url("/fonts/KGBlankSpaceSketch.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "KG Miss Kindergarten";
+  src: url("/fonts/KGMissKindergarten.ttf") format("truetype");
+  font-display: swap;
+}
+
+:root {
+  --background: #fffaf0;
+  --foreground: #35405f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(255, 221, 134, 0.32), transparent 32rem),
+    radial-gradient(circle at bottom right, rgba(173, 216, 230, 0.32), transparent 30rem),
+    var(--background);
+  color: var(--foreground);
+  font-family: "KG Miss Kindergarten", Arial, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.font-display {
+  font-family: "KG Blank Space", Arial, sans-serif;
+}
+
+.font-kindergarten {
+  font-family: "KG Miss Kindergarten", Arial, sans-serif;
+}
+
+.page-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.soft-card {
+  border: 1px solid rgba(92, 104, 181, 0.14);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 18px 45px rgba(72, 80, 140, 0.12);
+}
+
+.button-shadow {
+  box-shadow: 0 12px 24px rgba(82, 93, 175, 0.22);
+}
+
+.premium-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 1.25rem;
+  padding: 0.85rem 1.1rem;
+  font-weight: 800;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  transition: 0.2s ease;
+}
+
+.premium-action:hover {
+  transform: translateY(-2px);
+}

@@ -19,27 +19,16 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./*"]
     }
   },
   "include": [
     "next-env.d.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "next.config.ts",
-    "postcss.config.mjs",
-    "eslint.config.mjs",
+    "**/*.ts",
+    "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "src/**/*.mts"
+    "**/*.mts"
   ],
-  "exclude": [
-    "node_modules",
-    "legacy",
-    "app",
-    "components",
-    "lib",
-    "types",
-    "fd-arcadia-learning-hub"
-  ]
+  "exclude": ["node_modules"]
 }

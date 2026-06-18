@@ -11,11 +11,6 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
-    "legacy/**",
-    "fd-arcadia-learning-hub/**",
-    "components/**",
-    "lib/**",
-    "types/**",
     "next-env.d.ts",
   ]),
 ]);

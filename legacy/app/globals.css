@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "KG Miss Kindergarten";
+  src: url("/fonts/KGMissKindergarten.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "KG Blank Space Sketch";
+  src: url("/fonts/KGBlankSpaceSketch.ttf") format("truetype");
+  font-display: swap;
+}
+
+:root {
+  --fd-red: #bf3f55;
+  --fd-orange: #e9a657;
+  --fd-yellow: #fff0a8;
+  --fd-green: #6fae91;
+  --fd-mauve: #c28cae;
+  --fd-purple: #8c79c6;
+  --fd-blue: #384282;
+  --fd-sky: #78a8d8;
+  --fd-cream: #fff9f0;
+  --fd-ink: #263066;
+  --fd-blush: #fff0f4;
+  --fd-lilac: #f0edff;
+  --fd-mint: #edf9f3;
+  --background: var(--fd-cream);
+  --foreground: var(--fd-ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(240, 237, 255, 0.95), transparent 34%),
+    radial-gradient(circle at 88% 12%, rgba(255, 240, 244, 0.92), transparent 30%),
+    linear-gradient(135deg, #fffdf8 0%, #fff5ec 46%, #f4f1ff 100%);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: var(--fd-yellow);
+  color: var(--fd-blue);
+}
+
+.font-kindergarten {
+  font-family: "KG Miss Kindergarten", var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.font-blank-space {
+  font-family: "KG Blank Space Sketch", var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.premium-page-bg {
+  background:
+    radial-gradient(circle at 8% 10%, rgba(255, 240, 244, 0.96), transparent 32%),
+    radial-gradient(circle at 88% 16%, rgba(237, 249, 243, 0.9), transparent 28%),
+    radial-gradient(circle at 55% 95%, rgba(240, 237, 255, 0.95), transparent 36%),
+    linear-gradient(135deg, #fffdf8 0%, #fff7ed 46%, #f7f4ff 100%);
+}
+
+.premium-button-shadow {
+  box-shadow: 0 18px 38px rgba(56, 66, 130, 0.2), 0 7px 0 rgba(38, 48, 102, 0.12);
+}
+
+.premium-button-shadow-red {
+  box-shadow: 0 20px 42px rgba(191, 63, 85, 0.28), 0 7px 0 rgba(126, 36, 52, 0.16);
+}
+
+.premium-card-shadow {
+  box-shadow: 0 24px 70px rgba(56, 66, 130, 0.12);
+}
