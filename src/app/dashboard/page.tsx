@@ -11,7 +11,6 @@ import {
   Crown,
   FileText,
   Gift,
-  Layers3,
   LockKeyhole,
   Palette,
   ShieldCheck,
@@ -26,13 +25,27 @@ import { ProtectedPage } from "@/components/ProtectedPage";
 import { type Profile, supabase, userTypeLabels } from "@/lib/supabase";
 
 const ADMIN_EMAIL = "fdarcadia.hello@gmail.com";
+const WHATSAPP_NUMBER = "601140731757";
 
 type ParentAccessField =
   | "learning_hub_unlocked"
   | "custom_worksheet_unlocked"
-  | "flashcard_modul_unlocked"
+  | "math_activity_unlocked"
   | "draw_learn_unlocked"
-  | "sifir_deck_unlocked";
+  | "sifir_deck_unlocked"
+  | "freebies_unlocked";
+
+const packageLabels: Record<string, string> = {
+  math_package: "Math Package RM25",
+  learning_hub_weekly: "Learning Hub Weekly RM30",
+  learning_hub_monthly: "Learning Hub Monthly RM50",
+  learning_hub_6month: "Learning Hub Premium RM210",
+  full_package: "Full Package RM250",
+  worksheet_trial: "Worksheet Trial RM5",
+  worksheet_basic: "Worksheet Basic RM15",
+  worksheet_standard: "Worksheet Standard RM25",
+  worksheet_premium: "Worksheet Premium RM39",
+};
 
 const parentFeatureCards: {
   title: string;
@@ -51,25 +64,9 @@ const parentFeatureCards: {
     description: "Monthly schedules, weekly activities and downloads.",
   },
   {
-    title: "🎁 Freebies",
-    href: "/freebies",
-    field: null,
-    icon: Gift,
-    color: "bg-orange-100 text-orange-700",
-    description: "Free worksheets, flashcards, trackers and printable activities.",
-  },
-  {
-    title: "Draw & Learn",
-    href: "/worksheet",
-    field: "draw_learn_unlocked",
-    icon: Palette,
-    color: "bg-purple-100 text-purple-700",
-    description: "Interactive worksheet canvas for children.",
-  },
-  {
     title: "Math Activity",
     href: "/math-activity",
-    field: null,
+    field: "math_activity_unlocked",
     icon: Calculator,
     color: "bg-emerald-100 text-emerald-700",
     description: "Practice tambah, tolak, darab and bahagi.",
@@ -83,12 +80,20 @@ const parentFeatureCards: {
     description: "Practice multiplication using premium card and keypad game.",
   },
   {
-    title: "Flashcard & Modul",
-    href: "/flashcard-modul",
-    field: "flashcard_modul_unlocked",
-    icon: Layers3,
-    color: "bg-sky-100 text-sky-700",
-    description: "Access flashcards and learning modules.",
+    title: "Draw & Learn",
+    href: "/worksheet",
+    field: "draw_learn_unlocked",
+    icon: Palette,
+    color: "bg-purple-100 text-purple-700",
+    description: "Interactive worksheet canvas for children.",
+  },
+  {
+    title: "Freebies",
+    href: "/freebies",
+    field: "freebies_unlocked",
+    icon: Gift,
+    color: "bg-orange-100 text-orange-700",
+    description: "Free worksheets, flashcards, trackers and printable activities.",
   },
   {
     title: "Custom Worksheet",
@@ -97,6 +102,14 @@ const parentFeatureCards: {
     icon: FileText,
     color: "bg-pink-100 text-pink-700",
     description: "Download custom worksheets by subject.",
+  },
+  {
+    title: "Pricing & Payment",
+    href: "/pricing",
+    field: null,
+    icon: Crown,
+    color: "bg-indigo-100 text-indigo-700",
+    description: "View packages and contact admin for manual payment confirmation.",
   },
 ];
 
@@ -304,8 +317,16 @@ function ParentDashboard({ userId }: { userId: string }) {
   }, [profile?.full_name]);
 
   const packageName = profile?.package_type
-    ? profile.package_type.toUpperCase()
-    : "NO PACKAGE";
+    ? packageLabels[profile.package_type] || profile.package_type
+    : "No Active Package";
+
+  const whatsappText = encodeURIComponent(
+    `Hi FD Arcadia, I would like to subscribe or upgrade my package. My registered email is ${
+      profile?.email || ""
+    }.`
+  );
+
+  const whatsappLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${whatsappText}`;
 
   const today = new Date();
   const day = today.getDay();
@@ -356,6 +377,68 @@ function ParentDashboard({ userId }: { userId: string }) {
               {profile?.subscription_start || "-"} →{" "}
               {profile?.subscription_end || "-"}
             </span>
+          </div>
+
+          <div className="mt-5">
+            <Link
+              href="/pricing"
+              className="inline-flex rounded-2xl bg-yellow-200 px-5 py-3 font-bold text-indigo-700 transition hover:bg-yellow-300"
+            >
+              View Packages
+            </Link>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-[2rem] border border-yellow-200 bg-yellow-50 p-6">
+          <h2 className="text-2xl font-bold text-indigo-700">
+            Payment & Access Information
+          </h2>
+
+          <p className="mt-3 text-slate-700">
+            All package purchases are processed manually by FD Arcadia Learning
+            Hub.
+          </p>
+
+          <ol className="mt-4 space-y-2 text-slate-700">
+            <li>1. Register your account.</li>
+            <li>2. Choose your preferred package.</li>
+            <li>
+              3. WhatsApp admin with your registered email and payment proof.
+            </li>
+            <li>4. Admin will unlock your package after confirmation.</li>
+          </ol>
+
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/pricing"
+              className="inline-flex justify-center rounded-2xl bg-indigo-600 px-5 py-3 font-bold text-white transition hover:bg-indigo-700"
+            >
+              View Packages
+            </Link>
+
+            <a
+              href={whatsappLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex justify-center rounded-2xl bg-green-500 px-5 py-3 font-bold text-white transition hover:bg-green-600"
+            >
+              WhatsApp Admin
+            </a>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-[2rem] bg-white p-6 shadow-sm">
+          <h2 className="text-2xl font-bold text-indigo-700">
+            Current Package Status
+          </h2>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <StatusBox label="Package" value={packageName} />
+            <StatusBox
+              label="Start Date"
+              value={profile?.subscription_start || "-"}
+            />
+            <StatusBox label="End Date" value={profile?.subscription_end || "-"} />
           </div>
         </section>
 
@@ -489,27 +572,47 @@ function ParentDashboard({ userId }: { userId: string }) {
                 <p className="mt-4 text-lg leading-8 text-slate-600">
                   {unlocked
                     ? card.description
-                    : "Please purchase to unlock this section."}
+                    : "Locked. View package pricing and WhatsApp admin to unlock access."}
                 </p>
 
                 {unlocked ? (
-                  <p className="mt-4 rounded-2xl bg-yellow-100 px-4 py-2 text-yellow-800">
-                    Tap to open
-                  </p>
-                ) : null}
+  <p className="mt-4 rounded-2xl bg-yellow-100 px-4 py-2 text-yellow-800">
+    Tap to open
+  </p>
+) : (
+  <p className="mt-4 rounded-2xl bg-slate-100 px-4 py-2 text-slate-500">
+    Locked
+  </p>
+)}
               </div>
             );
 
-            return unlocked ? (
-              <Link key={card.title} href={card.href} className="block">
+            return (
+              <Link
+                key={card.title}
+                href={unlocked ? card.href : "/pricing"}
+                className="block"
+              >
                 {content}
               </Link>
-            ) : (
-              <div key={card.title}>{content}</div>
             );
           })}
         </section>
       </main>
     </>
+  );
+}
+
+function StatusBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-indigo-50 p-4">
+      <p className="text-sm font-bold tracking-[0.18em] text-yellow-600">
+        {label.toUpperCase()}
+      </p>
+
+      <p className="mt-2 break-words text-lg font-bold text-indigo-700">
+        {value}
+      </p>
+    </div>
   );
 }

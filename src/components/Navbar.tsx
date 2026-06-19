@@ -9,6 +9,8 @@ import {
   LogOut,
   UserRound,
   ShieldCheck,
+  Gift,
+  BadgeDollarSign,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -64,6 +66,22 @@ export function Navbar() {
             <UserRound size={20} />
             Profile
           </Link>
+
+          <Link
+  href="/pricing"
+  className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+>
+  <BadgeDollarSign size={20} />
+  Pricing
+</Link>
+
+<Link
+  href="/freebies"
+  className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+>
+  <Gift size={20} />
+  Freebies
+</Link>
 
           <button
             type="button"

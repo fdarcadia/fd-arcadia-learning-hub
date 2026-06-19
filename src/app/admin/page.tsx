@@ -27,9 +27,12 @@ type Profile = {
   learning_hub_unlocked: boolean;
   custom_worksheet_unlocked: boolean;
   flashcard_modul_unlocked: boolean;
+  math_activity_unlocked: boolean;
   draw_learn_unlocked: boolean;
   sifir_deck_unlocked: boolean;
+  freebies_unlocked: boolean;
   package_type: string | null;
+  package_note: string | null;
   subscription_start: string | null;
   subscription_end: string | null;
 };
@@ -38,15 +41,68 @@ type AccessField =
   | "learning_hub_unlocked"
   | "custom_worksheet_unlocked"
   | "flashcard_modul_unlocked"
+  | "math_activity_unlocked"
   | "draw_learn_unlocked"
-  | "sifir_deck_unlocked";
+  | "sifir_deck_unlocked"
+  | "freebies_unlocked";
 
 const ADMIN_EMAIL = "fdarcadia.hello@gmail.com";
 
 const packageOptions = [
-  { value: "trial", label: "Trial RM30", weeks: 1 },
-  { value: "monthly", label: "Monthly RM50", months: 1 },
-  { value: "premium", label: "Premium RM250", months: 6 },
+  {
+    value: "math_package",
+    label: "Math Package RM25",
+    days: 365,
+    note: "Math Activity + Sifir Deck + Freebies",
+  },
+  {
+    value: "learning_hub_weekly",
+    label: "Learning Hub Weekly RM30",
+    days: 7,
+    note: "1 Week Learning Hub",
+  },
+  {
+    value: "learning_hub_monthly",
+    label: "Learning Hub Monthly RM50",
+    months: 1,
+    note: "1 Month Learning Hub",
+  },
+  {
+    value: "learning_hub_6month",
+    label: "Learning Hub 6 Months RM210",
+    months: 6,
+    note: "6 Months Learning Hub",
+  },
+  {
+    value: "full_package",
+    label: "Full Package RM250",
+    months: 6,
+    note: "Learning Hub + Math Activity + Draw & Learn + Sifir Deck + Freebies",
+  },
+  {
+    value: "worksheet_trial",
+    label: "Custom Worksheet Trial RM5",
+    days: 365,
+    note: "3 Activities",
+  },
+  {
+    value: "worksheet_basic",
+    label: "Custom Worksheet Basic RM15",
+    days: 365,
+    note: "7 Activities",
+  },
+  {
+    value: "worksheet_standard",
+    label: "Custom Worksheet Standard RM25",
+    days: 365,
+    note: "12 Activities",
+  },
+  {
+    value: "worksheet_premium",
+    label: "Custom Worksheet Premium RM39",
+    days: 365,
+    note: "18 Activities",
+  },
 ];
 
 function addDays(dateString: string, days: number) {
@@ -66,11 +122,65 @@ function getEndDate(packageType: string, startDate: string) {
     (option) => option.value === packageType
   );
 
-  if (selectedPackage?.weeks) {
-    return addDays(startDate, selectedPackage.weeks * 7);
+  if (!selectedPackage) return startDate;
+
+  if (selectedPackage.days) {
+    return addDays(startDate, selectedPackage.days);
   }
 
-  return addMonths(startDate, selectedPackage?.months ?? 1);
+  return addMonths(startDate, selectedPackage.months ?? 1);
+}
+
+function getPackageUnlocks(packageType: string) {
+  const base = {
+    learning_hub_unlocked: false,
+    custom_worksheet_unlocked: false,
+    flashcard_modul_unlocked: false,
+    math_activity_unlocked: false,
+    draw_learn_unlocked: false,
+    sifir_deck_unlocked: false,
+    freebies_unlocked: false,
+  };
+
+  switch (packageType) {
+    case "math_package":
+      return {
+        ...base,
+        math_activity_unlocked: true,
+        sifir_deck_unlocked: true,
+        freebies_unlocked: true,
+      };
+
+    case "learning_hub_weekly":
+    case "learning_hub_monthly":
+    case "learning_hub_6month":
+      return {
+        ...base,
+        learning_hub_unlocked: true,
+      };
+
+    case "full_package":
+      return {
+        ...base,
+        learning_hub_unlocked: true,
+        math_activity_unlocked: true,
+        draw_learn_unlocked: true,
+        sifir_deck_unlocked: true,
+        freebies_unlocked: true,
+      };
+
+    case "worksheet_trial":
+    case "worksheet_basic":
+    case "worksheet_standard":
+    case "worksheet_premium":
+      return {
+        ...base,
+        custom_worksheet_unlocked: true,
+      };
+
+    default:
+      return base;
+  }
 }
 
 export default function AdminPage() {
@@ -82,12 +192,10 @@ export default function AdminPage() {
         ) : (
           <>
             <Navbar />
-
             <main className="page-shell py-10">
               <h1 className="text-3xl font-bold text-red-600">
                 Access denied
               </h1>
-
               <p className="mt-2 text-slate-600">
                 Only FD Arcadia admin can open this page.
               </p>
@@ -135,74 +243,104 @@ function AdminContent() {
     });
   }, [profiles, search]);
 
-async function toggleAccess(
-  id: string,
-  field: AccessField,
-  currentValue: boolean
-) {
-  setError("");
+  async function toggleAccess(
+    id: string,
+    field: AccessField,
+    currentValue: boolean
+  ) {
+    setError("");
 
-  const nextValue = !Boolean(currentValue);
+    const nextValue = !Boolean(currentValue);
 
-  const { data, error: updateError } = await supabase
-    .from("profiles")
-    .update({ [field]: nextValue })
-    .eq("id", id)
-    .select()
-    .single<Profile>();
+    const { data, error: updateError } = await supabase
+      .from("profiles")
+      .update({ [field]: nextValue })
+      .eq("id", id)
+      .select()
+      .single<Profile>();
 
-  if (updateError || !data) {
-    setError(updateError?.message ?? "Unable to update access.");
-    return;
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Unable to update access.");
+      return;
+    }
+
+    setProfiles((current) =>
+      current.map((profile) => (profile.id === id ? data : profile))
+    );
   }
 
-  setProfiles((current) =>
-    current.map((profile) => (profile.id === id ? data : profile))
-  );
-}
-
-  async function saveSubscription(
+  async function savePackage(
     profile: Profile,
     packageType: string,
     startDate: string
   ) {
     if (!startDate) {
-      setError("Please choose subscription start date.");
+      setError("Please choose package start date.");
       return;
     }
 
+    const selectedPackage = packageOptions.find(
+      (option) => option.value === packageType
+    );
+
     const endDate = getEndDate(packageType, startDate);
+    const unlocks = getPackageUnlocks(packageType);
 
-    const { error: updateError } = await supabase
+    const updatePayload = {
+      package_type: packageType,
+      package_note: selectedPackage?.note ?? "",
+      subscription_start: startDate,
+      subscription_end: endDate,
+      ...unlocks,
+    };
+
+    const { data, error: updateError } = await supabase
       .from("profiles")
-      .update({
-        package_type: packageType,
-        subscription_start: startDate,
-        subscription_end: endDate,
-        learning_hub_unlocked: true,
-      })
-      .eq("id", profile.id);
+      .update(updatePayload)
+      .eq("id", profile.id)
+      .select()
+      .single<Profile>();
 
-    if (updateError) {
-      setError(updateError.message);
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Unable to save package.");
       return;
     }
 
     setProfiles((current) =>
-      current.map((item) =>
-        item.id === profile.id
-          ? {
-              ...item,
-              package_type: packageType,
-              subscription_start: startDate,
-              subscription_end: endDate,
-              learning_hub_unlocked: true,
-            }
-          : item
-      )
+      current.map((item) => (item.id === profile.id ? data : item))
     );
 
     setError("");
+  }
+
+  async function resetAccess(profile: Profile) {
+    const { data, error: updateError } = await supabase
+      .from("profiles")
+      .update({
+        package_type: null,
+        package_note: null,
+        subscription_start: null,
+        subscription_end: null,
+        learning_hub_unlocked: false,
+        custom_worksheet_unlocked: false,
+        flashcard_modul_unlocked: false,
+        math_activity_unlocked: false,
+        draw_learn_unlocked: false,
+        sifir_deck_unlocked: false,
+        freebies_unlocked: false,
+      })
+      .eq("id", profile.id)
+      .select()
+      .single<Profile>();
+
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Unable to reset access.");
+      return;
+    }
+
+    setProfiles((current) =>
+      current.map((item) => (item.id === profile.id ? data : item))
+    );
   }
 
   return (
@@ -213,17 +351,11 @@ async function toggleAccess(
         <section className="rounded-[2rem] bg-indigo-600 p-6 text-white shadow-xl">
           <div className="flex items-center gap-3">
             <ShieldCheck size={34} />
-
             <div>
-              <p className="tracking-[0.25em] text-yellow-200">
-                ADMIN PANEL
-              </p>
-
+              <p className="tracking-[0.25em] text-yellow-200">ADMIN PANEL</p>
               <h1 className="font-display mt-1 text-5xl">Admin Dashboard</h1>
-
               <p className="mt-2 text-indigo-100">
-                Manage users, subscriptions, freebies, sifir deck and monthly
-                schedule.
+                Manage users, manual payment confirmation and package unlocks.
               </p>
             </div>
           </div>
@@ -289,9 +421,19 @@ async function toggleAccess(
           />
         </section>
 
+        <section className="mt-6 rounded-[2rem] bg-yellow-50 p-5 text-slate-700">
+          <h2 className="text-xl font-bold text-indigo-700">
+            Manual Payment Instruction
+          </h2>
+          <p className="mt-2">
+            Parent register account first, then WhatsApp admin with registered
+            email and payment proof. Admin will choose package here and unlock
+            access manually.
+          </p>
+        </section>
+
         <div className="mt-6 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-white px-4 py-3 shadow-sm">
           <Search className="text-indigo-500" size={22} />
-
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -312,7 +454,8 @@ async function toggleAccess(
               key={profile.id}
               profile={profile}
               onToggle={toggleAccess}
-              onSaveSubscription={saveSubscription}
+              onSavePackage={savePackage}
+              onResetAccess={resetAccess}
             />
           ))}
         </section>
@@ -329,7 +472,6 @@ function AdminHeader() {
           <div className="grid h-11 w-11 place-items-center rounded-2xl bg-indigo-600 text-white">
             <ShieldCheck size={24} />
           </div>
-
           <div>
             <p className="font-display text-2xl text-indigo-700">FD Arcadia</p>
             <p className="text-xs font-bold tracking-[0.2em] text-yellow-600">
@@ -404,7 +546,6 @@ function MonthlyCalendarPreview() {
         <div>
           <div className="flex items-center gap-2">
             <Sparkles className="text-yellow-500" size={24} />
-
             <p className="tracking-[0.2em] text-sm font-bold text-yellow-600">
               MONTHLY CALENDAR PREVIEW
             </p>
@@ -476,9 +617,7 @@ function AdminQuickLink({
       className="rounded-[2rem] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
     >
       <Icon className={color} size={34} />
-
       <h2 className="mt-4 text-2xl font-bold text-indigo-700">{title}</h2>
-
       <p className="mt-2 text-slate-600">{description}</p>
     </Link>
   );
@@ -487,22 +626,28 @@ function AdminQuickLink({
 function UserCard({
   profile,
   onToggle,
-  onSaveSubscription,
+  onSavePackage,
+  onResetAccess,
 }: {
   profile: Profile;
   onToggle: (id: string, field: AccessField, currentValue: boolean) => void;
-  onSaveSubscription: (
+  onSavePackage: (
     profile: Profile,
     packageType: string,
     startDate: string
   ) => void;
+  onResetAccess: (profile: Profile) => void;
 }) {
   const [packageType, setPackageType] = useState(
-    profile.package_type || "trial"
+    profile.package_type || "math_package"
   );
 
   const [startDate, setStartDate] = useState(
     profile.subscription_start || new Date().toISOString().slice(0, 10)
+  );
+
+  const selectedPackage = packageOptions.find(
+    (option) => option.value === packageType
   );
 
   const previewEndDate = startDate ? getEndDate(packageType, startDate) : "-";
@@ -514,9 +659,7 @@ function UserCard({
           <h2 className="text-2xl font-bold text-indigo-700">
             {profile.full_name || "No name"}
           </h2>
-
           <p className="text-slate-600">{profile.email}</p>
-
           <p className="text-sm text-slate-500">
             Type: {profile.user_type || "Not selected"}
           </p>
@@ -524,18 +667,19 @@ function UserCard({
 
         <div className="rounded-2xl bg-yellow-100 px-4 py-2 font-bold text-yellow-800">
           {profile.package_type
-            ? profile.package_type.toUpperCase()
+            ? profile.package_type.replaceAll("_", " ").toUpperCase()
             : "NO PACKAGE"}
         </div>
       </div>
 
       <div className="mt-4 rounded-2xl bg-yellow-50 p-4 text-sm text-slate-700">
         <p>Package: {profile.package_type || "Not set"}</p>
+        <p>Note: {profile.package_note || "-"}</p>
         <p>Start: {profile.subscription_start || "-"}</p>
         <p>End: {profile.subscription_end || "-"}</p>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <AccessButton
           label="Learning Hub"
           active={profile.learning_hub_unlocked}
@@ -544,6 +688,54 @@ function UserCard({
               profile.id,
               "learning_hub_unlocked",
               profile.learning_hub_unlocked
+            )
+          }
+        />
+
+        <AccessButton
+          label="Math Activity"
+          active={profile.math_activity_unlocked}
+          onClick={() =>
+            onToggle(
+              profile.id,
+              "math_activity_unlocked",
+              profile.math_activity_unlocked
+            )
+          }
+        />
+
+        <AccessButton
+          label="Draw & Learn"
+          active={profile.draw_learn_unlocked}
+          onClick={() =>
+            onToggle(
+              profile.id,
+              "draw_learn_unlocked",
+              profile.draw_learn_unlocked
+            )
+          }
+        />
+
+        <AccessButton
+          label="Sifir Deck"
+          active={profile.sifir_deck_unlocked}
+          onClick={() =>
+            onToggle(
+              profile.id,
+              "sifir_deck_unlocked",
+              profile.sifir_deck_unlocked
+            )
+          }
+        />
+
+        <AccessButton
+          label="Freebies"
+          active={profile.freebies_unlocked}
+          onClick={() =>
+            onToggle(
+              profile.id,
+              "freebies_unlocked",
+              profile.freebies_unlocked
             )
           }
         />
@@ -571,34 +763,18 @@ function UserCard({
             )
           }
         />
-
-        <AccessButton
-          label="Draw & Learn"
-          active={profile.draw_learn_unlocked}
-          onClick={() =>
-            onToggle(profile.id, "draw_learn_unlocked", profile.draw_learn_unlocked)
-          }
-        />
-
-        <AccessButton
-          label="Sifir Deck"
-          active={profile.sifir_deck_unlocked}
-          onClick={() =>
-            onToggle(
-              profile.id,
-              "sifir_deck_unlocked",
-              profile.sifir_deck_unlocked
-            )
-          }
-        />
       </div>
 
       <div className="mt-5 rounded-[1.5rem] border border-indigo-100 bg-indigo-50 p-4">
         <div className="flex items-center gap-2 text-indigo-700">
           <CalendarDays size={20} />
-
-          <p className="font-bold">Learning Hub Subscription</p>
+          <p className="font-bold">Manual Package Unlock</p>
         </div>
+
+        <p className="mt-2 text-sm text-slate-600">
+          Parent WhatsApp admin with payment proof. After confirmation, choose
+          package and click Save Package.
+        </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <select
@@ -621,16 +797,24 @@ function UserCard({
           />
 
           <button
-            onClick={() => onSaveSubscription(profile, packageType, startDate)}
+            onClick={() => onSavePackage(profile, packageType, startDate)}
             className="rounded-2xl bg-indigo-600 px-4 py-3 font-bold text-white transition hover:bg-indigo-700"
           >
-            Save Subscription
+            Save Package
           </button>
         </div>
 
-        <p className="mt-3 text-sm text-slate-600">
-          End date preview: {previewEndDate}
-        </p>
+        <div className="mt-3 rounded-2xl bg-white p-3 text-sm text-slate-600">
+          <p>Package detail: {selectedPackage?.note}</p>
+          <p>End date preview: {previewEndDate}</p>
+        </div>
+
+        <button
+          onClick={() => onResetAccess(profile)}
+          className="mt-4 rounded-2xl bg-red-100 px-4 py-3 font-bold text-red-700 transition hover:bg-red-200"
+        >
+          Reset / Lock All Access
+        </button>
       </div>
     </div>
   );
