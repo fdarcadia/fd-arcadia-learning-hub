@@ -8,6 +8,7 @@ import {
   Calculator,
   CalendarDays,
   FileText,
+  Gift,
   Search,
   ShieldCheck,
   Sparkles,
@@ -27,6 +28,7 @@ type Profile = {
   custom_worksheet_unlocked: boolean;
   flashcard_modul_unlocked: boolean;
   draw_learn_unlocked: boolean;
+  sifir_deck_unlocked: boolean;
   package_type: string | null;
   subscription_start: string | null;
   subscription_end: string | null;
@@ -36,7 +38,8 @@ type AccessField =
   | "learning_hub_unlocked"
   | "custom_worksheet_unlocked"
   | "flashcard_modul_unlocked"
-  | "draw_learn_unlocked";
+  | "draw_learn_unlocked"
+  | "sifir_deck_unlocked";
 
 const ADMIN_EMAIL = "fdarcadia.hello@gmail.com";
 
@@ -132,27 +135,31 @@ function AdminContent() {
     });
   }, [profiles, search]);
 
-  async function toggleAccess(
-    id: string,
-    field: AccessField,
-    currentValue: boolean
-  ) {
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ [field]: !currentValue })
-      .eq("id", id);
+async function toggleAccess(
+  id: string,
+  field: AccessField,
+  currentValue: boolean
+) {
+  setError("");
 
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
+  const nextValue = !Boolean(currentValue);
 
-    setProfiles((current) =>
-      current.map((profile) =>
-        profile.id === id ? { ...profile, [field]: !currentValue } : profile
-      )
-    );
+  const { data, error: updateError } = await supabase
+    .from("profiles")
+    .update({ [field]: nextValue })
+    .eq("id", id)
+    .select()
+    .single<Profile>();
+
+  if (updateError || !data) {
+    setError(updateError?.message ?? "Unable to update access.");
+    return;
   }
+
+  setProfiles((current) =>
+    current.map((profile) => (profile.id === id ? data : profile))
+  );
+}
 
   async function saveSubscription(
     profile: Profile,
@@ -215,7 +222,8 @@ function AdminContent() {
               <h1 className="font-display mt-1 text-5xl">Admin Dashboard</h1>
 
               <p className="mt-2 text-indigo-100">
-                Manage users, subscriptions, sifir deck and monthly schedule.
+                Manage users, subscriptions, freebies, sifir deck and monthly
+                schedule.
               </p>
             </div>
           </div>
@@ -223,13 +231,21 @@ function AdminContent() {
 
         <MonthlyCalendarPreview />
 
-        <section className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <section className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <AdminQuickLink
             href="/admin/learning-hub"
             icon={BookOpenCheck}
             title="Learning Hub"
             description="Add month, week and Google Drive links."
             color="text-yellow-700"
+          />
+
+          <AdminQuickLink
+            href="/admin/freebies"
+            icon={Gift}
+            title="Freebies"
+            description="Create folders and upload Google Drive free resources."
+            color="text-orange-600"
           />
 
           <AdminQuickLink
@@ -519,7 +535,7 @@ function UserCard({
         <p>End: {profile.subscription_end || "-"}</p>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <AccessButton
           label="Learning Hub"
           active={profile.learning_hub_unlocked}
@@ -560,10 +576,18 @@ function UserCard({
           label="Draw & Learn"
           active={profile.draw_learn_unlocked}
           onClick={() =>
+            onToggle(profile.id, "draw_learn_unlocked", profile.draw_learn_unlocked)
+          }
+        />
+
+        <AccessButton
+          label="Sifir Deck"
+          active={profile.sifir_deck_unlocked}
+          onClick={() =>
             onToggle(
               profile.id,
-              "draw_learn_unlocked",
-              profile.draw_learn_unlocked
+              "sifir_deck_unlocked",
+              profile.sifir_deck_unlocked
             )
           }
         />
