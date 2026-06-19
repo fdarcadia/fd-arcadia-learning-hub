@@ -35,14 +35,13 @@ const sifirColors: Record<number, string> = {
 
 const text = {
   bm: {
-    bm: "BM",
-    en: "English",
     chooseTitle: "Pilih Sifir",
     chooseSubtitle: "Sifir berapa yang ingin kamu kuasai?",
+    tileLabel: "SIFIR",
+    headerTitle: "Sifir",
     back: "Balik",
     subtitle: "Latihan sifir menggunakan kad yang admin sediakan.",
     loading: "Memuatkan kad...",
-    emptyTitle: "Belum ada kad sifir.",
     emptyDesc: "Admin perlu tambah soalan di Admin Sifir Deck dahulu.",
     cardMode: "Card Mode",
     verticalMode: "Vertical Mode",
@@ -59,14 +58,13 @@ const text = {
     noQuestion: "Tiada soalan untuk sifir",
   },
   en: {
-    bm: "BM",
-    en: "English",
     chooseTitle: "Choose Times Table",
-    chooseSubtitle: "Which times table do you want to master?",
+    chooseSubtitle: "Which multiplication table do you want to master?",
+    tileLabel: "TIMES",
+    headerTitle: "Times Table",
     back: "Back",
     subtitle: "Practice multiplication using admin cards.",
     loading: "Loading cards...",
-    emptyTitle: "No sifir cards yet.",
     emptyDesc: "Admin needs to add questions in Admin Sifir Deck first.",
     cardMode: "Card Mode",
     verticalMode: "Vertical Mode",
@@ -242,12 +240,9 @@ function SifirDeckGame() {
 
   if (!selectedSifir) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-emerald-50 px-4 py-10">
+      <main className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-emerald-50 px-4 py-8">
         <div className="mx-auto max-w-5xl">
-          <LanguageToggle
-            uiLanguage={uiLanguage}
-            setUiLanguage={setUiLanguage}
-          />
+          <LanguageToggle uiLanguage={uiLanguage} setUiLanguage={setUiLanguage} />
 
           <Link
             href="/dashboard"
@@ -258,10 +253,11 @@ function SifirDeckGame() {
           </Link>
 
           <section className="mt-12 text-center">
-            <h1 className="text-6xl font-black text-slate-800">
+            <h1 className="font-display text-5xl font-black leading-tight text-slate-800 sm:text-6xl">
               {t.chooseTitle}
             </h1>
-            <p className="mt-4 text-2xl font-bold text-slate-500">
+
+            <p className="mx-auto mt-4 max-w-2xl text-xl font-bold leading-8 text-slate-500 sm:text-2xl">
               {t.chooseSubtitle}
             </p>
           </section>
@@ -274,10 +270,11 @@ function SifirDeckGame() {
                 onClick={() => chooseSifir(num)}
                 className={`aspect-square rounded-[2rem] ${sifirColors[num]} text-white shadow-[0_10px_0] transition hover:-translate-y-1 active:translate-y-1 active:shadow-none`}
               >
-                <span className="block text-lg font-black uppercase tracking-widest">
-                  Sifir
+                <span className="block text-sm font-black uppercase tracking-[0.2em] sm:text-base">
+                  {t.tileLabel}
                 </span>
-                <span className="mt-2 block text-6xl font-black drop-shadow">
+
+                <span className="font-display mt-2 block text-6xl font-black drop-shadow sm:text-7xl">
                   {num}
                 </span>
               </button>
@@ -291,10 +288,7 @@ function SifirDeckGame() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-emerald-50 px-4 py-8">
       <div className="mx-auto max-w-5xl">
-        <LanguageToggle
-          uiLanguage={uiLanguage}
-          setUiLanguage={setUiLanguage}
-        />
+        <LanguageToggle uiLanguage={uiLanguage} setUiLanguage={setUiLanguage} />
 
         <section className="rounded-[2rem] bg-gradient-to-r from-emerald-500 to-green-500 p-6 text-white shadow-xl">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -302,9 +296,11 @@ function SifirDeckGame() {
               <p className="text-sm font-bold tracking-[0.25em] text-yellow-100">
                 FD ARCADIA
               </p>
-              <h1 className="mt-2 text-5xl font-black">
-                ✏️ Sifir {selectedSifir}
+
+              <h1 className="font-display mt-2 text-4xl font-black sm:text-5xl">
+                ✏️ {t.headerTitle} {selectedSifir}
               </h1>
+
               <p className="mt-2 text-green-50">{t.subtitle}</p>
             </div>
 
@@ -353,9 +349,10 @@ function SifirDeckGame() {
           </div>
         ) : cards.length === 0 ? (
           <div className="mt-8 rounded-[2rem] bg-white p-10 text-center shadow">
-            <h2 className="text-3xl font-bold text-slate-700">
+            <h2 className="font-display text-3xl font-bold text-slate-700">
               {t.noQuestion} {selectedSifir}.
             </h2>
+
             <p className="mt-2 text-slate-500">{t.emptyDesc}</p>
           </div>
         ) : (
@@ -412,18 +409,18 @@ function SifirDeckGame() {
               checkText={t.check}
             />
 
-            {status === "correct" ? (
+            {status === "correct" && (
               <div className="mt-6 rounded-[2rem] bg-emerald-100 p-5 text-center text-2xl font-black text-emerald-700">
                 <Star className="mr-2 inline fill-yellow-300 text-yellow-400" />
                 {t.correct}
               </div>
-            ) : null}
+            )}
 
-            {status === "wrong" ? (
+            {status === "wrong" && (
               <div className="mt-6 rounded-[2rem] bg-red-100 p-5 text-center text-2xl font-black text-red-600">
                 {t.wrong}
               </div>
-            ) : null}
+            )}
           </section>
         )}
       </div>
@@ -508,7 +505,9 @@ function CardQuestion({
       }`}
     >
       <p className="text-2xl text-white/80">{label}</p>
-      <h2 className="mt-6 text-7xl font-black">{current.question}</h2>
+      <h2 className="font-display mt-6 text-6xl font-black sm:text-7xl">
+        {current.question}
+      </h2>
     </div>
   );
 }
@@ -526,13 +525,15 @@ function VerticalQuestion({
 }) {
   return (
     <div className="mx-auto max-w-xl rounded-[2rem] border-4 border-yellow-200 bg-yellow-50 p-8 text-center shadow-xl">
-      <div className="mx-auto w-72 text-right text-7xl font-black text-slate-800">
+      <div className="mx-auto w-72 text-right text-6xl font-black text-slate-800 sm:text-7xl">
         <div>{first}</div>
         <div className="flex justify-between">
           <span>×</span>
           <span>{second}</span>
         </div>
+
         <div className="my-4 border-t-8 border-slate-800" />
+
         <div
           className={`min-h-24 rounded-2xl border-4 bg-white px-4 py-3 text-center ${
             status === "correct"
@@ -589,6 +590,7 @@ function AnswerInput({
             : "border-sky-200 text-indigo-700 focus:border-indigo-500"
         }`}
       />
+
       <p className="mt-3 text-center text-sm font-bold text-slate-400">
         {hint}
       </p>

@@ -432,8 +432,20 @@ export default function MathActivityPage() {
                 </p>
               </div>
 
-              <div className="overflow-auto rounded-3xl">
-                <div className="relative mx-auto h-[650px] w-[950px] rounded-3xl bg-white">
+              <div className="overflow-x-auto rounded-3xl">
+  <div
+    className="
+      relative
+      mx-auto
+      min-h-[430px]
+      h-[70vw]
+      max-h-[650px]
+      w-full
+      max-w-[950px]
+      rounded-3xl
+      bg-white
+    "
+  >
                   {(currentQuestion.layout_json?.items || []).map((item) => (
                     <ParentLayoutItem
                       key={item.id}
@@ -606,10 +618,10 @@ function ParentLayoutItem({
             : ""
         }`}
         style={{
-          left: item.x,
-          top: item.y,
-          width: item.width || 80,
-          height: item.height || 80,
+          left: `${(item.x / 950) * 100}%`,
+top: `${(item.y / 650) * 100}%`,
+width: `${((item.width || 80) / 950) * 100}%`,
+height: `${((item.height || 80) / 650) * 100}%`,
           transform: `rotate(${item.rotation || 0}deg)`,
           borderColor:
             selectedBox === item.id
@@ -630,10 +642,10 @@ function ParentLayoutItem({
       <div
         className="absolute rounded-full"
         style={{
-          left: item.x,
-          top: item.y,
-          width: item.width || 300,
-          height: item.height || 5,
+          left: `${(item.x / 950) * 100}%`,
+top: `${(item.y / 650) * 100}%`,
+width: `${((item.width || 300) / 950) * 100}%`,
+height: item.height || 5,
           transform: `rotate(${item.rotation || 0}deg)`,
           transformOrigin: "left center",
           backgroundColor: item.lineColor || "#3b82f6",
@@ -647,8 +659,8 @@ function ParentLayoutItem({
       <div
         className="absolute"
         style={{
-          left: item.x,
-          top: item.y,
+          left: `${(item.x / 950) * 100}%`,
+top: `${(item.y / 650) * 100}%`,
           transform: `rotate(${item.rotation || 0}deg)`,
           color: item.textColor || "#0f172a",
         }}

@@ -25,6 +25,7 @@ export type Profile = {
   custom_worksheet_unlocked: boolean;
   flashcard_modul_unlocked: boolean;
   draw_learn_unlocked: boolean;
+sifir_deck_unlocked: boolean;
   package_type: string | null;
 subscription_start: string | null;
 subscription_end: string | null;

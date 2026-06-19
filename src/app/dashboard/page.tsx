@@ -6,10 +6,11 @@ import {
   Baby,
   BarChart3,
   BookOpenCheck,
-  CalendarDays,
   Calculator,
+  CalendarDays,
   Crown,
   FileText,
+  Gift,
   Layers3,
   LockKeyhole,
   Palette,
@@ -29,7 +30,9 @@ const ADMIN_EMAIL = "fdarcadia.hello@gmail.com";
 type ParentAccessField =
   | "learning_hub_unlocked"
   | "custom_worksheet_unlocked"
-  | "flashcard_modul_unlocked";
+  | "flashcard_modul_unlocked"
+  | "draw_learn_unlocked"
+  | "sifir_deck_unlocked";
 
 const parentFeatureCards: {
   title: string;
@@ -48,25 +51,17 @@ const parentFeatureCards: {
     description: "Monthly schedules, weekly activities and downloads.",
   },
   {
-    title: "Custom Worksheet",
-    href: "/custom-worksheet",
-    field: "custom_worksheet_unlocked",
-    icon: FileText,
-    color: "bg-pink-100 text-pink-700",
-    description: "Download custom worksheets by subject.",
-  },
-  {
-    title: "Flashcard & Modul",
-    href: "/flashcard-modul",
-    field: "flashcard_modul_unlocked",
-    icon: Layers3,
-    color: "bg-sky-100 text-sky-700",
-    description: "Access flashcards and learning modules.",
+    title: "🎁 Freebies",
+    href: "/freebies",
+    field: null,
+    icon: Gift,
+    color: "bg-orange-100 text-orange-700",
+    description: "Free worksheets, flashcards, trackers and printable activities.",
   },
   {
     title: "Draw & Learn",
     href: "/worksheet",
-    field: null,
+    field: "draw_learn_unlocked",
     icon: Palette,
     color: "bg-purple-100 text-purple-700",
     description: "Interactive worksheet canvas for children.",
@@ -82,10 +77,26 @@ const parentFeatureCards: {
   {
     title: "Sifir Deck",
     href: "/sifir-deck",
-    field: null,
+    field: "sifir_deck_unlocked",
     icon: Star,
     color: "bg-yellow-100 text-yellow-700",
-    description: "Practice sifir using premium card and keypad game.",
+    description: "Practice multiplication using premium card and keypad game.",
+  },
+  {
+    title: "Flashcard & Modul",
+    href: "/flashcard-modul",
+    field: "flashcard_modul_unlocked",
+    icon: Layers3,
+    color: "bg-sky-100 text-sky-700",
+    description: "Access flashcards and learning modules.",
+  },
+  {
+    title: "Custom Worksheet",
+    href: "/custom-worksheet",
+    field: "custom_worksheet_unlocked",
+    icon: FileText,
+    color: "bg-pink-100 text-pink-700",
+    description: "Download custom worksheets by subject.",
   },
 ];
 
@@ -96,7 +107,7 @@ export default function DashboardPage() {
         user.email === ADMIN_EMAIL ? (
           <AdminDashboard email={user.email ?? ""} />
         ) : (
-          <ParentDashboard userId={user.id} email={user.email ?? ""} />
+          <ParentDashboard userId={user.id} />
         )
       }
     </ProtectedPage>
@@ -151,6 +162,14 @@ function AdminDashboard({ email }: { email: string }) {
             icon={BookOpenCheck}
             color="text-yellow-700"
             description="Add month, week, schedule and Google Drive links."
+          />
+
+          <AdminCard
+            title="Freebies"
+            href="/admin/freebies"
+            icon={Gift}
+            color="text-orange-600"
+            description="Create folders and upload Google Drive free resources."
           />
 
           <AdminCard
@@ -249,13 +268,7 @@ function AdminCard({
   );
 }
 
-function ParentDashboard({
-  userId,
-  email,
-}: {
-  userId: string;
-  email: string;
-}) {
+function ParentDashboard({ userId }: { userId: string }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [childrenCount, setChildrenCount] = useState(0);
   const [error, setError] = useState("");
@@ -287,9 +300,8 @@ function ParentDashboard({
   }, [userId]);
 
   const displayName = useMemo(() => {
-    if (profile?.full_name) return profile.full_name;
-    return email || "Parent";
-  }, [email, profile?.full_name]);
+    return profile?.full_name?.trim() || "Parent";
+  }, [profile?.full_name]);
 
   const packageName = profile?.package_type
     ? profile.package_type.toUpperCase()
@@ -319,13 +331,13 @@ function ParentDashboard({
       <Navbar />
 
       <main className="page-shell py-8">
-        <section className="rounded-[2rem] bg-indigo-600 p-6 text-white shadow-xl sm:p-8">
+        <section className="overflow-hidden rounded-[2rem] bg-indigo-600 p-6 text-white shadow-xl sm:p-8">
           <div className="flex items-center gap-3">
             <Crown className="text-yellow-200" size={34} />
             <p className="tracking-[0.25em] text-yellow-200">WELCOME BACK</p>
           </div>
 
-          <h1 className="font-display mt-4 text-5xl sm:text-6xl">
+          <h1 className="font-display mt-4 break-words text-5xl sm:text-6xl">
             {displayName}
           </h1>
 
@@ -445,10 +457,7 @@ function ParentDashboard({
 
         <section className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {parentFeatureCards.map((card) => {
-            const unlocked = card.field
-              ? Boolean(profile?.[card.field])
-              : true;
-
+            const unlocked = card.field ? Boolean(profile?.[card.field]) : true;
             const Icon = card.icon;
 
             const content = (
