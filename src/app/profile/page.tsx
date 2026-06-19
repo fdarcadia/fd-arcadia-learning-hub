@@ -152,7 +152,7 @@ setFullName(nextProfile.full_name ?? "");
                 Upload photo
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/jpg"
                   onChange={handleAvatarChange}
                   className="sr-only"
                 />

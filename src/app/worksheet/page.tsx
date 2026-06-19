@@ -59,6 +59,7 @@ export default function WorksheetPage() {
 
 function WorksheetCanvas() {
   const canvasEl = useRef<HTMLCanvasElement | null>(null);
+  const canvasWrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<fabric.Canvas | null>(null);
 
   const [tool, setTool] = useState<Tool>("select");
@@ -69,12 +70,52 @@ function WorksheetCanvas() {
   const [currentPage, setCurrentPage] = useState(1);
   const [message, setMessage] = useState("");
 
+  function getCanvasSize() {
+    const screenWidth =
+      typeof window !== "undefined" ? window.innerWidth : 1200;
+
+    const wrapperWidth = canvasWrapRef.current?.clientWidth || screenWidth - 32;
+
+    const width = Math.min(wrapperWidth, 1200);
+
+    let height = 850;
+
+    if (screenWidth < 640) {
+      height = Math.max(560, width * 1.25);
+    } else if (screenWidth < 1024) {
+      height = Math.max(650, width * 0.85);
+    } else {
+      height = 850;
+    }
+
+    return {
+      width,
+      height,
+    };
+  }
+
+  function resizeCanvas() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const { width, height } = getCanvasSize();
+
+    canvas.setDimensions({
+      width,
+      height,
+    });
+
+    canvas.requestRenderAll();
+  }
+
   useEffect(() => {
     if (!canvasEl.current) return;
 
+    const { width, height } = getCanvasSize();
+
     const canvas = new fabric.Canvas(canvasEl.current, {
-      width: 1200,
-      height: 850,
+      width,
+      height,
       backgroundColor: "#ffffff",
       preserveObjectStacking: true,
       selection: true,
@@ -82,7 +123,19 @@ function WorksheetCanvas() {
 
     canvasRef.current = canvas;
 
+    const observer = new ResizeObserver(() => {
+      resizeCanvas();
+    });
+
+    if (canvasWrapRef.current) {
+      observer.observe(canvasWrapRef.current);
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+
     return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", resizeCanvas);
       canvas.dispose();
     };
   }, []);
@@ -150,16 +203,19 @@ function WorksheetCanvas() {
         crossOrigin: "anonymous",
       });
 
+      const canvasWidth = canvas.width || 800;
+      const canvasHeight = canvas.height || 600;
+
       const scale = Math.min(
-        canvas.width! / image.width!,
-        canvas.height! / image.height!
+        canvasWidth / (image.width || canvasWidth),
+        canvasHeight / (image.height || canvasHeight)
       );
 
       image.set({
-        left: asBackground ? 0 : 80,
-        top: asBackground ? 0 : 80,
-        scaleX: asBackground ? scale : 0.8,
-        scaleY: asBackground ? scale : 0.8,
+        left: asBackground ? 0 : 40,
+        top: asBackground ? 0 : 40,
+        scaleX: asBackground ? scale : Math.min(0.8, scale),
+        scaleY: asBackground ? scale : Math.min(0.8, scale),
         selectable: !asBackground,
         evented: !asBackground,
         borderColor: "#6366f1",
@@ -181,7 +237,9 @@ function WorksheetCanvas() {
       canvas.requestRenderAll();
       setTool("select");
     } catch {
-      alert("Image cannot be loaded. Use PNG/JPG direct image link or upload image file.");
+      alert(
+        "Image cannot be loaded. Use PNG/JPG direct image link or upload image file."
+      );
     }
   }
 
@@ -283,10 +341,10 @@ function WorksheetCanvas() {
     if (!canvas) return;
 
     const textbox = new fabric.Textbox("Type here", {
-      left: 120,
-      top: 120,
-      width: 320,
-      fontSize: 34,
+      left: 60,
+      top: 80,
+      width: 260,
+      fontSize: 28,
       fill: "#3730a3",
       fontFamily: "Arial",
       backgroundColor: "rgba(255, 247, 204, 0.95)",
@@ -309,11 +367,11 @@ function WorksheetCanvas() {
     if (!canvas) return;
 
     const answer = new fabric.Textbox("", {
-      left: 140,
-      top: 160,
-      width: 360,
-      height: 80,
-      fontSize: 34,
+      left: 70,
+      top: 100,
+      width: 280,
+      height: 70,
+      fontSize: 28,
       fill: "#1e3a8a",
       fontFamily: "Arial",
       backgroundColor: "rgba(255, 251, 230, 0.95)",
@@ -336,10 +394,10 @@ function WorksheetCanvas() {
     if (!canvas) return;
 
     const rect = new fabric.Rect({
-      left: 160,
-      top: 160,
-      width: 220,
-      height: 140,
+      left: 80,
+      top: 90,
+      width: 180,
+      height: 110,
       fill: "rgba(255,255,255,0.2)",
       stroke: colour,
       strokeWidth: 5,
@@ -360,9 +418,9 @@ function WorksheetCanvas() {
     if (!canvas) return;
 
     const circle = new fabric.Circle({
-      left: 180,
-      top: 180,
-      radius: 80,
+      left: 90,
+      top: 90,
+      radius: 70,
       fill: "rgba(255,255,255,0.2)",
       stroke: colour,
       strokeWidth: 5,
@@ -380,7 +438,7 @@ function WorksheetCanvas() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const line = new fabric.Line([100, 100, 380, 100], {
+    const line = new fabric.Line([60, 80, 280, 80], {
       stroke: colour,
       strokeWidth: penSize,
       borderColor: "#6366f1",
@@ -398,9 +456,9 @@ function WorksheetCanvas() {
     if (!canvas) return;
 
     const text = new fabric.Text(sticker, {
-      left: 160,
-      top: 160,
-      fontSize: 74,
+      left: 80,
+      top: 80,
+      fontSize: 60,
       borderColor: "#6366f1",
       cornerColor: "#6366f1",
       cornerSize: 14,
@@ -490,120 +548,122 @@ function WorksheetCanvas() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-indigo-50 px-4 py-8">
+    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-indigo-50 px-3 py-5 md:px-4 md:py-8">
       <section className="mx-auto max-w-7xl">
-        <section className="overflow-hidden rounded-[2.5rem] bg-gradient-to-r from-indigo-600 via-violet-600 to-pink-500 p-7 text-white shadow-2xl">
+        <section className="overflow-hidden rounded-[1.8rem] bg-gradient-to-r from-indigo-600 via-violet-600 to-pink-500 p-5 text-white shadow-2xl md:rounded-[2.5rem] md:p-7">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.35em] text-yellow-200">
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-yellow-200 md:text-sm md:tracking-[0.35em]">
                 FD Arcadia
               </p>
-              <h1 className="mt-2 text-4xl font-black md:text-6xl">
+
+              <h1 className="mt-2 text-3xl font-black md:text-6xl">
                 Draw & Learn Studio
               </h1>
-              <p className="mt-3 max-w-2xl text-indigo-50">
+
+              <p className="mt-3 max-w-2xl text-sm text-indigo-50 md:text-base">
                 Upload worksheet, draw, type, add shapes, stickers and download your edited page.
               </p>
             </div>
 
-            <div className="rounded-3xl bg-white/20 px-5 py-3 text-sm font-bold backdrop-blur">
+            <div className="w-fit rounded-3xl bg-white/20 px-5 py-3 text-sm font-bold backdrop-blur">
               Page {currentPage}
             </div>
           </div>
         </section>
 
-        <section className="mt-6 grid gap-5 lg:grid-cols-[88px_1fr]">
-          <aside className="sticky top-24 h-fit rounded-[2rem] border border-white/70 bg-white/80 p-3 shadow-xl backdrop-blur">
-            <div className="grid gap-3">
+        <section className="mt-5 grid gap-4 lg:grid-cols-[76px_1fr]">
+          <aside className="rounded-[1.5rem] border border-white/70 bg-white/90 p-2 shadow-xl backdrop-blur lg:sticky lg:top-24 lg:h-fit lg:rounded-[2rem] lg:p-3">
+            <div className="grid grid-cols-8 gap-2 overflow-x-auto lg:grid-cols-1 lg:overflow-visible">
               <ToolButton active={tool === "select"} onClick={() => setTool("select")} title="Select">
-                <MousePointer2 size={26} />
+                <MousePointer2 size={22} />
               </ToolButton>
 
               <ToolButton active={tool === "pen"} onClick={() => setTool("pen")} title="Pen">
-                <Pencil size={26} />
+                <Pencil size={22} />
               </ToolButton>
 
               <ToolButton active={tool === "marker"} onClick={() => setTool("marker")} title="Marker">
-                <Brush size={26} />
+                <Brush size={22} />
               </ToolButton>
 
               <ToolButton active={tool === "highlighter"} onClick={() => setTool("highlighter")} title="Highlighter">
-                <Highlighter size={26} />
+                <Highlighter size={22} />
               </ToolButton>
 
               <ToolButton active={tool === "eraser"} onClick={() => setTool("eraser")} title="Eraser">
-                <Eraser size={26} />
+                <Eraser size={22} />
               </ToolButton>
 
               <ToolButton onClick={addTextBox} title="Text">
-                <Type size={26} />
+                <Type size={22} />
               </ToolButton>
 
               <ToolButton onClick={addAnswerBox} title="Answer Box">
-                <RectangleHorizontal size={26} />
+                <RectangleHorizontal size={22} />
               </ToolButton>
 
               <ToolButton danger onClick={deleteSelected} title="Delete Selected">
-                <Trash2 size={26} />
+                <Trash2 size={22} />
               </ToolButton>
             </div>
           </aside>
 
           <div className="space-y-5">
-            <section className="rounded-[2.5rem] border border-white/80 bg-white/90 p-5 shadow-xl backdrop-blur">
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="premium-action bg-indigo-100 text-indigo-700">
+            <section className="rounded-[1.8rem] border border-white/80 bg-white/90 p-4 shadow-xl backdrop-blur md:rounded-[2.5rem] md:p-5">
+              <div className="flex gap-2 overflow-x-auto pb-2 md:flex-wrap">
+                <label className="premium-action shrink-0 bg-indigo-100 text-indigo-700">
                   <Upload size={18} /> Image
                   <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                 </label>
 
-                <label className="premium-action bg-pink-100 text-pink-700">
+                <label className="premium-action shrink-0 bg-pink-100 text-pink-700">
                   <Upload size={18} /> PDF
                   <input type="file" accept="application/pdf" onChange={handlePdfUpload} className="hidden" />
                 </label>
 
-                <button onClick={addRectangle} className="premium-action bg-rose-100 text-rose-700">
+                <button onClick={addRectangle} className="premium-action shrink-0 bg-rose-100 text-rose-700">
                   <RectangleHorizontal size={18} /> Rect
                 </button>
 
-                <button onClick={addCircle} className="premium-action bg-emerald-100 text-emerald-700">
+                <button onClick={addCircle} className="premium-action shrink-0 bg-emerald-100 text-emerald-700">
                   <Circle size={18} /> Circle
                 </button>
 
-                <button onClick={addLine} className="premium-action bg-orange-100 text-orange-700">
+                <button onClick={addLine} className="premium-action shrink-0 bg-orange-100 text-orange-700">
                   <Minus size={18} /> Line
                 </button>
 
-                <button onClick={duplicateSelected} className="premium-action bg-sky-100 text-sky-700">
+                <button onClick={duplicateSelected} className="premium-action shrink-0 bg-sky-100 text-sky-700">
                   <Copy size={18} /> Copy
                 </button>
 
-                <button onClick={saveDraftInBrowser} className="premium-action bg-yellow-100 text-yellow-800">
+                <button onClick={saveDraftInBrowser} className="premium-action shrink-0 bg-yellow-100 text-yellow-800">
                   <Save size={18} /> Save
                 </button>
 
-                <button onClick={loadDraftFromBrowser} className="premium-action bg-slate-100 text-slate-700">
+                <button onClick={loadDraftFromBrowser} className="premium-action shrink-0 bg-slate-100 text-slate-700">
                   Load
                 </button>
 
-                <button onClick={clearAll} className="premium-action bg-slate-100 text-slate-700">
+                <button onClick={clearAll} className="premium-action shrink-0 bg-slate-100 text-slate-700">
                   <RotateCcw size={18} /> Clear
                 </button>
 
-                <button onClick={downloadCanvas} className="premium-action bg-emerald-600 text-white">
+                <button onClick={downloadCanvas} className="premium-action shrink-0 bg-emerald-600 text-white">
                   <Download size={18} /> Download
                 </button>
               </div>
 
-              <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr]">
-                <div className="rounded-[2rem] bg-indigo-50 p-4">
-                  <div className="flex flex-wrap items-center gap-3">
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr]">
+                <div className="rounded-[1.5rem] bg-indigo-50 p-3 md:rounded-[2rem] md:p-4">
+                  <div className="flex flex-wrap items-center gap-2 md:gap-3">
                     {colours.map((item) => (
                       <button
                         key={item}
                         type="button"
                         onClick={() => setColour(item)}
-                        className={`h-10 w-10 rounded-full border-4 transition ${
+                        className={`h-8 w-8 rounded-full border-4 transition md:h-10 md:w-10 ${
                           colour === item
                             ? "scale-110 border-indigo-600 shadow-lg"
                             : "border-white"
@@ -615,9 +675,9 @@ function WorksheetCanvas() {
                   </div>
                 </div>
 
-                <div className="rounded-[2rem] bg-yellow-50 p-4">
-                  <div className="flex items-center gap-4">
-                    <span className="min-w-16 font-bold text-yellow-800">
+                <div className="rounded-[1.5rem] bg-yellow-50 p-3 md:rounded-[2rem] md:p-4">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <span className="min-w-14 text-sm font-bold text-yellow-800 md:min-w-16 md:text-base">
                       Size {penSize}
                     </span>
                     <input
@@ -632,30 +692,30 @@ function WorksheetCanvas() {
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-col gap-3 md:flex-row">
+              <div className="mt-4 flex flex-col gap-3 md:flex-row">
                 <input
                   value={imageLink}
                   onChange={(event) => setImageLink(event.target.value)}
                   placeholder="Paste direct PNG / JPG image link"
-                  className="w-full rounded-[1.5rem] border border-indigo-100 bg-white px-5 py-4 outline-none ring-indigo-200 transition focus:ring-4"
+                  className="w-full rounded-[1.3rem] border border-indigo-100 bg-white px-4 py-3 text-sm outline-none ring-indigo-200 transition focus:ring-4 md:rounded-[1.5rem] md:px-5 md:py-4 md:text-base"
                 />
 
                 <button
                   type="button"
                   onClick={() => addImageFromUrl(imageLink, false)}
-                  className="rounded-[1.5rem] bg-indigo-600 px-6 py-4 font-bold text-white shadow-lg transition hover:bg-indigo-700"
+                  className="rounded-[1.3rem] bg-indigo-600 px-6 py-3 font-bold text-white shadow-lg transition hover:bg-indigo-700 md:rounded-[1.5rem] md:py-4"
                 >
                   <Link2 className="inline" size={18} /> Add
                 </button>
               </div>
 
               {pdfPages.length > 0 && (
-                <div className="mt-5 flex flex-wrap gap-2">
+                <div className="mt-4 flex gap-2 overflow-x-auto pb-2 md:flex-wrap">
                   {pdfPages.map((page) => (
                     <button
                       key={page.pageNo}
                       onClick={() => openPdfPage(page)}
-                      className={`rounded-2xl px-4 py-3 font-bold transition ${
+                      className={`shrink-0 rounded-2xl px-4 py-3 font-bold transition ${
                         currentPage === page.pageNo
                           ? "bg-indigo-600 text-white shadow-lg"
                           : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
@@ -667,13 +727,13 @@ function WorksheetCanvas() {
                 </div>
               )}
 
-              <div className="mt-5 flex flex-wrap gap-3">
+              <div className="mt-4 flex gap-2 overflow-x-auto pb-2 md:flex-wrap md:gap-3">
                 {stickers.map((sticker) => (
                   <button
                     key={sticker}
                     type="button"
                     onClick={() => addSticker(sticker)}
-                    className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-2xl shadow-md transition hover:-translate-y-1 hover:shadow-lg"
+                    className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-xl shadow-md transition hover:-translate-y-1 hover:shadow-lg md:h-14 md:w-14 md:text-2xl"
                   >
                     {sticker}
                   </button>
@@ -681,23 +741,26 @@ function WorksheetCanvas() {
               </div>
 
               {message && (
-                <div className="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 font-medium text-emerald-700">
+                <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 md:text-base">
                   {message}
                 </div>
               )}
             </section>
 
             <section
-              className="rounded-[2.5rem] border border-white/80 bg-white/90 p-4 shadow-xl backdrop-blur"
+              className="rounded-[1.8rem] border border-white/80 bg-white/90 p-3 shadow-xl backdrop-blur md:rounded-[2.5rem] md:p-4"
               onDrop={handleDrop}
               onDragOver={(event) => event.preventDefault()}
             >
-              <p className="mb-3 text-center text-sm font-medium text-slate-500">
+              <p className="mb-3 text-center text-xs font-medium text-slate-500 md:text-sm">
                 Drag & drop PDF or image here. Select object to move, resize or delete.
               </p>
 
-              <div className="overflow-auto rounded-[2rem] border-2 border-indigo-100 bg-white shadow-inner">
-                <canvas ref={canvasEl} />
+              <div
+                ref={canvasWrapRef}
+                className="w-full overflow-hidden rounded-[1.5rem] border-2 border-indigo-100 bg-white shadow-inner md:rounded-[2rem]"
+              >
+                <canvas ref={canvasEl} className="block max-w-full touch-none" />
               </div>
             </section>
           </div>
@@ -725,7 +788,7 @@ function ToolButton({
       type="button"
       onClick={onClick}
       title={title}
-      className={`grid h-14 w-14 place-items-center rounded-2xl transition hover:-translate-y-1 ${
+      className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl transition hover:-translate-y-1 md:h-14 md:w-14 ${
         danger
           ? "bg-red-100 text-red-700 shadow-md hover:bg-red-200"
           : active

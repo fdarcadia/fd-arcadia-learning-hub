@@ -65,16 +65,6 @@ export function Navbar() {
             Profile
           </Link>
 
-          {email === "fdarcadia.hello@gmail.com" && (
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-emerald-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <ShieldCheck size={20} />
-              Admin
-            </Link>
-          )}
-
           <button
             type="button"
             onClick={handleLogout}
