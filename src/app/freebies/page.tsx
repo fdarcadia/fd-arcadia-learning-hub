@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, FolderOpen, Gift } from "lucide-react";
+import { ArrowLeft, Download, FolderOpen, Gift, PencilLine } from "lucide-react";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { supabase } from "@/lib/supabase";
 
@@ -21,10 +21,27 @@ type FreebieItem = {
 
 export default function FreebiesPage() {
   return (
-    <ProtectedPage>
-      {() => <FreebiesContent />}
-    </ProtectedPage>
+    <ProtectedPage>{() => <FreebiesContent />}</ProtectedPage>
   );
+}
+
+function getFileType(link: string) {
+  const lower = link.toLowerCase();
+
+  if (
+    lower.includes(".png") ||
+    lower.includes(".jpg") ||
+    lower.includes(".jpeg") ||
+    lower.includes(".webp")
+  ) {
+    return "image";
+  }
+
+  if (lower.includes(".pdf")) {
+    return "pdf";
+  }
+
+  return "link";
 }
 
 function FreebiesContent() {
@@ -135,29 +152,48 @@ function FreebiesContent() {
         </section>
 
         <section className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {filteredItems.map((item) => (
-            <a
-              key={item.id}
-              href={item.google_drive_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-[2rem] bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
-            >
-              <Download className="text-indigo-600" size={34} />
+          {filteredItems.map((item) => {
+            const fileType = getFileType(item.google_drive_link);
 
-              <h2 className="mt-4 text-2xl font-bold text-indigo-700">
-                {item.title}
-              </h2>
+            return (
+              <div
+                key={item.id}
+                className="rounded-[2rem] bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+              >
+                <Download className="text-indigo-600" size={34} />
 
-              <p className="mt-2 text-slate-600">
-                {item.description || "Click to download this free resource."}
-              </p>
+                <h2 className="mt-4 text-2xl font-bold text-indigo-700">
+                  {item.title}
+                </h2>
 
-              <p className="mt-4 rounded-2xl bg-yellow-100 px-4 py-2 font-bold text-yellow-800">
-                Open Google Drive
-              </p>
-            </a>
-          ))}
+                <p className="mt-2 text-slate-600">
+                  {item.description || "Click to download this free resource."}
+                </p>
+
+                <div className="mt-5 flex flex-col gap-2">
+                  <a
+                    href={item.google_drive_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-yellow-100 px-4 py-3 font-bold text-yellow-800 transition hover:bg-yellow-200"
+                  >
+                    <Download size={18} />
+                    Open Google Drive
+                  </a>
+
+                  <Link
+                    href={`/worksheet?file=${encodeURIComponent(
+                      item.google_drive_link
+                    )}&type=${fileType}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 font-bold text-white transition hover:bg-indigo-700"
+                  >
+                    <PencilLine size={18} />
+                    Open in Worksheet
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
         </section>
 
         {filteredItems.length === 0 ? (

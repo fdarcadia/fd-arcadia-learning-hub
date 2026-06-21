@@ -1,6 +1,14 @@
 "use client";
 
-import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
+import {
+  ChangeEvent,
+  DragEvent,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { useSearchParams } from "next/navigation";
 import * as fabric from "fabric";
 import {
   Circle,
@@ -50,7 +58,9 @@ export default function WorksheetPage() {
       {() => (
         <>
           <Navbar />
-          <WorksheetCanvas />
+          <Suspense fallback={null}>
+            <WorksheetCanvas />
+          </Suspense>
         </>
       )}
     </ProtectedPage>
@@ -58,9 +68,14 @@ export default function WorksheetPage() {
 }
 
 function WorksheetCanvas() {
+  const searchParams = useSearchParams();
+  const freebiesFile = searchParams.get("file");
+  const freebiesType = searchParams.get("type");
+
   const canvasEl = useRef<HTMLCanvasElement | null>(null);
   const canvasWrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<fabric.Canvas | null>(null);
+  const loadedFreebieRef = useRef("");
 
   const [tool, setTool] = useState<Tool>("select");
   const [colour, setColour] = useState("#2563eb");
@@ -69,29 +84,30 @@ function WorksheetCanvas() {
   const [pdfPages, setPdfPages] = useState<PdfPage[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [message, setMessage] = useState("");
+  const [canvasWidth, setCanvasWidth] = useState(794);
+  const [canvasHeight, setCanvasHeight] = useState(1123);
 
   function getCanvasSize() {
-    const screenWidth =
-      typeof window !== "undefined" ? window.innerWidth : 1200;
-
-    const wrapperWidth = canvasWrapRef.current?.clientWidth || screenWidth - 32;
-
-    const width = Math.min(wrapperWidth, 1200);
-
-    let height = 850;
-
-    if (screenWidth < 640) {
-      height = Math.max(560, width * 1.25);
-    } else if (screenWidth < 1024) {
-      height = Math.max(650, width * 0.85);
-    } else {
-      height = 850;
-    }
-
     return {
+      width: canvasWidth,
+      height: canvasHeight,
+    };
+  }
+
+  function updatePageSize(width: number, height: number) {
+    const canvas = canvasRef.current;
+
+    setCanvasWidth(width);
+    setCanvasHeight(height);
+
+    if (!canvas) return;
+
+    canvas.setDimensions({
       width,
       height,
-    };
+    });
+
+    canvas.requestRenderAll();
   }
 
   function resizeCanvas() {
@@ -123,26 +139,53 @@ function WorksheetCanvas() {
 
     canvasRef.current = canvas;
 
-    const observer = new ResizeObserver(() => {
-      resizeCanvas();
-    });
-
-    if (canvasWrapRef.current) {
-      observer.observe(canvasWrapRef.current);
-    }
-
-    window.addEventListener("resize", resizeCanvas);
-
     return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", resizeCanvas);
       canvas.dispose();
     };
   }, []);
 
   useEffect(() => {
+    resizeCanvas();
+  }, [canvasWidth, canvasHeight]);
+
+  useEffect(() => {
     applyTool(tool);
   }, [tool, colour, penSize]);
+
+  useEffect(() => {
+    if (!canvasRef.current || !freebiesFile) return;
+    if (loadedFreebieRef.current === freebiesFile) return;
+
+    loadedFreebieRef.current = freebiesFile;
+    loadFreebiesFile(freebiesFile, freebiesType || "link");
+  }, [freebiesFile, freebiesType]);
+
+  async function loadFreebiesFile(url: string, type: string) {
+    setMessage("Loading freebies file...");
+
+    try {
+      if (type === "pdf" || url.toLowerCase().includes(".pdf")) {
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error("Cannot fetch PDF.");
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        await loadPdfFromArrayBuffer(arrayBuffer);
+        setMessage("Freebies PDF loaded.");
+        return;
+      }
+
+      await addImageFromUrl(url, true);
+      setImageLink(url);
+      setMessage("Freebies image loaded.");
+    } catch {
+      setMessage(
+        "Cannot load this file directly. Please open Google Drive and upload the file manually."
+      );
+    }
+  }
 
   function applyTool(nextTool: Tool) {
     const canvas = canvasRef.current;
@@ -203,17 +246,26 @@ function WorksheetCanvas() {
         crossOrigin: "anonymous",
       });
 
-      const canvasWidth = canvas.width || 800;
-      const canvasHeight = canvas.height || 600;
+      const imageWidth = image.width || 800;
+      const imageHeight = image.height || 600;
+
+      const canvasWidthNow = canvas.width || canvasWidth;
+      const canvasHeightNow = canvas.height || canvasHeight;
 
       const scale = Math.min(
-        canvasWidth / (image.width || canvasWidth),
-        canvasHeight / (image.height || canvasHeight)
+        canvasWidthNow / imageWidth,
+        canvasHeightNow / imageHeight
       );
 
+      const scaledWidth = imageWidth * scale;
+      const scaledHeight = imageHeight * scale;
+
+      const centerLeft = (canvasWidthNow - scaledWidth) / 2;
+      const centerTop = (canvasHeightNow - scaledHeight) / 2;
+
       image.set({
-        left: asBackground ? 0 : 40,
-        top: asBackground ? 0 : 40,
+        left: asBackground ? centerLeft : 40,
+        top: asBackground ? centerTop : 40,
         scaleX: asBackground ? scale : Math.min(0.8, scale),
         scaleY: asBackground ? scale : Math.min(0.8, scale),
         selectable: !asBackground,
@@ -250,7 +302,7 @@ function WorksheetCanvas() {
     const reader = new FileReader();
 
     reader.onload = () => {
-      addImageFromUrl(String(reader.result), false);
+      addImageFromUrl(String(reader.result), true);
     };
 
     reader.readAsDataURL(file);
@@ -261,11 +313,14 @@ function WorksheetCanvas() {
     if (!file) return;
 
     setMessage("Loading PDF pages...");
-
     const arrayBuffer = await file.arrayBuffer();
+    await loadPdfFromArrayBuffer(arrayBuffer);
+  }
+
+  async function loadPdfFromArrayBuffer(arrayBuffer: ArrayBuffer) {
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
-    pdfjs.GlobalWorkerOptions.workerSrc = "";
+    pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
     const pdf = await pdfjs.getDocument({
       data: arrayBuffer,
@@ -319,18 +374,16 @@ function WorksheetCanvas() {
     if (!file) return;
 
     if (file.type === "application/pdf") {
-      const input = {
-        target: { files: [file] },
-      } as unknown as ChangeEvent<HTMLInputElement>;
-
-      handlePdfUpload(input);
+      file.arrayBuffer().then((arrayBuffer) => {
+        loadPdfFromArrayBuffer(arrayBuffer);
+      });
       return;
     }
 
     const reader = new FileReader();
 
     reader.onload = () => {
-      addImageFromUrl(String(reader.result), false);
+      addImageFromUrl(String(reader.result), true);
     };
 
     reader.readAsDataURL(file);
@@ -638,6 +691,39 @@ function WorksheetCanvas() {
                   <Copy size={18} /> Copy
                 </button>
 
+                <button
+                  onClick={() => updatePageSize(794, 1123)}
+                  className="premium-action shrink-0 bg-indigo-100 text-indigo-700"
+                >
+                  Portrait
+                </button>
+
+                <button
+                  onClick={() => updatePageSize(1123, 794)}
+                  className="premium-action shrink-0 bg-indigo-100 text-indigo-700"
+                >
+                  Landscape
+                </button>
+
+                <button
+                  onClick={() => updatePageSize(canvasWidth + 100, canvasHeight + 100)}
+                  className="premium-action shrink-0 bg-yellow-100 text-yellow-800"
+                >
+                  Bigger
+                </button>
+
+                <button
+                  onClick={() =>
+                    updatePageSize(
+                      Math.max(400, canvasWidth - 100),
+                      Math.max(400, canvasHeight - 100)
+                    )
+                  }
+                  className="premium-action shrink-0 bg-yellow-100 text-yellow-800"
+                >
+                  Smaller
+                </button>
+
                 <button onClick={saveDraftInBrowser} className="premium-action shrink-0 bg-yellow-100 text-yellow-800">
                   <Save size={18} /> Save
                 </button>
@@ -758,9 +844,9 @@ function WorksheetCanvas() {
 
               <div
                 ref={canvasWrapRef}
-                className="w-full overflow-hidden rounded-[1.5rem] border-2 border-indigo-100 bg-white shadow-inner md:rounded-[2rem]"
+                className="w-full overflow-auto rounded-[1.5rem] border-2 border-indigo-100 bg-white shadow-inner md:rounded-[2rem]"
               >
-                <canvas ref={canvasEl} className="block max-w-full touch-none" />
+                <canvas ref={canvasEl} className="block touch-none" />
               </div>
             </section>
           </div>

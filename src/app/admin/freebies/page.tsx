@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -10,6 +10,7 @@ import {
   Plus,
   Save,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { supabase } from "@/lib/supabase";
@@ -27,6 +28,7 @@ type FreebieItem = {
   title: string;
   description: string | null;
   google_drive_link: string;
+  file_type: string | null;
   freebies_folders?: {
     name: string;
   } | null;
@@ -56,6 +58,8 @@ function AdminFreebiesContent() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [googleDriveLink, setGoogleDriveLink] = useState("");
+  const [fileType, setFileType] = useState("link");
+  const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -115,11 +119,58 @@ function AdminFreebiesContent() {
     await loadData();
   }
 
+  async function uploadFreebieFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+      setMessage("Only image or PDF allowed.");
+      return;
+    }
+
+    setUploading(true);
+    setMessage("Uploading file...");
+
+    const extension = file.name.split(".").pop();
+    const safeName = file.name
+      .replace(/\.[^/.]+$/, "")
+      .replace(/[^a-zA-Z0-9-_]/g, "-")
+      .toLowerCase();
+
+    const fileName = `${Date.now()}-${safeName}.${extension}`;
+    const filePath = `uploads/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("freebies")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      setUploading(false);
+      setMessage(uploadError.message);
+      return;
+    }
+
+    const { data } = supabase.storage.from("freebies").getPublicUrl(filePath);
+
+    setGoogleDriveLink(data.publicUrl);
+    setFileType(file.type === "application/pdf" ? "pdf" : "image");
+
+    if (!title.trim()) {
+      setTitle(file.name.replace(/\.[^/.]+$/, ""));
+    }
+
+    setUploading(false);
+    setMessage("File uploaded. Now click Save Freebie.");
+  }
+
   async function saveFreebie(event: FormEvent) {
     event.preventDefault();
 
     if (!folderId || !title.trim() || !googleDriveLink.trim()) {
-      setMessage("Please choose folder, add title and Google Drive link.");
+      setMessage("Please choose folder, add title and link or upload file.");
       return;
     }
 
@@ -128,6 +179,7 @@ function AdminFreebiesContent() {
       title: title.trim(),
       description: description.trim() || null,
       google_drive_link: googleDriveLink.trim(),
+      file_type: fileType,
     });
 
     if (error) {
@@ -138,6 +190,7 @@ function AdminFreebiesContent() {
     setTitle("");
     setDescription("");
     setGoogleDriveLink("");
+    setFileType("link");
     setMessage("Freebie saved successfully.");
     await loadData();
   }
@@ -205,12 +258,10 @@ function AdminFreebiesContent() {
                 ADMIN FREEBIES
               </p>
 
-              <h1 className="font-display mt-1 text-5xl">
-                Freebies Upload
-              </h1>
+              <h1 className="font-display mt-1 text-5xl">Freebies Upload</h1>
 
               <p className="mt-2 text-indigo-100">
-                Create folders and save Google Drive resources by topic.
+                Create folders, upload image/PDF, or save Google Drive resources.
               </p>
             </div>
           </div>
@@ -273,7 +324,7 @@ function AdminFreebiesContent() {
           >
             <div className="flex items-center gap-2 text-indigo-700">
               <Download size={26} />
-              <h2 className="text-2xl font-bold">Upload Google Drive Link</h2>
+              <h2 className="text-2xl font-bold">Upload Freebie</h2>
             </div>
 
             <div className="mt-5 grid gap-4">
@@ -304,16 +355,42 @@ function AdminFreebiesContent() {
                 className="h-24 rounded-2xl border border-indigo-100 px-4 py-3 outline-none"
               />
 
+              <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-pink-100 px-5 py-3 font-bold text-pink-700 transition hover:bg-pink-200">
+                <Upload size={20} />
+                {uploading ? "Uploading..." : "Upload Image / PDF"}
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={uploadFreebieFile}
+                  className="hidden"
+                  disabled={uploading}
+                />
+              </label>
+
+              <div className="text-center text-sm font-bold text-slate-400">
+                OR
+              </div>
+
               <input
                 value={googleDriveLink}
-                onChange={(event) => setGoogleDriveLink(event.target.value)}
+                onChange={(event) => {
+                  setGoogleDriveLink(event.target.value);
+                  setFileType("link");
+                }}
                 placeholder="Paste Google Drive link here"
                 className="rounded-2xl border border-indigo-100 px-4 py-3 outline-none"
               />
 
+              {googleDriveLink ? (
+                <p className="rounded-2xl bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700">
+                  File type: {fileType}
+                </p>
+              ) : null}
+
               <button
                 type="submit"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-bold text-white transition hover:bg-indigo-700"
+                disabled={uploading}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-bold text-white transition hover:bg-indigo-700 disabled:opacity-50"
               >
                 <Save size={20} />
                 Save Freebie
@@ -343,6 +420,10 @@ function AdminFreebiesContent() {
 
                 <p className="mt-1 text-slate-600">
                   {item.description || "No description"}
+                </p>
+
+                <p className="mt-2 text-sm font-bold text-indigo-500">
+                  Type: {item.file_type || "link"}
                 </p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
