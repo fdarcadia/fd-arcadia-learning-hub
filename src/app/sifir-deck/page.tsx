@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, RefObject } from "react";
 import {
   ArrowLeft,
   Check,
@@ -23,11 +24,16 @@ type Status = "idle" | "correct" | "wrong" | "timeup";
 
 type SifirCard = {
   id: string;
-  language?: string;
+  language?: string | null;
   question: string;
   answer: string;
-  level?: QuestionLevel | null;
-  is_active?: boolean;
+  difficulty?: QuestionLevel | null;
+  is_active?: boolean | null;
+};
+
+const QUESTION_FONT_STYLE: CSSProperties = {
+  fontFamily:
+    '"KG Miss Kindergarten", "KG Miss Kindergarten Sketch", "Comic Sans MS", cursive',
 };
 
 const sifirOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -47,29 +53,86 @@ const sifirColors: Record<number, string> = {
   12: "bg-amber-300 shadow-amber-700",
 };
 
-function getQuestionLevel(multiplier: number): QuestionLevel {
-  if (multiplier <= 4) return "easy";
-  if (multiplier <= 8) return "medium";
-  return "hard";
-}
 
 function generateAutoSifirCards(): SifirCard[] {
   const generatedCards: SifirCard[] = [];
 
   for (let sifir = 1; sifir <= 12; sifir += 1) {
     for (let multiplier = 1; multiplier <= 12; multiplier += 1) {
+      const answer = sifir * multiplier;
+
       generatedCards.push({
-        id: `auto-${sifir}-${multiplier}`,
+        id: `easy-${sifir}-${multiplier}`,
         language: "auto",
         question: `${sifir} × ${multiplier}`,
-        answer: String(sifir * multiplier),
-        level: getQuestionLevel(multiplier),
+        answer: String(answer),
+        difficulty: "easy",
+        is_active: true,
+      });
+
+      generatedCards.push({
+        id: `medium-a-${sifir}-${multiplier}`,
+        language: "auto",
+        question: `${sifir} × ${multiplier}`,
+        answer: String(answer),
+        difficulty: "medium",
+        is_active: true,
+      });
+
+      generatedCards.push({
+        id: `medium-b-${sifir}-${multiplier}`,
+        language: "auto",
+        question: `${sifir} × ___ = ${answer}`,
+        answer: String(multiplier),
+        difficulty: "medium",
+        is_active: true,
+      });
+
+      generatedCards.push({
+        id: `medium-c-${sifir}-${multiplier}`,
+        language: "auto",
+        question: `${multiplier} × ${sifir}`,
+        answer: String(answer),
+        difficulty: "medium",
+        is_active: true,
+      });
+
+      generatedCards.push({
+        id: `hard-a-${sifir}-${multiplier}`,
+        language: "auto",
+        question: `${sifir} × ___ = ${answer}`,
+        answer: String(multiplier),
+        difficulty: "hard",
+        is_active: true,
+      });
+
+      generatedCards.push({
+        id: `hard-b-${sifir}-${multiplier}`,
+        language: "auto",
+        question: `___ × ${multiplier} = ${answer}`,
+        answer: String(sifir),
+        difficulty: "hard",
+        is_active: true,
+      });
+
+      generatedCards.push({
+        id: `hard-c-${sifir}-${multiplier}`,
+        language: "auto",
+        question: `${multiplier} × ${sifir}`,
+        answer: String(answer),
+        difficulty: "hard",
         is_active: true,
       });
     }
   }
 
   return generatedCards;
+}
+
+function normalizeDifficulty(value: unknown): QuestionLevel {
+  if (value === "medium") return "medium";
+  if (value === "hard") return "hard";
+  return "easy";
 }
 
 function mergeCardsWithoutDuplicate(
@@ -79,11 +142,19 @@ function mergeCardsWithoutDuplicate(
   const cardMap = new Map<string, SifirCard>();
 
   autoCards.forEach((card) => {
-    cardMap.set(`${card.question}-${card.level || "easy"}`, card);
+    cardMap.set(`${card.question}-${card.difficulty || "easy"}`, card);
   });
 
   adminCards.forEach((card) => {
-    cardMap.set(`${card.question}-${card.level || "easy"}`, card);
+    const normalizedCard: SifirCard = {
+      ...card,
+      difficulty: normalizeDifficulty(card.difficulty),
+    };
+
+    cardMap.set(
+      `${normalizedCard.question}-${normalizedCard.difficulty || "easy"}`,
+      normalizedCard
+    );
   });
 
   return Array.from(cardMap.values());
@@ -286,7 +357,7 @@ function SifirDeckGame() {
 
     const { data, error } = await supabase
       .from("sifir_deck_questions")
-      .select("*")
+      .select("id,language,question,answer,difficulty,is_active,created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -329,13 +400,14 @@ function SifirDeckGame() {
       const parsed = parseQuestion(card.question);
       const sameSifir =
         Number(parsed.first) === num || Number(parsed.second) === num;
-      const sameLevel = (card.level || "easy") === difficulty;
+      const sameDifficulty = normalizeDifficulty(card.difficulty) === difficulty;
 
-      return sameSifir && sameLevel;
+      return sameSifir && sameDifficulty;
     });
 
     const shuffled = [...filtered].sort(() => Math.random() - 0.5);
-    const limitedQuestions = shuffled.slice(0, wheelLimit);
+    const maxQuestions = difficulty === "easy" ? 12 : wheelLimit;
+    const limitedQuestions = shuffled.slice(0, maxQuestions);
 
     setSelectedSifir(num);
     setCards(limitedQuestions);
@@ -428,9 +500,7 @@ function SifirDeckGame() {
     setInput("");
     setStatus("idle");
 
-    setWheelRotation(
-      (prev) => prev + 1800 + Math.floor(Math.random() * 1080)
-    );
+    setWheelRotation((prev) => prev + 1800 + Math.floor(Math.random() * 1080));
 
     setTimeout(() => {
       setIndex(nextIndex);
@@ -470,9 +540,7 @@ function SifirDeckGame() {
     setAnsweredCurrent(false);
     setTimeLeft(timerSeconds);
 
-    setWheelRotation(
-      (prev) => prev + 1800 + Math.floor(Math.random() * 1080)
-    );
+    setWheelRotation((prev) => prev + 1800 + Math.floor(Math.random() * 1080));
 
     setTimeout(() => {
       const randomIndex = Math.floor(Math.random() * cards.length);
@@ -527,7 +595,10 @@ function SifirDeckGame() {
           </Link>
 
           <section className="mt-12 text-center">
-            <h1 className="font-display text-5xl font-black leading-tight text-slate-800 sm:text-6xl">
+            <h1
+              className="text-5xl font-black leading-tight text-slate-800 sm:text-6xl"
+              style={QUESTION_FONT_STYLE}
+            >
               {t.chooseTitle}
             </h1>
 
@@ -556,6 +627,7 @@ function SifirDeckGame() {
                       ? getLevelActiveClass(level)
                       : "bg-slate-100 text-slate-500"
                   }`}
+                  style={QUESTION_FONT_STYLE}
                 >
                   {level === "easy"
                     ? `⭐ ${t.easy}`
@@ -575,11 +647,17 @@ function SifirDeckGame() {
                 onClick={() => chooseSifir(num)}
                 className={`aspect-square rounded-[2rem] ${sifirColors[num]} text-white shadow-[0_10px_0] transition hover:-translate-y-1 active:translate-y-1 active:shadow-none`}
               >
-                <span className="block text-sm font-black uppercase tracking-[0.2em] sm:text-base">
+                <span
+                  className="block text-sm font-black uppercase tracking-[0.2em] sm:text-base"
+                  style={QUESTION_FONT_STYLE}
+                >
                   {t.tileLabel}
                 </span>
 
-                <span className="font-display mt-2 block text-6xl font-black drop-shadow sm:text-7xl">
+                <span
+                  className="mt-2 block text-6xl font-black drop-shadow sm:text-7xl"
+                  style={QUESTION_FONT_STYLE}
+                >
                   {num}
                 </span>
               </button>
@@ -602,7 +680,10 @@ function SifirDeckGame() {
                 FD ARCADIA
               </p>
 
-              <h1 className="font-display mt-2 text-4xl font-black sm:text-5xl">
+              <h1
+                className="mt-2 text-4xl font-black sm:text-5xl"
+                style={QUESTION_FONT_STYLE}
+              >
                 ✏️ {t.headerTitle} {selectedSifir}
               </h1>
 
@@ -676,7 +757,10 @@ function SifirDeckGame() {
           </div>
         ) : cards.length === 0 ? (
           <div className="mt-8 rounded-[2rem] bg-white p-10 text-center shadow">
-            <h2 className="font-display text-3xl font-bold text-slate-700">
+            <h2
+              className="text-3xl font-bold text-slate-700"
+              style={QUESTION_FONT_STYLE}
+            >
               {t.noQuestion} {selectedSifir}.
             </h2>
 
@@ -995,7 +1079,10 @@ function ResultScreen({
     <section className="mt-8 rounded-[2rem] bg-white p-8 text-center shadow-xl">
       <Trophy className="mx-auto fill-yellow-300 text-yellow-500" size={72} />
 
-      <h2 className="font-display mt-4 text-5xl font-black text-indigo-700">
+      <h2
+        className="mt-4 text-5xl font-black text-indigo-700"
+        style={QUESTION_FONT_STYLE}
+      >
         {resultTitle}
       </h2>
 
@@ -1060,7 +1147,11 @@ function CardQuestion({
       }`}
     >
       <p className="text-2xl text-white/80">{label}</p>
-      <h2 className="font-display mt-6 text-6xl font-black sm:text-7xl">
+
+      <h2
+        className="mt-6 text-6xl font-black sm:text-7xl"
+        style={QUESTION_FONT_STYLE}
+      >
         {current.question}
       </h2>
     </div>
@@ -1080,7 +1171,10 @@ function VerticalQuestion({
 }) {
   return (
     <div className="mx-auto max-w-xl rounded-[2rem] border-4 border-yellow-200 bg-yellow-50 p-8 text-center shadow-xl">
-      <div className="mx-auto w-72 text-right text-6xl font-black text-slate-800 sm:text-7xl">
+      <div
+        className="mx-auto w-72 text-right text-6xl font-black text-slate-800 sm:text-7xl"
+        style={QUESTION_FONT_STYLE}
+      >
         <div>{first}</div>
 
         <div className="flex justify-between">
@@ -1153,7 +1247,10 @@ function WheelQuestion({
               QUESTION
             </p>
 
-            <p className="mt-2 text-3xl font-black text-indigo-700 sm:text-4xl">
+            <p
+              className="mt-2 text-3xl font-black text-indigo-700 sm:text-4xl"
+              style={QUESTION_FONT_STYLE}
+            >
               {spinning ? "🎡" : current.question}
             </p>
           </div>
@@ -1183,7 +1280,7 @@ function AnswerInput({
   onSubmit,
   disabled,
 }: {
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: RefObject<HTMLInputElement | null>;
   input: string;
   status: Status;
   placeholder: string;
@@ -1215,6 +1312,7 @@ function AnswerInput({
             ? "border-red-400 text-red-600"
             : "border-sky-200 text-indigo-700 focus:border-indigo-500"
         }`}
+        style={QUESTION_FONT_STYLE}
       />
 
       <p className="mt-3 text-center text-sm font-bold text-slate-400">
@@ -1248,6 +1346,7 @@ function NumberPad({
             type="button"
             onClick={() => onPress(num)}
             className="h-20 rounded-2xl bg-white text-3xl font-black text-slate-800 shadow-md transition hover:scale-105"
+            style={QUESTION_FONT_STYLE}
           >
             {num}
           </button>
@@ -1265,6 +1364,7 @@ function NumberPad({
           type="button"
           onClick={() => onPress("0")}
           className="h-20 rounded-2xl bg-white text-3xl font-black text-slate-800 shadow-md transition hover:scale-105"
+          style={QUESTION_FONT_STYLE}
         >
           0
         </button>
