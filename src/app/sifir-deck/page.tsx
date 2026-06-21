@@ -28,7 +28,7 @@ type SifirCard = {
   question: string;
   answer: string;
   difficulty?: QuestionLevel | null;
-  is_active?: boolean | null;
+  table_no?: number | null;
 };
 
 const QUESTION_FONT_STYLE: CSSProperties = {
@@ -67,7 +67,7 @@ function generateAutoSifirCards(): SifirCard[] {
         question: `${sifir} × ${multiplier}`,
         answer: String(answer),
         difficulty: "easy",
-        is_active: true,
+        table_no: sifir,
       });
 
       generatedCards.push({
@@ -76,7 +76,7 @@ function generateAutoSifirCards(): SifirCard[] {
         question: `${sifir} × ${multiplier}`,
         answer: String(answer),
         difficulty: "medium",
-        is_active: true,
+        table_no: sifir,
       });
 
       generatedCards.push({
@@ -85,7 +85,7 @@ function generateAutoSifirCards(): SifirCard[] {
         question: `${sifir} × ___ = ${answer}`,
         answer: String(multiplier),
         difficulty: "medium",
-        is_active: true,
+        table_no: sifir,
       });
 
       generatedCards.push({
@@ -94,7 +94,7 @@ function generateAutoSifirCards(): SifirCard[] {
         question: `${multiplier} × ${sifir}`,
         answer: String(answer),
         difficulty: "medium",
-        is_active: true,
+        table_no: sifir,
       });
 
       generatedCards.push({
@@ -103,7 +103,7 @@ function generateAutoSifirCards(): SifirCard[] {
         question: `${sifir} × ___ = ${answer}`,
         answer: String(multiplier),
         difficulty: "hard",
-        is_active: true,
+        table_no: sifir,
       });
 
       generatedCards.push({
@@ -112,7 +112,7 @@ function generateAutoSifirCards(): SifirCard[] {
         question: `___ × ${multiplier} = ${answer}`,
         answer: String(sifir),
         difficulty: "hard",
-        is_active: true,
+        table_no: sifir,
       });
 
       generatedCards.push({
@@ -121,7 +121,7 @@ function generateAutoSifirCards(): SifirCard[] {
         question: `${multiplier} × ${sifir}`,
         answer: String(answer),
         difficulty: "hard",
-        is_active: true,
+        table_no: sifir,
       });
     }
   }
@@ -357,21 +357,16 @@ function SifirDeckGame() {
 
     const { data, error } = await supabase
       .from("sifir_deck_questions")
-      .select("id,language,question,answer,difficulty,is_active,created_at")
+      .select("id,language,question,answer,difficulty,created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error(error);
       setAllCards(autoCards);
     } else {
-      const activeAdminCards = (data || []).filter((card: SifirCard) => {
-        if (typeof card.is_active === "boolean") return card.is_active;
-        return true;
-      });
-
       const combinedCards = mergeCardsWithoutDuplicate(
         autoCards,
-        activeAdminCards as SifirCard[]
+        (data || []) as SifirCard[]
       );
 
       setAllCards(combinedCards);
@@ -398,11 +393,24 @@ function SifirDeckGame() {
   function chooseSifir(num: number) {
     const filtered = allCards.filter((card) => {
       const parsed = parseQuestion(card.question);
-      const sameSifir =
-        Number(parsed.first) === num || Number(parsed.second) === num;
-      const sameDifficulty = normalizeDifficulty(card.difficulty) === difficulty;
+      const cardDifficulty = normalizeDifficulty(card.difficulty);
 
-      return sameSifir && sameDifficulty;
+      if (cardDifficulty !== difficulty) return false;
+
+      const firstNumber = Number(parsed.first);
+      const secondNumber = Number(parsed.second);
+      const isNormalQuestion =
+        !card.question.includes("___") && !card.question.includes("=");
+
+      if (difficulty === "easy") {
+        return firstNumber === num && isNormalQuestion;
+      }
+
+      if (typeof card.table_no === "number") {
+        return card.table_no === num;
+      }
+
+      return firstNumber === num || secondNumber === num;
     });
 
     const shuffled = [...filtered].sort(() => Math.random() - 0.5);
