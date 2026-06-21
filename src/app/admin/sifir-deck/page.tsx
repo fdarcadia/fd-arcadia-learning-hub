@@ -5,9 +5,11 @@ import Link from "next/link";
 import {
   ArrowLeft,
   CheckCircle2,
+  Clock,
   Loader2,
   Plus,
   Save,
+  Settings,
   Trash2,
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
@@ -16,11 +18,14 @@ import { supabase } from "@/lib/supabase";
 
 const ADMIN_EMAIL = "fdarcadia.hello@gmail.com";
 
+type QuestionLevel = "easy" | "medium" | "hard";
+
 type DeckQuestion = {
   id: string;
   language: string;
   question: string;
   answer: string;
+  level: QuestionLevel | null;
   created_at?: string;
 };
 
@@ -47,13 +52,19 @@ export default function AdminSifirDeckPage() {
 
 function Content() {
   const [language, setLanguage] = useState("bm");
+  const [level, setLevel] = useState<QuestionLevel>("easy");
   const [firstNumber, setFirstNumber] = useState("");
   const [secondNumber, setSecondNumber] = useState("");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+
   const [items, setItems] = useState<DeckQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [wheelLimit, setWheelLimit] = useState(20);
+  const [timerSeconds, setTimerSeconds] = useState(30);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -61,8 +72,13 @@ function Content() {
 
   useEffect(() => {
     if (firstNumber && secondNumber) {
-      setQuestion(`${firstNumber} × ${secondNumber} = ?`);
-      setAnswer(String(Number(firstNumber) * Number(secondNumber)));
+      const first = Number(firstNumber);
+      const second = Number(secondNumber);
+
+      if (!Number.isNaN(first) && !Number.isNaN(second)) {
+        setQuestion(`${firstNumber} × ${secondNumber} = ?`);
+        setAnswer(String(first * second));
+      }
     }
   }, [firstNumber, secondNumber]);
 
@@ -81,7 +97,47 @@ function Content() {
       setItems((data || []) as DeckQuestion[]);
     }
 
+    const { data: settings, error: settingsError } = await supabase
+      .from("sifir_deck_settings")
+      .select("wheel_question_limit, timer_seconds")
+      .eq("id", "global")
+      .maybeSingle();
+
+    if (!settingsError && settings) {
+      setWheelLimit(Number(settings.wheel_question_limit || 20));
+      setTimerSeconds(Number(settings.timer_seconds || 30));
+    }
+
     setLoading(false);
+  }
+
+  async function saveSettings() {
+    if (wheelLimit < 1) {
+      alert("Wheel question limit must be at least 1.");
+      return;
+    }
+
+    if (timerSeconds < 5) {
+      alert("Timer must be at least 5 seconds.");
+      return;
+    }
+
+    setSavingSettings(true);
+
+    const { error } = await supabase.from("sifir_deck_settings").upsert({
+      id: "global",
+      wheel_question_limit: wheelLimit,
+      timer_seconds: timerSeconds,
+    });
+
+    setSavingSettings(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Spin wheel settings saved.");
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -98,6 +154,7 @@ function Content() {
       language,
       question: question.trim(),
       answer: answer.trim(),
+      level,
     });
 
     setSaving(false);
@@ -111,6 +168,7 @@ function Content() {
     setSecondNumber("");
     setQuestion("");
     setAnswer("");
+    setLevel("easy");
 
     await loadData();
   }
@@ -150,7 +208,7 @@ function Content() {
                 </h1>
 
                 <p className="mt-3 text-indigo-100">
-                  Cards created here will appear on parent Sifir Deck page.
+                  Add questions, set level, timer and spin wheel limit.
                 </p>
               </div>
 
@@ -169,6 +227,84 @@ function Content() {
                   <ArrowLeft className="mr-2 inline" size={18} />
                   Back
                 </Link>
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
+            <div className="flex items-center gap-3">
+              <div className="grid h-14 w-14 place-items-center rounded-2xl bg-pink-100 text-pink-600">
+                <Settings size={28} />
+              </div>
+
+              <div>
+                <h2 className="text-3xl font-bold text-indigo-700">
+                  Spin Wheel Settings
+                </h2>
+                <p className="text-slate-500">
+                  Control how many random questions and how many seconds per
+                  question.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <label className="grid gap-2">
+                <span className="font-bold text-slate-700">
+                  Random Questions Per Round
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={wheelLimit}
+                  onChange={(e) => setWheelLimit(Number(e.target.value))}
+                  className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-pink-500"
+                />
+              </label>
+
+              <label className="grid gap-2">
+                <span className="font-bold text-slate-700">
+                  Timer Seconds
+                </span>
+                <input
+                  type="number"
+                  min={5}
+                  max={300}
+                  value={timerSeconds}
+                  onChange={(e) => setTimerSeconds(Number(e.target.value))}
+                  className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-pink-500"
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={saveSettings}
+                disabled={savingSettings}
+                className="self-end rounded-2xl bg-pink-500 px-6 py-4 font-bold text-white shadow-md transition hover:bg-pink-600 disabled:opacity-60"
+              >
+                {savingSettings ? (
+                  <>
+                    <Loader2 className="mr-2 inline animate-spin" size={20} />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 inline" size={20} />
+                    Save Settings
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl bg-pink-50 p-4 text-pink-700">
+                Parent Spin Wheel will use{" "}
+                <b>{wheelLimit} random question(s)</b> per round.
+              </div>
+
+              <div className="rounded-2xl bg-yellow-50 p-4 text-yellow-700">
+                Timer will be <b>{timerSeconds} second(s)</b> per question.
               </div>
             </div>
           </section>
@@ -203,6 +339,21 @@ function Content() {
                   >
                     <option value="bm">Bahasa Melayu</option>
                     <option value="en">English</option>
+                  </select>
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="font-bold text-slate-700">
+                    Question Level
+                  </span>
+                  <select
+                    value={level}
+                    onChange={(e) => setLevel(e.target.value as QuestionLevel)}
+                    className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500"
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
                   </select>
                 </label>
 
@@ -303,6 +454,20 @@ function Content() {
                   {answer || "56"}
                 </p>
               </div>
+
+              <div className="mt-5 rounded-[2rem] bg-slate-50 p-4 text-center">
+                <p className="text-sm font-bold text-slate-500">LEVEL</p>
+                <p className="mt-2 text-2xl font-black uppercase text-indigo-700">
+                  {level}
+                </p>
+              </div>
+
+              <div className="mt-5 rounded-[2rem] bg-yellow-50 p-4 text-center text-yellow-700">
+                <Clock className="mx-auto" size={28} />
+                <p className="mt-2 font-bold">
+                  Spin Wheel Timer: {timerSeconds}s
+                </p>
+              </div>
             </div>
           </section>
 
@@ -343,9 +508,19 @@ function Content() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-indigo-700">
-                          {item.language.toUpperCase()}
-                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-indigo-700">
+                            {item.language.toUpperCase()}
+                          </span>
+
+                          <span
+                            className={`rounded-full px-3 py-1 text-sm font-bold uppercase ${getLevelClass(
+                              item.level || "easy"
+                            )}`}
+                          >
+                            {item.level || "easy"}
+                          </span>
+                        </div>
 
                         <h3 className="mt-4 text-3xl font-black text-indigo-700">
                           {item.question}
@@ -374,4 +549,10 @@ function Content() {
       </main>
     </>
   );
+}
+
+function getLevelClass(level: QuestionLevel) {
+  if (level === "easy") return "bg-emerald-100 text-emerald-700";
+  if (level === "medium") return "bg-yellow-100 text-yellow-700";
+  return "bg-red-100 text-red-700";
 }

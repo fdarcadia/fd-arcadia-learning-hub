@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  Clock,
   Languages,
   Trash2,
   XCircle,
@@ -80,6 +81,12 @@ export default function MathActivityPage() {
   const [result, setResult] = useState<"correct" | "wrong" | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [timerEnabled, setTimerEnabled] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(60);
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerExpired, setTimerExpired] = useState(false);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -124,18 +131,18 @@ export default function MathActivityPage() {
   );
 
   const folders = useMemo(
-    () => Array.from(new Set(topicQuestions.map((q) => q.mode_label || "No Folder"))),
+    () =>
+      Array.from(
+        new Set(topicQuestions.map((q) => q.mode_label || "No Folder"))
+      ),
     [topicQuestions]
   );
 
-  useEffect(() => {
-    setSelectedFolder(folders[0] || "");
-    setCurrentIndex(0);
-    resetAnswer();
-  }, [selectedTopic, folders.join("|")]);
-
   const folderQuestions = useMemo(
-    () => topicQuestions.filter((q) => (q.mode_label || "No Folder") === selectedFolder),
+    () =>
+      topicQuestions.filter(
+        (q) => (q.mode_label || "No Folder") === selectedFolder
+      ),
     [topicQuestions, selectedFolder]
   );
 
@@ -150,6 +157,12 @@ export default function MathActivityPage() {
   );
 
   useEffect(() => {
+    setSelectedFolder(folders[0] || "");
+    setCurrentIndex(0);
+    resetAnswer();
+  }, [selectedTopic, folders.join("|")]);
+
+  useEffect(() => {
     if (!selectedBox && editableBoxes.length > 0) {
       setSelectedBox(editableBoxes[0].id);
     }
@@ -157,7 +170,7 @@ export default function MathActivityPage() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!currentQuestion) return;
+      if (!currentQuestion || timerExpired) return;
 
       if (/^[0-9]$/.test(event.key)) {
         event.preventDefault();
@@ -189,10 +202,38 @@ export default function MathActivityPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
+  useEffect(() => {
+    setTimeLeft(timerSeconds);
+    setTimerExpired(false);
+    setTimerRunning(timerEnabled);
+  }, [timerEnabled, timerSeconds, currentQuestion?.id]);
+
+  useEffect(() => {
+    if (!timerEnabled || !timerRunning || timerExpired || !currentQuestion) {
+      return;
+    }
+
+    if (timeLeft <= 0) {
+      setTimerExpired(true);
+      setTimerRunning(false);
+      setResult("wrong");
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timerEnabled, timerRunning, timerExpired, timeLeft, currentQuestion]);
+
   const resetAnswer = () => {
     setAnswers({});
     setSelectedBox("");
     setResult(null);
+    setTimeLeft(timerSeconds);
+    setTimerExpired(false);
+    setTimerRunning(timerEnabled);
   };
 
   const chooseTopic = (topic: Topic) => {
@@ -209,20 +250,23 @@ export default function MathActivityPage() {
   };
 
   const moveToNextBox = () => {
-    if (editableBoxes.length === 0) return;
+    if (editableBoxes.length === 0 || timerExpired) return;
     const index = editableBoxes.findIndex((box) => box.id === selectedBox);
-    const nextIndex = index < 0 || index + 1 >= editableBoxes.length ? 0 : index + 1;
+    const nextIndex =
+      index < 0 || index + 1 >= editableBoxes.length ? 0 : index + 1;
     setSelectedBox(editableBoxes[nextIndex].id);
   };
 
   const moveToPreviousBox = () => {
-    if (editableBoxes.length === 0) return;
+    if (editableBoxes.length === 0 || timerExpired) return;
     const index = editableBoxes.findIndex((box) => box.id === selectedBox);
     const prevIndex = index <= 0 ? editableBoxes.length - 1 : index - 1;
     setSelectedBox(editableBoxes[prevIndex].id);
   };
 
   const pressNumber = (num: string) => {
+    if (timerExpired) return;
+
     const boxId = selectedBox || editableBoxes[0]?.id;
     if (!boxId) return;
 
@@ -236,6 +280,8 @@ export default function MathActivityPage() {
   };
 
   const deleteNumber = () => {
+    if (timerExpired) return;
+
     const boxId = selectedBox || editableBoxes[0]?.id;
     if (!boxId) return;
 
@@ -244,7 +290,9 @@ export default function MathActivityPage() {
   };
 
   const checkAnswer = async () => {
-    if (!currentQuestion) return;
+    if (!currentQuestion || timerExpired) return;
+
+    setTimerRunning(false);
 
     const answerEntries = Object.entries(currentQuestion.answer_json || {});
     let score = 0;
@@ -290,7 +338,10 @@ export default function MathActivityPage() {
   };
 
   const deleteAttempt = async (id: string) => {
-    const yes = confirm(language === "en" ? "Delete this history?" : "Padam sejarah ini?");
+    const yes = confirm(
+      language === "en" ? "Delete this history?" : "Padam sejarah ini?"
+    );
+
     if (!yes) return;
 
     const { error } = await supabase
@@ -308,17 +359,22 @@ export default function MathActivityPage() {
 
   const nextQuestion = () => {
     if (folderQuestions.length === 0) return;
-    setCurrentIndex((prev) => (prev + 1 >= folderQuestions.length ? 0 : prev + 1));
+    setCurrentIndex((prev) =>
+      prev + 1 >= folderQuestions.length ? 0 : prev + 1
+    );
     resetAnswer();
   };
 
   const previousQuestion = () => {
     if (folderQuestions.length === 0) return;
-    setCurrentIndex((prev) => (prev - 1 < 0 ? folderQuestions.length - 1 : prev - 1));
+    setCurrentIndex((prev) =>
+      prev - 1 < 0 ? folderQuestions.length - 1 : prev - 1
+    );
     resetAnswer();
   };
 
-  const topicInfo = topics.find((topic) => topic.id === selectedTopic) || topics[0];
+  const topicInfo =
+    topics.find((topic) => topic.id === selectedTopic) || topics[0];
 
   if (loading) {
     return (
@@ -372,12 +428,86 @@ export default function MathActivityPage() {
                 <div className="text-xl font-black">
                   {language === "en" ? topic.en : topic.bm}
                 </div>
+
                 <div className="text-sm font-bold opacity-70">
                   {language === "en" ? topic.bm : topic.en}
                 </div>
               </button>
             ))}
           </div>
+        </section>
+
+        <section className="mb-6 rounded-3xl bg-white p-5 shadow">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-black text-slate-900">
+                {language === "en" ? "Timer" : "Masa"}
+              </h2>
+
+              <p className="text-sm font-bold text-slate-400">
+                {language === "en"
+                  ? "Optional countdown timer"
+                  : "Pilihan timer kiraan masa"}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setTimerEnabled(false)}
+                className={`rounded-2xl px-4 py-2 font-black ${
+                  !timerEnabled
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                OFF
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTimerEnabled(true)}
+                className={`rounded-2xl px-4 py-2 font-black ${
+                  timerEnabled
+                    ? "bg-indigo-600 text-white"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                ON
+              </button>
+
+              {timerEnabled && (
+                <select
+                  value={timerSeconds}
+                  onChange={(e) => setTimerSeconds(Number(e.target.value))}
+                  className="rounded-2xl border px-4 py-2 font-bold"
+                >
+                  <option value={30}>30s</option>
+                  <option value={60}>60s</option>
+                  <option value={90}>90s</option>
+                  <option value={120}>120s</option>
+                  <option value={180}>180s</option>
+                </select>
+              )}
+            </div>
+          </div>
+
+          {timerEnabled && (
+            <div className="mt-4 flex flex-col items-center justify-center rounded-2xl bg-orange-50 p-4">
+              <div className="flex items-center justify-center gap-2">
+                <Clock className="text-orange-600" />
+                <span className="text-3xl font-black text-orange-600">
+                  {timeLeft}s
+                </span>
+              </div>
+
+              {timerExpired && (
+                <p className="mt-2 font-black text-red-600">
+                  {language === "en" ? "Time is up!" : "Masa tamat!"}
+                </p>
+              )}
+            </div>
+          )}
         </section>
 
         <section className="mb-6 rounded-3xl bg-white p-5 shadow">
@@ -424,7 +554,9 @@ export default function MathActivityPage() {
                 </p>
 
                 <h2 className="text-4xl font-black text-slate-900">
-                  {language === "en" ? currentQuestion.title_en : currentQuestion.title_bm}
+                  {language === "en"
+                    ? currentQuestion.title_en
+                    : currentQuestion.title_bm}
                 </h2>
 
                 <p className="mt-1 text-sm font-bold text-slate-400">
@@ -433,19 +565,7 @@ export default function MathActivityPage() {
               </div>
 
               <div className="overflow-x-auto rounded-3xl">
-  <div
-    className="
-      relative
-      mx-auto
-      min-h-[430px]
-      h-[70vw]
-      max-h-[650px]
-      w-full
-      max-w-[950px]
-      rounded-3xl
-      bg-white
-    "
-  >
+                <div className="relative mx-auto min-h-[430px] h-[70vw] max-h-[650px] w-full max-w-[950px] rounded-3xl bg-white">
                   {(currentQuestion.layout_json?.items || []).map((item) => (
                     <ParentLayoutItem
                       key={item.id}
@@ -453,7 +573,11 @@ export default function MathActivityPage() {
                       selectedBox={selectedBox}
                       answer={answers[item.id] || ""}
                       onSelectBox={() => {
-                        if (item.type === "box" && item.editable) {
+                        if (
+                          item.type === "box" &&
+                          item.editable &&
+                          !timerExpired
+                        ) {
                           setSelectedBox(item.id);
                         }
                       }}
@@ -474,7 +598,13 @@ export default function MathActivityPage() {
               {result === "wrong" && (
                 <div className="mb-4 flex items-center justify-center gap-2 rounded-2xl bg-red-100 p-3 font-black text-red-700">
                   <XCircle />
-                  {language === "en" ? "Try again" : "Cuba lagi"}
+                  {timerExpired
+                    ? language === "en"
+                      ? "Time is up!"
+                      : "Masa tamat!"
+                    : language === "en"
+                    ? "Try again"
+                    : "Cuba lagi"}
                 </div>
               )}
 
@@ -490,7 +620,8 @@ export default function MathActivityPage() {
                     key={num}
                     type="button"
                     onClick={() => pressNumber(num)}
-                    className="rounded-2xl bg-white p-5 text-2xl font-black text-slate-900 shadow ring-1 ring-slate-200"
+                    disabled={timerExpired}
+                    className="rounded-2xl bg-white p-5 text-2xl font-black text-slate-900 shadow ring-1 ring-slate-200 disabled:opacity-50"
                   >
                     {num}
                   </button>
@@ -499,7 +630,8 @@ export default function MathActivityPage() {
                 <button
                   type="button"
                   onClick={deleteNumber}
-                  className="rounded-2xl bg-red-100 p-5 font-black text-red-700 shadow"
+                  disabled={timerExpired}
+                  className="rounded-2xl bg-red-100 p-5 font-black text-red-700 shadow disabled:opacity-50"
                 >
                   {language === "en" ? "Delete" : "Padam"}
                 </button>
@@ -507,7 +639,8 @@ export default function MathActivityPage() {
                 <button
                   type="button"
                   onClick={() => pressNumber("0")}
-                  className="rounded-2xl bg-white p-5 text-2xl font-black text-slate-900 shadow ring-1 ring-slate-200"
+                  disabled={timerExpired}
+                  className="rounded-2xl bg-white p-5 text-2xl font-black text-slate-900 shadow ring-1 ring-slate-200 disabled:opacity-50"
                 >
                   0
                 </button>
@@ -515,7 +648,8 @@ export default function MathActivityPage() {
                 <button
                   type="button"
                   onClick={checkAnswer}
-                  className="rounded-2xl bg-indigo-600 p-5 font-black text-white shadow"
+                  disabled={timerExpired}
+                  className="rounded-2xl bg-indigo-600 p-5 font-black text-white shadow disabled:opacity-50"
                 >
                   {language === "en" ? "Check & Save" : "Semak & Simpan"}
                 </button>
@@ -613,15 +747,13 @@ function ParentLayoutItem({
         onClick={onSelectBox}
         disabled={!item.editable}
         className={`absolute flex items-center justify-center rounded-xl border-4 font-black shadow ${
-          selectedBox === item.id
-            ? "ring-4 ring-indigo-200"
-            : ""
+          selectedBox === item.id ? "ring-4 ring-indigo-200" : ""
         }`}
         style={{
           left: `${(item.x / 950) * 100}%`,
-top: `${(item.y / 650) * 100}%`,
-width: `${((item.width || 80) / 950) * 100}%`,
-height: `${((item.height || 80) / 650) * 100}%`,
+          top: `${(item.y / 650) * 100}%`,
+          width: `${((item.width || 80) / 950) * 100}%`,
+          height: `${((item.height || 80) / 650) * 100}%`,
           transform: `rotate(${item.rotation || 0}deg)`,
           borderColor:
             selectedBox === item.id
@@ -643,9 +775,9 @@ height: `${((item.height || 80) / 650) * 100}%`,
         className="absolute rounded-full"
         style={{
           left: `${(item.x / 950) * 100}%`,
-top: `${(item.y / 650) * 100}%`,
-width: `${((item.width || 300) / 950) * 100}%`,
-height: item.height || 5,
+          top: `${(item.y / 650) * 100}%`,
+          width: `${((item.width || 300) / 950) * 100}%`,
+          height: item.height || 5,
           transform: `rotate(${item.rotation || 0}deg)`,
           transformOrigin: "left center",
           backgroundColor: item.lineColor || "#3b82f6",
@@ -660,7 +792,7 @@ height: item.height || 5,
         className="absolute"
         style={{
           left: `${(item.x / 950) * 100}%`,
-top: `${(item.y / 650) * 100}%`,
+          top: `${(item.y / 650) * 100}%`,
           transform: `rotate(${item.rotation || 0}deg)`,
           color: item.textColor || "#0f172a",
         }}

@@ -1,25 +1,39 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, Eraser, Star, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Clock,
+  Eraser,
+  RotateCw,
+  Star,
+  Trophy,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { supabase } from "@/lib/supabase";
+
+type QuestionLevel = "easy" | "medium" | "hard";
+type UiLanguage = "bm" | "en";
+type GameMode = "card" | "vertical" | "wheel";
+type Status = "idle" | "correct" | "wrong" | "timeup";
 
 type SifirCard = {
   id: string;
   language?: string;
   question: string;
   answer: string;
+  level?: QuestionLevel | null;
   is_active?: boolean;
 };
 
-type UiLanguage = "bm" | "en";
-
-const sifirOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const sifirOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 const sifirColors: Record<number, string> = {
+  1: "bg-sky-400 shadow-sky-700",
   2: "bg-rose-400 shadow-rose-700",
   3: "bg-orange-400 shadow-orange-700",
   4: "bg-yellow-300 shadow-yellow-600",
@@ -33,6 +47,48 @@ const sifirColors: Record<number, string> = {
   12: "bg-amber-300 shadow-amber-700",
 };
 
+function getQuestionLevel(multiplier: number): QuestionLevel {
+  if (multiplier <= 4) return "easy";
+  if (multiplier <= 8) return "medium";
+  return "hard";
+}
+
+function generateAutoSifirCards(): SifirCard[] {
+  const generatedCards: SifirCard[] = [];
+
+  for (let sifir = 1; sifir <= 12; sifir += 1) {
+    for (let multiplier = 1; multiplier <= 12; multiplier += 1) {
+      generatedCards.push({
+        id: `auto-${sifir}-${multiplier}`,
+        language: "auto",
+        question: `${sifir} × ${multiplier}`,
+        answer: String(sifir * multiplier),
+        level: getQuestionLevel(multiplier),
+        is_active: true,
+      });
+    }
+  }
+
+  return generatedCards;
+}
+
+function mergeCardsWithoutDuplicate(
+  autoCards: SifirCard[],
+  adminCards: SifirCard[]
+) {
+  const cardMap = new Map<string, SifirCard>();
+
+  autoCards.forEach((card) => {
+    cardMap.set(`${card.question}-${card.level || "easy"}`, card);
+  });
+
+  adminCards.forEach((card) => {
+    cardMap.set(`${card.question}-${card.level || "easy"}`, card);
+  });
+
+  return Array.from(cardMap.values());
+}
+
 const text = {
   bm: {
     chooseTitle: "Pilih Sifir",
@@ -40,11 +96,13 @@ const text = {
     tileLabel: "SIFIR",
     headerTitle: "Sifir",
     back: "Balik",
-    subtitle: "Latihan sifir menggunakan kad yang admin sediakan.",
+    subtitle: "Latihan sifir auto 1 hingga 12 dengan pilihan tahap dan spin wheel.",
     loading: "Memuatkan kad...",
-    emptyDesc: "Admin perlu tambah soalan di Admin Sifir Deck dahulu.",
+    emptyDesc: "Tiada soalan dijumpai. Sila refresh semula halaman ini.",
     cardMode: "Card Mode",
     verticalMode: "Vertical Mode",
+    wheelMode: "Spin Wheel",
+    spin: "Pusing Roda",
     previous: "Sebelum",
     next: "Seterusnya",
     card: "Kad",
@@ -56,6 +114,17 @@ const text = {
     clear: "Padam Jawapan",
     check: "Semak",
     noQuestion: "Tiada soalan untuk sifir",
+    level: "Tahap",
+    easy: "Easy",
+    medium: "Medium",
+    hard: "Hard",
+    result: "Keputusan",
+    playAgain: "Main Lagi",
+    chooseOther: "Pilih Sifir Lain",
+    correctCount: "Betul",
+    wrongCount: "Salah",
+    score: "Markah",
+    timeUp: "Masa Tamat!",
   },
   en: {
     chooseTitle: "Choose Times Table",
@@ -63,11 +132,13 @@ const text = {
     tileLabel: "TIMES",
     headerTitle: "Times Table",
     back: "Back",
-    subtitle: "Practice multiplication using admin cards.",
+    subtitle: "Practice auto times tables 1 to 12 with level and spin wheel.",
     loading: "Loading cards...",
-    emptyDesc: "Admin needs to add questions in Admin Sifir Deck first.",
+    emptyDesc: "No question found. Please refresh this page.",
     cardMode: "Card Mode",
     verticalMode: "Vertical Mode",
+    wheelMode: "Spin Wheel",
+    spin: "Spin Wheel",
     previous: "Previous",
     next: "Next",
     card: "Card",
@@ -79,6 +150,17 @@ const text = {
     clear: "Clear Answer",
     check: "Check",
     noQuestion: "No question for times table",
+    level: "Level",
+    easy: "Easy",
+    medium: "Medium",
+    hard: "Hard",
+    result: "Result",
+    playAgain: "Play Again",
+    chooseOther: "Choose Other Times Table",
+    correctCount: "Correct",
+    wrongCount: "Wrong",
+    score: "Score",
+    timeUp: "Time's Up!",
   },
 };
 
@@ -101,10 +183,20 @@ function SifirDeckGame() {
   const [selectedSifir, setSelectedSifir] = useState<number | null>(null);
   const [index, setIndex] = useState(0);
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>("bm");
-  const [mode, setMode] = useState<"card" | "vertical">("card");
+  const [mode, setMode] = useState<GameMode>("card");
+  const [difficulty, setDifficulty] = useState<QuestionLevel>("easy");
   const [input, setInput] = useState("");
-  const [status, setStatus] = useState<"idle" | "correct" | "wrong">("idle");
+  const [status, setStatus] = useState<Status>("idle");
   const [loading, setLoading] = useState(true);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [wheelLimit, setWheelLimit] = useState(20);
+  const [timerSeconds, setTimerSeconds] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [wheelRotation, setWheelRotation] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [wrongCount, setWrongCount] = useState(0);
+  const [answeredCurrent, setAnsweredCurrent] = useState(false);
+  const [showResult, setShowResult] = useState(false);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const current = cards[index];
@@ -122,7 +214,7 @@ function SifirDeckGame() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!current || !selectedSifir) return;
+      if (!current || !selectedSifir || isSpinning || showResult) return;
 
       if (/^[0-9]$/.test(event.key)) {
         event.preventDefault();
@@ -145,11 +237,52 @@ function SifirDeckGame() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
+  useEffect(() => {
+    if (
+      mode !== "wheel" ||
+      !selectedSifir ||
+      !current ||
+      isSpinning ||
+      showResult ||
+      answeredCurrent
+    ) {
+      return;
+    }
+
+    if (timeLeft <= 0) {
+      setStatus("timeup");
+      setWrongCount((prev) => prev + 1);
+      setAnsweredCurrent(true);
+
+      const timeout = setTimeout(() => {
+        moveToNextWheelQuestion();
+      }, 1000);
+
+      return () => clearTimeout(timeout);
+    }
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [
+    mode,
+    selectedSifir,
+    current,
+    isSpinning,
+    showResult,
+    answeredCurrent,
+    timeLeft,
+  ]);
+
   async function loadCards() {
     setLoading(true);
     setInput("");
     setStatus("idle");
     setIndex(0);
+
+    const autoCards = generateAutoSifirCards();
 
     const { data, error } = await supabase
       .from("sifir_deck_questions")
@@ -158,14 +291,34 @@ function SifirDeckGame() {
 
     if (error) {
       console.error(error);
-      setAllCards([]);
+      setAllCards(autoCards);
     } else {
-      const activeCards = (data || []).filter((card: SifirCard) => {
+      const activeAdminCards = (data || []).filter((card: SifirCard) => {
         if (typeof card.is_active === "boolean") return card.is_active;
         return true;
       });
 
-      setAllCards(activeCards as SifirCard[]);
+      const combinedCards = mergeCardsWithoutDuplicate(
+        autoCards,
+        activeAdminCards as SifirCard[]
+      );
+
+      setAllCards(combinedCards);
+    }
+
+    const { data: settings, error: settingsError } = await supabase
+      .from("sifir_deck_settings")
+      .select("wheel_question_limit,timer_seconds")
+      .eq("id", "global")
+      .maybeSingle();
+
+    if (!settingsError && settings) {
+      const limit = Number(settings.wheel_question_limit || 20);
+      const timer = Number(settings.timer_seconds || 30);
+
+      setWheelLimit(limit);
+      setTimerSeconds(timer);
+      setTimeLeft(timer);
     }
 
     setLoading(false);
@@ -174,14 +327,26 @@ function SifirDeckGame() {
   function chooseSifir(num: number) {
     const filtered = allCards.filter((card) => {
       const parsed = parseQuestion(card.question);
-      return Number(parsed.first) === num || Number(parsed.second) === num;
+      const sameSifir =
+        Number(parsed.first) === num || Number(parsed.second) === num;
+      const sameLevel = (card.level || "easy") === difficulty;
+
+      return sameSifir && sameLevel;
     });
 
+    const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+    const limitedQuestions = shuffled.slice(0, wheelLimit);
+
     setSelectedSifir(num);
-    setCards(filtered);
+    setCards(limitedQuestions);
     setIndex(0);
     setInput("");
     setStatus("idle");
+    setCorrectCount(0);
+    setWrongCount(0);
+    setShowResult(false);
+    setAnsweredCurrent(false);
+    setTimeLeft(timerSeconds);
   }
 
   function backToChoose() {
@@ -190,47 +355,150 @@ function SifirDeckGame() {
     setIndex(0);
     setInput("");
     setStatus("idle");
+    setCorrectCount(0);
+    setWrongCount(0);
+    setShowResult(false);
+    setAnsweredCurrent(false);
+    setTimeLeft(timerSeconds);
+  }
+
+  function restartRound() {
+    if (!selectedSifir) return;
+    chooseSifir(selectedSifir);
   }
 
   function pressNumber(num: string) {
-    if (status === "correct") return;
+    if (status === "correct" || isSpinning) return;
     setInput((prev) => `${prev}${num}`.replace(/[^0-9]/g, "").slice(0, 4));
     setStatus("idle");
   }
 
   function handleInputChange(value: string) {
+    if (isSpinning) return;
     setInput(value.replace(/[^0-9]/g, "").slice(0, 4));
     setStatus("idle");
   }
 
   function clearInput() {
+    if (isSpinning) return;
     setInput("");
     setStatus("idle");
     inputRef.current?.focus();
   }
 
   function checkAnswer() {
-    if (!current || !input) return;
+    if (!current || !input || isSpinning) return;
 
     const userAnswer = input.trim();
     const correctAnswer = String(current.answer || "").trim();
+    const isCorrect = userAnswer === correctAnswer;
 
-    setStatus(userAnswer === correctAnswer ? "correct" : "wrong");
+    setStatus(isCorrect ? "correct" : "wrong");
+
+    if (mode === "wheel") {
+      setAnsweredCurrent(true);
+
+      if (isCorrect) {
+        setCorrectCount((prev) => prev + 1);
+
+        setTimeout(() => {
+          autoSpinNextQuestion();
+        }, 1000);
+      } else {
+        setWrongCount((prev) => prev + 1);
+      }
+
+      return;
+    }
+
     inputRef.current?.focus();
+  }
+
+  function autoSpinNextQuestion() {
+    if (cards.length === 0) return;
+
+    if (index + 1 >= cards.length) {
+      setShowResult(true);
+      return;
+    }
+
+    const nextIndex = index + 1;
+
+    setIsSpinning(true);
+    setInput("");
+    setStatus("idle");
+
+    setWheelRotation(
+      (prev) => prev + 1800 + Math.floor(Math.random() * 1080)
+    );
+
+    setTimeout(() => {
+      setIndex(nextIndex);
+      setAnsweredCurrent(false);
+      setTimeLeft(timerSeconds);
+      setIsSpinning(false);
+      inputRef.current?.focus();
+    }, 3000);
   }
 
   function nextCard() {
     if (cards.length === 0) return;
-    setIndex((prev) => (prev + 1 >= cards.length ? 0 : prev + 1));
+
+    const nextIndex = index + 1 >= cards.length ? 0 : index + 1;
+
+    setIndex(nextIndex);
     setInput("");
     setStatus("idle");
   }
 
   function previousCard() {
     if (cards.length === 0) return;
-    setIndex((prev) => (prev - 1 < 0 ? cards.length - 1 : prev - 1));
+
+    const prevIndex = index - 1 < 0 ? cards.length - 1 : index - 1;
+
+    setIndex(prevIndex);
     setInput("");
     setStatus("idle");
+  }
+
+  function spinWheel() {
+    if (cards.length === 0 || isSpinning || showResult) return;
+
+    setIsSpinning(true);
+    setStatus("idle");
+    setInput("");
+    setAnsweredCurrent(false);
+    setTimeLeft(timerSeconds);
+
+    setWheelRotation(
+      (prev) => prev + 1800 + Math.floor(Math.random() * 1080)
+    );
+
+    setTimeout(() => {
+      const randomIndex = Math.floor(Math.random() * cards.length);
+
+      setIndex(randomIndex);
+      setTimeLeft(timerSeconds);
+      setIsSpinning(false);
+      inputRef.current?.focus();
+    }, 3000);
+  }
+
+  function moveToNextWheelQuestion() {
+    if (cards.length === 0) return;
+
+    if (index + 1 >= cards.length) {
+      setShowResult(true);
+      return;
+    }
+
+    const nextIndex = index + 1;
+
+    setIndex(nextIndex);
+    setInput("");
+    setStatus("idle");
+    setAnsweredCurrent(false);
+    setTimeLeft(timerSeconds);
   }
 
   const questionParts = useMemo(() => {
@@ -238,11 +506,17 @@ function SifirDeckGame() {
     return parseQuestion(current.question);
   }, [current]);
 
+  const scorePercent =
+    cards.length > 0 ? Math.round((correctCount / cards.length) * 100) : 0;
+
   if (!selectedSifir) {
     return (
       <main className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-emerald-50 px-4 py-8">
         <div className="mx-auto max-w-5xl">
-          <LanguageToggle uiLanguage={uiLanguage} setUiLanguage={setUiLanguage} />
+          <LanguageToggle
+            uiLanguage={uiLanguage}
+            setUiLanguage={setUiLanguage}
+          />
 
           <Link
             href="/dashboard"
@@ -260,6 +534,37 @@ function SifirDeckGame() {
             <p className="mx-auto mt-4 max-w-2xl text-xl font-bold leading-8 text-slate-500 sm:text-2xl">
               {t.chooseSubtitle}
             </p>
+
+            <p className="mx-auto mt-4 inline-flex rounded-full bg-white px-5 py-3 text-sm font-bold text-emerald-700 shadow">
+              Spin Wheel: {wheelLimit} questions • Timer: {timerSeconds}s
+            </p>
+          </section>
+
+          <section className="mx-auto mt-8 max-w-3xl rounded-[2rem] bg-white p-5 shadow">
+            <p className="text-center text-sm font-black uppercase tracking-[0.2em] text-yellow-600">
+              {t.level}
+            </p>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {(["easy", "medium", "hard"] as QuestionLevel[]).map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setDifficulty(level)}
+                  className={`rounded-2xl px-5 py-4 font-black uppercase transition ${
+                    difficulty === level
+                      ? getLevelActiveClass(level)
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {level === "easy"
+                    ? `⭐ ${t.easy}`
+                    : level === "medium"
+                    ? `⭐⭐ ${t.medium}`
+                    : `⭐⭐⭐ ${t.hard}`}
+                </button>
+              ))}
+            </div>
           </section>
 
           <section className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
@@ -302,6 +607,11 @@ function SifirDeckGame() {
               </h1>
 
               <p className="mt-2 text-green-50">{t.subtitle}</p>
+
+              <p className="mt-2 text-sm font-bold text-yellow-100">
+                {t.level}: {difficulty.toUpperCase()} • Spin Wheel round:{" "}
+                {cards.length} question(s)
+              </p>
             </div>
 
             <button
@@ -340,6 +650,23 @@ function SifirDeckGame() {
             >
               {t.verticalMode}
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMode("wheel");
+                setTimeLeft(timerSeconds);
+                setStatus("idle");
+                setInput("");
+              }}
+              className={`rounded-2xl px-5 py-3 font-bold ${
+                mode === "wheel"
+                  ? "bg-pink-500 text-white ring-4 ring-pink-700"
+                  : "bg-pink-100 text-pink-700"
+              }`}
+            >
+              🎡 {t.wheelMode}
+            </button>
           </div>
         </section>
 
@@ -355,59 +682,145 @@ function SifirDeckGame() {
 
             <p className="mt-2 text-slate-500">{t.emptyDesc}</p>
           </div>
+        ) : showResult ? (
+          <ResultScreen
+            resultTitle={t.result}
+            correctLabel={t.correctCount}
+            wrongLabel={t.wrongCount}
+            scoreLabel={t.score}
+            playAgainText={t.playAgain}
+            chooseOtherText={t.chooseOther}
+            correctCount={correctCount}
+            wrongCount={wrongCount}
+            scorePercent={scorePercent}
+            onPlayAgain={restartRound}
+            onChooseOther={backToChoose}
+          />
         ) : (
           <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
-            <div className="mb-5 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={previousCard}
-                className="rounded-2xl bg-slate-100 px-5 py-3 font-bold text-slate-700"
-              >
-                {t.previous}
-              </button>
+            {mode !== "wheel" ? (
+              <div className="mb-5 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={previousCard}
+                  className="rounded-2xl bg-slate-100 px-5 py-3 font-bold text-slate-700"
+                >
+                  {t.previous}
+                </button>
 
-              <p className="font-bold text-emerald-700">
-                {t.card} {index + 1} / {cards.length}
-              </p>
+                <p className="font-bold text-emerald-700">
+                  {t.card} {index + 1} / {cards.length}
+                </p>
 
-              <button
-                type="button"
-                onClick={nextCard}
-                className="rounded-2xl bg-emerald-500 px-5 py-3 font-bold text-white"
-              >
-                {t.next}
-              </button>
-            </div>
-
-            {mode === "card" ? (
-              <CardQuestion current={current} status={status} label={t.question} />
+                <button
+                  type="button"
+                  onClick={nextCard}
+                  className="rounded-2xl bg-emerald-500 px-5 py-3 font-bold text-white"
+                >
+                  {t.next}
+                </button>
+              </div>
             ) : (
-              <VerticalQuestion
-                first={questionParts.first}
-                second={questionParts.second}
-                input={input}
-                status={status}
+              <WheelStats
+                timeLeft={timeLeft}
+                timerSeconds={timerSeconds}
+                currentIndex={index}
+                total={cards.length}
+                correctCount={correctCount}
+                wrongCount={wrongCount}
               />
             )}
 
-            <AnswerInput
-              inputRef={inputRef}
-              input={input}
-              status={status}
-              placeholder={t.typeAnswer}
-              hint={t.enterHint}
-              onChange={handleInputChange}
-              onSubmit={checkAnswer}
-            />
+            {mode === "card" ? (
+              <>
+                <CardQuestion
+                  current={current}
+                  status={status}
+                  label={t.question}
+                />
 
-            <NumberPad
-              status={status}
-              onPress={pressNumber}
-              onClear={clearInput}
-              onSubmit={checkAnswer}
-              clearText={t.clear}
-              checkText={t.check}
-            />
+                <AnswerInput
+                  inputRef={inputRef}
+                  input={input}
+                  status={status}
+                  placeholder={t.typeAnswer}
+                  hint={t.enterHint}
+                  onChange={handleInputChange}
+                  onSubmit={checkAnswer}
+                  disabled={isSpinning}
+                />
+
+                <NumberPad
+                  status={status}
+                  onPress={pressNumber}
+                  onClear={clearInput}
+                  onSubmit={checkAnswer}
+                  clearText={t.clear}
+                  checkText={t.check}
+                />
+              </>
+            ) : mode === "vertical" ? (
+              <>
+                <VerticalQuestion
+                  first={questionParts.first}
+                  second={questionParts.second}
+                  input={input}
+                  status={status}
+                />
+
+                <AnswerInput
+                  inputRef={inputRef}
+                  input={input}
+                  status={status}
+                  placeholder={t.typeAnswer}
+                  hint={t.enterHint}
+                  onChange={handleInputChange}
+                  onSubmit={checkAnswer}
+                  disabled={isSpinning}
+                />
+
+                <NumberPad
+                  status={status}
+                  onPress={pressNumber}
+                  onClear={clearInput}
+                  onSubmit={checkAnswer}
+                  clearText={t.clear}
+                  checkText={t.check}
+                />
+              </>
+            ) : (
+              <>
+                <WheelQuestion
+                  current={current}
+                  status={status}
+                  spinning={isSpinning}
+                  rotation={wheelRotation}
+                  spinText={t.spin}
+                  cardLabel={`${t.card} ${index + 1} / ${cards.length}`}
+                  onSpin={spinWheel}
+                />
+
+                <AnswerInput
+                  inputRef={inputRef}
+                  input={input}
+                  status={status}
+                  placeholder={t.typeAnswer}
+                  hint={t.enterHint}
+                  onChange={handleInputChange}
+                  onSubmit={checkAnswer}
+                  disabled={isSpinning}
+                />
+
+                <NumberPad
+                  status={status}
+                  onPress={pressNumber}
+                  onClear={clearInput}
+                  onSubmit={checkAnswer}
+                  clearText={t.clear}
+                  checkText={t.check}
+                />
+              </>
+            )}
 
             {status === "correct" && (
               <div className="mt-6 rounded-[2rem] bg-emerald-100 p-5 text-center text-2xl font-black text-emerald-700">
@@ -419,6 +832,13 @@ function SifirDeckGame() {
             {status === "wrong" && (
               <div className="mt-6 rounded-[2rem] bg-red-100 p-5 text-center text-2xl font-black text-red-600">
                 {t.wrong}
+              </div>
+            )}
+
+            {status === "timeup" && (
+              <div className="mt-6 rounded-[2rem] bg-orange-100 p-5 text-center text-2xl font-black text-orange-600">
+                <Clock className="mr-2 inline" />
+                {t.timeUp}
               </div>
             )}
           </section>
@@ -485,13 +905,148 @@ function parseQuestion(question: string) {
   return { first: question, second: "" };
 }
 
+function getLevelActiveClass(level: QuestionLevel) {
+  if (level === "easy") return "bg-emerald-500 text-white shadow-lg";
+  if (level === "medium") return "bg-yellow-400 text-slate-800 shadow-lg";
+  return "bg-red-500 text-white shadow-lg";
+}
+
+function WheelStats({
+  timeLeft,
+  timerSeconds,
+  currentIndex,
+  total,
+  correctCount,
+  wrongCount,
+}: {
+  timeLeft: number;
+  timerSeconds: number;
+  currentIndex: number;
+  total: number;
+  correctCount: number;
+  wrongCount: number;
+}) {
+  const percent = Math.max(0, Math.min(100, (timeLeft / timerSeconds) * 100));
+
+  return (
+    <div className="mb-6 rounded-[2rem] bg-indigo-50 p-5">
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div className="rounded-2xl bg-white p-4 text-center">
+          <p className="text-sm font-bold text-slate-400">QUESTION</p>
+          <p className="text-2xl font-black text-indigo-700">
+            {currentIndex + 1} / {total}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-white p-4 text-center">
+          <p className="text-sm font-bold text-slate-400">TIME</p>
+          <p className="text-2xl font-black text-orange-600">{timeLeft}s</p>
+        </div>
+
+        <div className="rounded-2xl bg-white p-4 text-center">
+          <p className="text-sm font-bold text-slate-400">CORRECT</p>
+          <p className="text-2xl font-black text-emerald-600">
+            {correctCount}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-white p-4 text-center">
+          <p className="text-sm font-bold text-slate-400">WRONG</p>
+          <p className="text-2xl font-black text-red-600">{wrongCount}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 h-4 overflow-hidden rounded-full bg-white">
+        <div
+          className="h-full rounded-full bg-orange-400 transition-all"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ResultScreen({
+  resultTitle,
+  correctLabel,
+  wrongLabel,
+  scoreLabel,
+  playAgainText,
+  chooseOtherText,
+  correctCount,
+  wrongCount,
+  scorePercent,
+  onPlayAgain,
+  onChooseOther,
+}: {
+  resultTitle: string;
+  correctLabel: string;
+  wrongLabel: string;
+  scoreLabel: string;
+  playAgainText: string;
+  chooseOtherText: string;
+  correctCount: number;
+  wrongCount: number;
+  scorePercent: number;
+  onPlayAgain: () => void;
+  onChooseOther: () => void;
+}) {
+  return (
+    <section className="mt-8 rounded-[2rem] bg-white p-8 text-center shadow-xl">
+      <Trophy className="mx-auto fill-yellow-300 text-yellow-500" size={72} />
+
+      <h2 className="font-display mt-4 text-5xl font-black text-indigo-700">
+        {resultTitle}
+      </h2>
+
+      <p className="mt-4 text-6xl font-black text-emerald-600">
+        {scorePercent}%
+      </p>
+
+      <p className="mt-2 text-xl font-bold text-slate-500">{scoreLabel}</p>
+
+      <div className="mx-auto mt-8 grid max-w-xl gap-4 sm:grid-cols-2">
+        <div className="rounded-[2rem] bg-emerald-100 p-6">
+          <p className="text-lg font-bold text-emerald-700">{correctLabel}</p>
+          <p className="mt-2 text-5xl font-black text-emerald-700">
+            {correctCount}
+          </p>
+        </div>
+
+        <div className="rounded-[2rem] bg-red-100 p-6">
+          <p className="text-lg font-bold text-red-700">{wrongLabel}</p>
+          <p className="mt-2 text-5xl font-black text-red-700">{wrongCount}</p>
+        </div>
+      </div>
+
+      <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+        <button
+          type="button"
+          onClick={onPlayAgain}
+          className="rounded-2xl bg-indigo-600 px-6 py-4 font-black text-white"
+        >
+          {playAgainText}
+        </button>
+
+        <button
+          type="button"
+          onClick={onChooseOther}
+          className="rounded-2xl bg-yellow-300 px-6 py-4 font-black text-slate-800"
+        >
+          {chooseOtherText}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function CardQuestion({
   current,
   status,
   label,
 }: {
   current: SifirCard;
-  status: "idle" | "correct" | "wrong";
+  status: Status;
   label: string;
 }) {
   return (
@@ -499,7 +1054,7 @@ function CardQuestion({
       className={`mx-auto max-w-3xl rounded-[2rem] p-10 text-center text-white shadow-2xl ${
         status === "correct"
           ? "bg-emerald-500"
-          : status === "wrong"
+          : status === "wrong" || status === "timeup"
           ? "bg-red-500"
           : "bg-indigo-600"
       }`}
@@ -521,12 +1076,13 @@ function VerticalQuestion({
   first: string;
   second: string;
   input: string;
-  status: "idle" | "correct" | "wrong";
+  status: Status;
 }) {
   return (
     <div className="mx-auto max-w-xl rounded-[2rem] border-4 border-yellow-200 bg-yellow-50 p-8 text-center shadow-xl">
       <div className="mx-auto w-72 text-right text-6xl font-black text-slate-800 sm:text-7xl">
         <div>{first}</div>
+
         <div className="flex justify-between">
           <span>×</span>
           <span>{second}</span>
@@ -538,7 +1094,7 @@ function VerticalQuestion({
           className={`min-h-24 rounded-2xl border-4 bg-white px-4 py-3 text-center ${
             status === "correct"
               ? "border-emerald-400 text-emerald-600"
-              : status === "wrong"
+              : status === "wrong" || status === "timeup"
               ? "border-red-400 text-red-600"
               : "border-slate-300 text-indigo-600"
           }`}
@@ -546,6 +1102,73 @@ function VerticalQuestion({
           {input || "?"}
         </div>
       </div>
+    </div>
+  );
+}
+
+function WheelQuestion({
+  current,
+  spinning,
+  rotation,
+  spinText,
+  cardLabel,
+  onSpin,
+}: {
+  current: SifirCard;
+  status: Status;
+  spinning: boolean;
+  rotation: number;
+  spinText: string;
+  cardLabel: string;
+  onSpin: () => void;
+}) {
+  return (
+    <div className="text-center">
+      <p className="mb-4 text-center font-bold text-emerald-700">
+        {cardLabel}
+      </p>
+
+      <div className="relative mx-auto h-[320px] w-[320px] sm:h-[430px] sm:w-[430px]">
+        <div className="absolute left-1/2 top-[-8px] z-30 -translate-x-1/2">
+          <div className="h-0 w-0 border-l-[24px] border-r-[24px] border-t-[48px] border-l-transparent border-r-transparent border-t-pink-600 drop-shadow-xl" />
+        </div>
+
+        <div className="absolute inset-0 rounded-full bg-pink-400 opacity-20 blur-2xl" />
+
+        <div
+          className="relative h-full w-full rounded-full border-[12px] border-white shadow-[0_20px_0_#be185d,0_30px_50px_rgba(0,0,0,0.25)] transition-transform duration-[3000ms] ease-out"
+          style={{
+            transform: `rotate(${rotation}deg)`,
+            background:
+              "conic-gradient(#ff4fa3 0deg 45deg, #ffd166 45deg 90deg, #06d6a0 90deg 135deg, #4cc9f0 135deg 180deg, #b517ff 180deg 225deg, #ff9f1c 225deg 270deg, #ef476f 270deg 315deg, #8ac926 315deg 360deg)",
+          }}
+        >
+          <div className="absolute inset-8 rounded-full border-[10px] border-white/50" />
+          <div className="absolute inset-[72px] rounded-full bg-white/20" />
+        </div>
+
+        <div className="absolute left-1/2 top-1/2 z-20 flex h-36 w-36 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-white bg-white p-3 shadow-2xl sm:h-44 sm:w-44">
+          <div className="text-center">
+            <p className="text-[10px] font-black tracking-[0.2em] text-pink-600 sm:text-xs">
+              QUESTION
+            </p>
+
+            <p className="mt-2 text-3xl font-black text-indigo-700 sm:text-4xl">
+              {spinning ? "🎡" : current.question}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onSpin}
+        disabled={spinning}
+        className="mt-10 inline-flex items-center justify-center gap-3 rounded-full bg-pink-600 px-10 py-5 text-xl font-black text-white shadow-xl transition hover:scale-105 hover:bg-pink-700 active:scale-95 disabled:opacity-60"
+      >
+        <RotateCw className={spinning ? "animate-spin" : ""} size={26} />
+        {spinning ? "Spinning..." : spinText}
+      </button>
     </div>
   );
 }
@@ -558,20 +1181,23 @@ function AnswerInput({
   hint,
   onChange,
   onSubmit,
+  disabled,
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
   input: string;
-  status: "idle" | "correct" | "wrong";
+  status: Status;
   placeholder: string;
   hint: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="mx-auto mt-8 max-w-xl rounded-[2rem] bg-white p-5 shadow">
       <input
         ref={inputRef}
         value={input}
+        disabled={disabled}
         inputMode="numeric"
         pattern="[0-9]*"
         placeholder={placeholder}
@@ -582,10 +1208,10 @@ function AnswerInput({
             onSubmit();
           }
         }}
-        className={`w-full rounded-2xl border-4 px-5 py-4 text-center text-5xl font-black outline-none ${
+        className={`w-full rounded-2xl border-4 px-5 py-4 text-center text-5xl font-black outline-none disabled:bg-slate-100 ${
           status === "correct"
             ? "border-emerald-400 text-emerald-600"
-            : status === "wrong"
+            : status === "wrong" || status === "timeup"
             ? "border-red-400 text-red-600"
             : "border-sky-200 text-indigo-700 focus:border-indigo-500"
         }`}
@@ -606,7 +1232,7 @@ function NumberPad({
   clearText,
   checkText,
 }: {
-  status: "idle" | "correct" | "wrong";
+  status: Status;
   onPress: (num: string) => void;
   onClear: () => void;
   onSubmit: () => void;
