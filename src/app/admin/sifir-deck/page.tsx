@@ -25,7 +25,7 @@ type DeckQuestion = {
   language: string;
   question: string;
   answer: string;
-  level: QuestionLevel | null;
+  difficulty: QuestionLevel | null;
   created_at?: string;
 };
 
@@ -154,7 +154,7 @@ function Content() {
       language,
       question: question.trim(),
       answer: answer.trim(),
-      level,
+      difficulty: level,
     });
 
     setSaving(false);
@@ -515,10 +515,10 @@ function Content() {
 
                           <span
                             className={`rounded-full px-3 py-1 text-sm font-bold uppercase ${getLevelClass(
-                              item.level || "easy"
+                              item.difficulty || "easy"
                             )}`}
                           >
-                            {item.level || "easy"}
+                            {item.difficulty || "easy"}
                           </span>
                         </div>
 
