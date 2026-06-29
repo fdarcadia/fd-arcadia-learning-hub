@@ -375,7 +375,6 @@ function CalendarPlanner() {
             ))}
 
             {calendarCells.map((cell, index) => {
-              const firstItem = cell.savedPlan?.items?.[0];
 
               return (
                 <button
@@ -413,16 +412,26 @@ function CalendarPlanner() {
                     ) : null}
                   </div>
 
-                  {firstItem ? (
-                    <div className="mt-4 space-y-1 text-xs">
-                      <p className="font-bold text-indigo-700">
-                        • {firstItem.time}
-                      </p>
-                      <p className="line-clamp-1 text-slate-700">
-                        {firstItem.subject}
-                      </p>
-                    </div>
-                  ) : null}
+                  {cell.savedPlan?.items?.length ? (
+  <div className="mt-4 space-y-1 text-xs">
+    {cell.savedPlan.items.slice(0, 3).map((item) => (
+      <div key={item.id} className="leading-tight">
+        <p className="font-bold text-indigo-700">
+          • {item.time}
+        </p>
+        <p className="line-clamp-1 text-slate-700">
+          {item.subject}
+        </p>
+      </div>
+    ))}
+
+    {cell.savedPlan.items.length > 3 ? (
+      <p className="font-bold text-pink-600">
+        +{cell.savedPlan.items.length - 3} more
+      </p>
+    ) : null}
+  </div>
+) : null}
                 </button>
               );
             })}
