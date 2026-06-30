@@ -1,14 +1,15 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  CheckCircle2,
   Clock,
   Loader2,
   Plus,
+  RefreshCw,
   Save,
+  Search,
   Settings,
   Trash2,
 } from "lucide-react";
@@ -26,6 +27,7 @@ type DeckQuestion = {
   question: string;
   answer: string;
   difficulty: QuestionLevel | null;
+  table_no: number | null;
   created_at?: string;
 };
 
@@ -66,6 +68,10 @@ function Content() {
   const [timerSeconds, setTimerSeconds] = useState(30);
   const [savingSettings, setSavingSettings] = useState(false);
 
+  const [selectedTable, setSelectedTable] = useState("all");
+  const [selectedLevel, setSelectedLevel] = useState("all");
+  const [search, setSearch] = useState("");
+
   useEffect(() => {
     loadData();
   }, []);
@@ -88,6 +94,8 @@ function Content() {
     const { data, error } = await supabase
       .from("sifir_deck_questions")
       .select("*")
+      .order("table_no", { ascending: true, nullsFirst: false })
+      .order("difficulty", { ascending: true })
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -140,6 +148,19 @@ function Content() {
     alert("Spin wheel settings saved.");
   }
 
+  function detectTableNo() {
+    if (secondNumber && !Number.isNaN(Number(secondNumber))) {
+      return Number(secondNumber);
+    }
+
+    const match = question.match(/[×xX]\s*(\d+)/);
+    if (match?.[1]) {
+      return Number(match[1]);
+    }
+
+    return null;
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
@@ -155,6 +176,7 @@ function Content() {
       question: question.trim(),
       answer: answer.trim(),
       difficulty: level,
+      table_no: detectTableNo(),
     });
 
     setSaving(false);
@@ -189,6 +211,26 @@ function Content() {
 
     await loadData();
   }
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const matchTable =
+        selectedTable === "all" || item.table_no === Number(selectedTable);
+
+      const matchLevel =
+        selectedLevel === "all" || item.difficulty === selectedLevel;
+
+      const keyword = search.toLowerCase();
+
+      const matchSearch =
+        item.question.toLowerCase().includes(keyword) ||
+        item.answer.toLowerCase().includes(keyword) ||
+        item.language.toLowerCase().includes(keyword) ||
+        String(item.table_no || "").includes(keyword);
+
+      return matchTable && matchLevel && matchSearch;
+    });
+  }, [items, selectedTable, selectedLevel, search]);
 
   return (
     <>
@@ -264,9 +306,7 @@ function Content() {
               </label>
 
               <label className="grid gap-2">
-                <span className="font-bold text-slate-700">
-                  Timer Seconds
-                </span>
+                <span className="font-bold text-slate-700">Timer Seconds</span>
                 <input
                   type="number"
                   min={5}
@@ -324,7 +364,7 @@ function Content() {
                     Add New Card
                   </h2>
                   <p className="text-slate-500">
-                    Auto calculate answer or edit manually.
+                    Auto calculate answer and detect sifir number.
                   </p>
                 </div>
               </div>
@@ -365,7 +405,7 @@ function Content() {
                     <input
                       value={firstNumber}
                       onChange={(e) => setFirstNumber(e.target.value)}
-                      placeholder="Contoh: 7"
+                      placeholder="Contoh: 42"
                       inputMode="numeric"
                       className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500"
                     />
@@ -373,12 +413,12 @@ function Content() {
 
                   <label className="grid gap-2">
                     <span className="font-bold text-slate-700">
-                      Second Number
+                      Sifir Number
                     </span>
                     <input
                       value={secondNumber}
                       onChange={(e) => setSecondNumber(e.target.value)}
-                      placeholder="Contoh: 8"
+                      placeholder="Contoh: 2"
                       inputMode="numeric"
                       className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500"
                     />
@@ -390,7 +430,7 @@ function Content() {
                   <input
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="Contoh: 7 × 8 = ?"
+                    placeholder="Contoh: 42 × 2 = ?"
                     className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500"
                     required
                   />
@@ -401,7 +441,7 @@ function Content() {
                   <input
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
-                    placeholder="Jawapan: 56"
+                    placeholder="Jawapan: 84"
                     inputMode="numeric"
                     className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500"
                     required
@@ -441,7 +481,7 @@ function Content() {
                 <p className="text-indigo-100">Soalan Sifir</p>
 
                 <h3 className="mt-5 text-5xl font-black">
-                  {question || "7 × 8 = ?"}
+                  {question || "42 × 2 = ?"}
                 </h3>
               </div>
 
@@ -451,7 +491,7 @@ function Content() {
                 </p>
 
                 <p className="mt-3 text-5xl font-black text-emerald-600">
-                  {answer || "56"}
+                  {answer || "84"}
                 </p>
               </div>
 
@@ -474,12 +514,12 @@ function Content() {
           <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="tracking-[0.2em] text-sm font-bold text-yellow-600">
-                  SAVED CARDS
+                <p className="text-sm font-bold tracking-[0.2em] text-yellow-600">
+                  SAVED QUESTIONS
                 </p>
 
                 <h2 className="mt-1 text-3xl font-bold text-indigo-700">
-                  {items.length} Sifir Cards
+                  {filteredItems.length} / {items.length} Questions
                 </h2>
               </div>
 
@@ -487,32 +527,92 @@ function Content() {
                 onClick={loadData}
                 className="rounded-2xl bg-emerald-100 px-5 py-3 font-bold text-emerald-700"
               >
+                <RefreshCw className="mr-2 inline" size={18} />
                 Refresh
               </button>
             </div>
 
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <select
+                value={selectedTable}
+                onChange={(e) => setSelectedTable(e.target.value)}
+                className="rounded-2xl border border-slate-300 px-4 py-3 font-semibold outline-none focus:border-indigo-500"
+              >
+                <option value="all">Semua Sifir</option>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((no) => (
+                  <option key={no} value={no}>
+                    Sifir {no}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedLevel}
+                onChange={(e) => setSelectedLevel(e.target.value)}
+                className="rounded-2xl border border-slate-300 px-4 py-3 font-semibold outline-none focus:border-indigo-500"
+              >
+                <option value="all">Semua Level</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+
+              <div className="relative">
+                <Search
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={18}
+                />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search soalan / jawapan..."
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 pl-11 font-semibold outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
             {loading ? (
               <div className="mt-6 rounded-2xl bg-slate-50 p-6 text-center text-slate-500">
-                Loading cards...
+                Loading questions...
               </div>
-            ) : items.length === 0 ? (
+            ) : filteredItems.length === 0 ? (
               <div className="mt-6 rounded-2xl bg-yellow-50 p-6 text-center text-yellow-700">
-                No cards yet. Add your first card above.
+                No questions found.
               </div>
             ) : (
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-[2rem] border border-indigo-100 bg-indigo-50 p-5 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-indigo-700">
-                            {item.language.toUpperCase()}
-                          </span>
+              <div className="mt-6 overflow-x-auto rounded-[1.5rem] border border-slate-200">
+                <table className="w-full min-w-[850px] border-collapse bg-white text-left">
+                  <thead className="bg-indigo-100 text-indigo-800">
+                    <tr>
+                      <th className="p-4">No</th>
+                      <th className="p-4">Sifir</th>
+                      <th className="p-4">Level</th>
+                      <th className="p-4">Language</th>
+                      <th className="p-4">Question</th>
+                      <th className="p-4">Answer</th>
+                      <th className="p-4 text-center">Action</th>
+                    </tr>
+                  </thead>
 
+                  <tbody>
+                    {filteredItems.map((item, index) => (
+                      <tr
+                        key={item.id}
+                        className="border-t border-slate-100 hover:bg-yellow-50"
+                      >
+                        <td className="p-4 font-semibold text-slate-600">
+                          {index + 1}
+                        </td>
+
+                        <td className="p-4">
+                          <span className="rounded-full bg-indigo-50 px-3 py-1 font-bold text-indigo-700">
+                            {item.table_no
+                              ? `Sifir ${item.table_no}`
+                              : "Not set"}
+                          </span>
+                        </td>
+
+                        <td className="p-4">
                           <span
                             className={`rounded-full px-3 py-1 text-sm font-bold uppercase ${getLevelClass(
                               item.difficulty || "easy"
@@ -520,28 +620,33 @@ function Content() {
                           >
                             {item.difficulty || "easy"}
                           </span>
-                        </div>
+                        </td>
 
-                        <h3 className="mt-4 text-3xl font-black text-indigo-700">
+                        <td className="p-4 font-bold uppercase text-slate-600">
+                          {item.language}
+                        </td>
+
+                        <td className="p-4 text-xl font-black text-indigo-700">
                           {item.question}
-                        </h3>
+                        </td>
 
-                        <p className="mt-3 inline-flex items-center rounded-2xl bg-emerald-100 px-4 py-2 font-bold text-emerald-700">
-                          <CheckCircle2 className="mr-2" size={18} />
-                          Answer: {item.answer}
-                        </p>
-                      </div>
+                        <td className="p-4 text-lg font-black text-emerald-700">
+                          {item.answer}
+                        </td>
 
-                      <button
-                        onClick={() => deleteQuestion(item.id)}
-                        className="rounded-2xl bg-red-100 p-3 text-red-600 transition hover:bg-red-200"
-                        title="Delete card"
-                      >
-                        <Trash2 />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                        <td className="p-4 text-center">
+                          <button
+                            onClick={() => deleteQuestion(item.id)}
+                            className="rounded-2xl bg-red-100 p-3 text-red-600 transition hover:bg-red-200"
+                            title="Delete question"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </section>
