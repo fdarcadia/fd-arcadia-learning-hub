@@ -29,6 +29,10 @@ type FlashcardBook = {
   is_active: boolean;
 };
 
+type FlashcardAccess = {
+  flashcard_id: string;
+};
+
 export default function FlashcardLibraryPage() {
   return (
     <ProtectedPage>
@@ -42,33 +46,48 @@ function FlashcardLibrary({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadBooks() {
-    setLoading(true);
-    setError("");
+  useEffect(() => {
+    async function loadBooks() {
+      setLoading(true);
+      setError("");
 
-    const { data, error } = await supabase
-      .from("flashcard_library")
-      .select(
-        `
-        *,
-        flashcard_access!inner(parent_id)
-      `
-      )
-      .eq("is_active", true)
-      .eq("flashcard_access.parent_id", userId)
-      .order("display_order", { ascending: true });
+      const { data: accessData, error: accessError } = await supabase
+        .from("flashcard_access")
+        .select("flashcard_id")
+        .eq("parent_id", userId);
 
-    if (error) {
-      setError(error.message);
+      if (accessError) {
+        setError(accessError.message);
+        setLoading(false);
+        return;
+      }
+
+      const accessRows = (accessData || []) as FlashcardAccess[];
+      const flashcardIds = accessRows.map((item) => item.flashcard_id);
+
+      if (flashcardIds.length === 0) {
+        setBooks([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data: bookData, error: bookError } = await supabase
+        .from("flashcard_library")
+        .select("*")
+        .in("id", flashcardIds)
+        .eq("is_active", true)
+        .order("display_order", { ascending: true });
+
+      if (bookError) {
+        setError(bookError.message);
+        setLoading(false);
+        return;
+      }
+
+      setBooks((bookData || []) as FlashcardBook[]);
       setLoading(false);
-      return;
     }
 
-    setBooks((data || []) as FlashcardBook[]);
-    setLoading(false);
-  }
-
-  useEffect(() => {
     loadBooks();
   }, [userId]);
 
@@ -118,8 +137,7 @@ function FlashcardLibrary({ userId }: { userId: string }) {
             </h2>
 
             <p className="mt-2 text-slate-600">
-              This page will show flashcard books after admin assigns access to
-              your account.
+              Admin belum assign flashcard book kepada akaun ini.
             </p>
           </section>
         ) : null}
