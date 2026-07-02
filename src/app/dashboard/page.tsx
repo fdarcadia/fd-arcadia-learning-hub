@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Baby,
   BarChart3,
+  BookOpen,
   BookOpenCheck,
   Calculator,
   CalendarDays,
@@ -27,13 +28,18 @@ import { type Profile, supabase, userTypeLabels } from "@/lib/supabase";
 const ADMIN_EMAIL = "fdarcadia.hello@gmail.com";
 const WHATSAPP_NUMBER = "601140731757";
 
+type DashboardProfile = Profile & {
+  flashcard_unlocked?: boolean;
+};
+
 type ParentAccessField =
   | "learning_hub_unlocked"
   | "custom_worksheet_unlocked"
   | "math_activity_unlocked"
   | "draw_learn_unlocked"
   | "sifir_deck_unlocked"
-  | "freebies_unlocked";
+  | "freebies_unlocked"
+  | "flashcard_unlocked";
 
 const packageLabels: Record<string, string> = {
   math_package: "Math Package RM25",
@@ -70,6 +76,14 @@ const parentFeatureCards: {
     icon: Calculator,
     color: "bg-emerald-100 text-emerald-700",
     description: "Practice tambah, tolak, darab and bahagi.",
+  },
+  {
+    title: "Flashcard Library",
+    href: "/flashcard-library",
+    field: "flashcard_unlocked",
+    icon: BookOpen,
+    color: "bg-indigo-100 text-indigo-700",
+    description: "Digital flashcard books to view online and download.",
   },
   {
     title: "Sifir Deck",
@@ -178,6 +192,14 @@ function AdminDashboard({ email }: { email: string }) {
           />
 
           <AdminCard
+            title="Flashcard Library"
+            href="/admin/flashcard-library"
+            icon={BookOpen}
+            color="text-indigo-600"
+            description="Manage digital books, Canva links and PDF downloads."
+          />
+
+          <AdminCard
             title="Freebies"
             href="/admin/freebies"
             icon={Gift}
@@ -223,6 +245,14 @@ function AdminDashboard({ email }: { email: string }) {
             icon={BookOpenCheck}
             color="text-indigo-600"
             description="View parent Learning Hub page."
+          />
+
+          <AdminCard
+            title="Preview Flashcard"
+            href="/flashcard-library"
+            icon={BookOpen}
+            color="text-indigo-600"
+            description="View parent Flashcard Library page."
           />
 
           <AdminCard
@@ -273,16 +303,14 @@ function AdminCard({
       className="rounded-[2rem] bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
     >
       <Icon className={color} size={36} />
-
       <h2 className="mt-5 text-3xl font-bold text-indigo-700">{title}</h2>
-
       <p className="mt-2 text-slate-600">{description}</p>
     </Link>
   );
 }
 
 function ParentDashboard({ userId }: { userId: string }) {
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<DashboardProfile | null>(null);
   const [childrenCount, setChildrenCount] = useState(0);
   const [error, setError] = useState("");
 
@@ -299,7 +327,7 @@ function ParentDashboard({ userId }: { userId: string }) {
         return;
       }
 
-      setProfile(profileData as Profile);
+      setProfile(profileData as DashboardProfile);
 
       const { count: childCount } = await supabase
         .from("children")
@@ -438,7 +466,10 @@ function ParentDashboard({ userId }: { userId: string }) {
               label="Start Date"
               value={profile?.subscription_start || "-"}
             />
-            <StatusBox label="End Date" value={profile?.subscription_end || "-"} />
+            <StatusBox
+              label="End Date"
+              value={profile?.subscription_end || "-"}
+            />
           </div>
         </section>
 
@@ -454,11 +485,9 @@ function ParentDashboard({ userId }: { userId: string }) {
             className="rounded-[2rem] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
           >
             <Baby className="text-orange-600" size={30} />
-
             <h3 className="mt-3 text-2xl font-bold text-indigo-700">
               {childrenCount} Child
             </h3>
-
             <p className="mt-2 text-slate-600">
               Child profiles added to your account.
             </p>
@@ -469,11 +498,9 @@ function ParentDashboard({ userId }: { userId: string }) {
             className="rounded-[2rem] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
           >
             <UserRound className="text-pink-600" size={30} />
-
             <h3 className="mt-3 text-2xl font-bold text-indigo-700">
               My Profile
             </h3>
-
             <p className="mt-2 text-slate-600">
               Update name and profile picture.
             </p>
@@ -486,7 +513,6 @@ function ParentDashboard({ userId }: { userId: string }) {
               <p className="tracking-[0.2em] text-sm font-bold text-yellow-600">
                 WEEKLY CALENDAR
               </p>
-
               <h2 className="mt-1 text-3xl font-bold text-indigo-700">
                 This Week
               </h2>
@@ -543,57 +569,53 @@ function ParentDashboard({ userId }: { userId: string }) {
             const unlocked = card.field ? Boolean(profile?.[card.field]) : true;
             const Icon = card.icon;
 
-            const content = (
-              <div
-                className={`soft-card min-h-72 rounded-[2rem] p-6 transition ${
-                  unlocked
-                    ? "hover:-translate-y-1 hover:shadow-2xl"
-                    : "border-dashed opacity-75"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div
-                    className={`grid h-16 w-16 place-items-center rounded-2xl ${card.color}`}
-                  >
-                    <Icon size={30} />
-                  </div>
-
-                  {unlocked ? (
-                    <Unlock className="text-emerald-600" size={26} />
-                  ) : (
-                    <LockKeyhole className="text-slate-400" size={26} />
-                  )}
-                </div>
-
-                <h2 className="mt-10 text-3xl font-bold text-indigo-700">
-                  {card.title}
-                </h2>
-
-                <p className="mt-4 text-lg leading-8 text-slate-600">
-                  {unlocked
-                    ? card.description
-                    : "Locked. View package pricing and WhatsApp admin to unlock access."}
-                </p>
-
-                {unlocked ? (
-  <p className="mt-4 rounded-2xl bg-yellow-100 px-4 py-2 text-yellow-800">
-    Tap to open
-  </p>
-) : (
-  <p className="mt-4 rounded-2xl bg-slate-100 px-4 py-2 text-slate-500">
-    Locked
-  </p>
-)}
-              </div>
-            );
-
             return (
               <Link
                 key={card.title}
                 href={unlocked ? card.href : "/pricing"}
                 className="block"
               >
-                {content}
+                <div
+                  className={`soft-card min-h-72 rounded-[2rem] p-6 transition ${
+                    unlocked
+                      ? "hover:-translate-y-1 hover:shadow-2xl"
+                      : "border-dashed opacity-75"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div
+                      className={`grid h-16 w-16 place-items-center rounded-2xl ${card.color}`}
+                    >
+                      <Icon size={30} />
+                    </div>
+
+                    {unlocked ? (
+                      <Unlock className="text-emerald-600" size={26} />
+                    ) : (
+                      <LockKeyhole className="text-slate-400" size={26} />
+                    )}
+                  </div>
+
+                  <h2 className="mt-10 text-3xl font-bold text-indigo-700">
+                    {card.title}
+                  </h2>
+
+                  <p className="mt-4 text-lg leading-8 text-slate-600">
+                    {unlocked
+                      ? card.description
+                      : "Locked. View package pricing and WhatsApp admin to unlock access."}
+                  </p>
+
+                  {unlocked ? (
+                    <p className="mt-4 rounded-2xl bg-yellow-100 px-4 py-2 text-yellow-800">
+                      Tap to open
+                    </p>
+                  ) : (
+                    <p className="mt-4 rounded-2xl bg-slate-100 px-4 py-2 text-slate-500">
+                      Locked
+                    </p>
+                  )}
+                </div>
               </Link>
             );
           })}

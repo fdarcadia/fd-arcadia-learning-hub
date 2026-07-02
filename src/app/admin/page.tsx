@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  BookOpen,
   BookOpenCheck,
   Calculator,
   CalendarDays,
@@ -26,7 +27,7 @@ type Profile = {
   user_type: string | null;
   learning_hub_unlocked: boolean;
   custom_worksheet_unlocked: boolean;
-  flashcard_modul_unlocked: boolean;
+  flashcard_unlocked: boolean;
   math_activity_unlocked: boolean;
   draw_learn_unlocked: boolean;
   sifir_deck_unlocked: boolean;
@@ -40,7 +41,7 @@ type Profile = {
 type AccessField =
   | "learning_hub_unlocked"
   | "custom_worksheet_unlocked"
-  | "flashcard_modul_unlocked"
+  | "flashcard_unlocked"
   | "math_activity_unlocked"
   | "draw_learn_unlocked"
   | "sifir_deck_unlocked"
@@ -124,9 +125,7 @@ function getEndDate(packageType: string, startDate: string) {
 
   if (!selectedPackage) return startDate;
 
-  if (selectedPackage.days) {
-    return addDays(startDate, selectedPackage.days);
-  }
+  if (selectedPackage.days) return addDays(startDate, selectedPackage.days);
 
   return addMonths(startDate, selectedPackage.months ?? 1);
 }
@@ -135,7 +134,7 @@ function getPackageUnlocks(packageType: string) {
   const base = {
     learning_hub_unlocked: false,
     custom_worksheet_unlocked: false,
-    flashcard_modul_unlocked: false,
+    flashcard_unlocked: false,
     math_activity_unlocked: false,
     draw_learn_unlocked: false,
     sifir_deck_unlocked: false,
@@ -167,6 +166,7 @@ function getPackageUnlocks(packageType: string) {
         draw_learn_unlocked: true,
         sifir_deck_unlocked: true,
         freebies_unlocked: true,
+        flashcard_unlocked: true,
       };
 
     case "worksheet_trial":
@@ -323,7 +323,7 @@ function AdminContent() {
         subscription_end: null,
         learning_hub_unlocked: false,
         custom_worksheet_unlocked: false,
-        flashcard_modul_unlocked: false,
+        flashcard_unlocked: false,
         math_activity_unlocked: false,
         draw_learn_unlocked: false,
         sifir_deck_unlocked: false,
@@ -353,9 +353,9 @@ function AdminContent() {
             <ShieldCheck size={34} />
             <div>
               <p className="tracking-[0.25em] text-yellow-200">ADMIN PANEL</p>
-              <h1 className="font-display mt-1 text-5xl">Admin Dashboard</h1>
+              <h1 className="font-display mt-1 text-5xl">Manage Users</h1>
               <p className="mt-2 text-indigo-100">
-                Manage users, manual payment confirmation and package unlocks.
+                Manage parent subscription, manual payment confirmation and package unlocks.
               </p>
             </div>
           </div>
@@ -370,6 +370,14 @@ function AdminContent() {
             title="Learning Hub"
             description="Add month, week and Google Drive links."
             color="text-yellow-700"
+          />
+
+          <AdminQuickLink
+            href="/admin/flashcard-library"
+            icon={BookOpen}
+            title="Flashcard Library"
+            description="Upload PDF, cover and manage book access."
+            color="text-indigo-600"
           />
 
           <AdminQuickLink
@@ -753,13 +761,13 @@ function UserCard({
         />
 
         <AccessButton
-          label="Flashcard"
-          active={profile.flashcard_modul_unlocked}
+          label="Flashcard Page"
+          active={profile.flashcard_unlocked}
           onClick={() =>
             onToggle(
               profile.id,
-              "flashcard_modul_unlocked",
-              profile.flashcard_modul_unlocked
+              "flashcard_unlocked",
+              profile.flashcard_unlocked
             )
           }
         />
