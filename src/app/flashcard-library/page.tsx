@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -41,6 +41,11 @@ export default function FlashcardLibraryPage() {
   );
 }
 
+function getBookNumber(title: string) {
+  const match = title.match(/Buku\s*(\d+)/i);
+  return match ? Number(match[1]) : 999;
+}
+
 function FlashcardLibrary({ userId }: { userId: string }) {
   const [books, setBooks] = useState<FlashcardBook[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,8 +80,7 @@ function FlashcardLibrary({ userId }: { userId: string }) {
         .from("flashcard_library")
         .select("*")
         .in("id", flashcardIds)
-        .eq("is_active", true)
-        .order("display_order", { ascending: true });
+        .eq("is_active", true);
 
       if (bookError) {
         setError(bookError.message);
@@ -84,12 +88,23 @@ function FlashcardLibrary({ userId }: { userId: string }) {
         return;
       }
 
-      setBooks((bookData || []) as FlashcardBook[]);
+      const sortedBooks = ((bookData || []) as FlashcardBook[]).sort((a, b) => {
+        const orderA = a.display_order ?? getBookNumber(a.title);
+        const orderB = b.display_order ?? getBookNumber(b.title);
+
+        if (orderA !== orderB) return orderA - orderB;
+
+        return getBookNumber(a.title) - getBookNumber(b.title);
+      });
+
+      setBooks(sortedBooks);
       setLoading(false);
     }
 
     loadBooks();
   }, [userId]);
+
+  const totalBooks = useMemo(() => books.length, [books]);
 
   return (
     <>
@@ -114,6 +129,12 @@ function FlashcardLibrary({ userId }: { userId: string }) {
           <p className="mt-2 text-indigo-100">
             Your purchased digital flashcard books.
           </p>
+
+          {!loading && !error && totalBooks > 0 ? (
+            <p className="mt-3 inline-flex rounded-full bg-white/20 px-4 py-2 text-sm font-bold text-white">
+              {totalBooks} book{totalBooks > 1 ? "s" : ""} unlocked
+            </p>
+          ) : null}
         </section>
 
         {loading ? (
@@ -146,13 +167,13 @@ function FlashcardLibrary({ userId }: { userId: string }) {
           {books.map((book) => (
             <div
               key={book.id}
-              className="rounded-[2rem] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+              className="overflow-hidden rounded-[2rem] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
             >
               {book.cover_url ? (
                 <img
                   src={book.cover_url}
                   alt={book.title}
-                  className="h-56 w-full rounded-2xl object-cover"
+                  className="h-56 w-full rounded-2xl object-cover object-top"
                 />
               ) : (
                 <div className="grid h-56 place-items-center rounded-2xl bg-indigo-50 text-5xl">
