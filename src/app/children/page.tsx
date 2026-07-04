@@ -1,8 +1,33 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { Baby, Plus, Trash2 } from "lucide-react";
-import { Navbar } from "@/components/Navbar";
+import type { ChangeEvent, FormEvent, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  Baby,
+  BarChart3,
+  BookOpen,
+  BookOpenCheck,
+  Camera,
+  CheckCircle2,
+  ChevronRight,
+  FileText,
+  Home,
+  ImagePlus,
+  Loader2,
+  Palette,
+  Pencil,
+  Plus,
+  Save,
+  Sparkles,
+  Trash2,
+  Trophy,
+  Upload,
+  UserRound,
+  Users,
+  X,
+} from "lucide-react";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { supabase } from "@/lib/supabase";
 
@@ -12,35 +37,125 @@ type Child = {
   child_name: string;
   age: string | null;
   avatar: string | null;
+  avatar_url?: string | null;
+  avatar_type?: string | null;
   subjects: string[] | null;
+  created_at?: string | null;
+  school?: string | null;
+  level?: string | null;
+  reading_level?: string | null;
+  math_level?: string | null;
+  learning_goal?: string | null;
+  parent_notes?: string | null;
 };
 
-const avatars = ["👧", "👦", "🧒", "👶", "😊", "🌟"];
-const subjects = ["Bahasa Melayu", "English", "Mathematics", "Science", "Membaca 3M"];
+type ChildFormState = {
+  id: string | null;
+  child_name: string;
+  age: string;
+  avatar_url: string;
+  avatar_type: "default" | "upload" | "url";
+  subjects: string[];
+  school: string;
+  level: string;
+  reading_level: string;
+  math_level: string;
+  learning_goal: string;
+  parent_notes: string;
+};
+
+const emptyForm: ChildFormState = {
+  id: null,
+  child_name: "",
+  age: "",
+  avatar_url: "/avatars/1.svg",
+  avatar_type: "default",
+  subjects: [],
+  school: "",
+  level: "",
+  reading_level: "",
+  math_level: "",
+  learning_goal: "",
+  parent_notes: "",
+};
+
+const defaultAvatars = [
+  "/avatars/1.svg",
+  "/avatars/2.svg",
+  "/avatars/3.svg",
+  "/avatars/4.svg",
+  "/avatars/5.svg",
+  "/avatars/6.svg",
+  "/avatars/7.svg",
+  "/avatars/8.svg",
+];
+
+const subjects = [
+  "Bahasa Melayu",
+  "English",
+  "Mathematics",
+  "Science",
+  "Membaca 3M",
+];
+
+const levels = [
+  "Preschool 4",
+  "Preschool 5",
+  "Preschool 6",
+  "Year 1",
+  "Year 2",
+  "Year 3",
+];
+
+const readingLevels = [
+  "Pre Reader",
+  "Letter Recognition",
+  "Vowels",
+  "KV",
+  "KVKV",
+  "KVK",
+  "Sentence",
+  "Story Book",
+];
+
+const mathLevels = [
+  "Numbers 1-10",
+  "Numbers 1-20",
+  "Counting",
+  "Addition",
+  "Subtraction",
+  "Multiplication",
+  "Division",
+  "Mixed",
+];
+
+const storageBucket = "child-avatars";
 
 export default function ChildrenPage() {
   return (
     <ProtectedPage>
-      {(user) => (
-        <>
-          <Navbar />
-          <ChildrenContent parentId={user.id} />
-        </>
-      )}
+      {(user) => <ChildrenContent parentId={user.id} />}
     </ProtectedPage>
   );
 }
 
 function ChildrenContent({ parentId }: { parentId: string }) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [children, setChildren] = useState<Child[]>([]);
-  const [childName, setChildName] = useState("");
-  const [age, setAge] = useState("");
-  const [avatar, setAvatar] = useState("👧");
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [form, setForm] = useState<ChildFormState>(emptyForm);
+  const [activeChildId, setActiveChildId] = useState<string>("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loadingChildren, setLoadingChildren] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
 
   async function loadChildren() {
+    setLoadingChildren(true);
+    setError("");
+
     const { data, error: loadError } = await supabase
       .from("children")
       .select("*")
@@ -49,36 +164,194 @@ function ChildrenContent({ parentId }: { parentId: string }) {
 
     if (loadError) {
       setError(loadError.message);
+      setLoadingChildren(false);
       return;
     }
 
-    setChildren((data || []) as Child[]);
+    const rows = (data || []) as Child[];
+    setChildren(rows);
+
+    if (!activeChildId && rows.length > 0) {
+      setActiveChildId(rows[0].id);
+    }
+
+    setLoadingChildren(false);
   }
 
   useEffect(() => {
     loadChildren();
   }, [parentId]);
 
-  function toggleSubject(subject: string) {
-    setSelectedSubjects((current) =>
-      current.includes(subject)
-        ? current.filter((item) => item !== subject)
-        : [...current, subject]
+  const activeChild = useMemo(() => {
+    return children.find((child) => child.id === activeChildId) || children[0];
+  }, [children, activeChildId]);
+
+  const stats = useMemo(() => {
+    const totalSubjects = children.reduce(
+      (sum, child) => sum + (child.subjects?.length || 0),
+      0
     );
+
+    return {
+      children: children.length,
+      subjects: totalSubjects,
+      averageProgress: children.length ? 72 : 0,
+      weeklyGoals: children.filter((child) => child.learning_goal).length,
+    };
+  }, [children]);
+
+  function updateForm<K extends keyof ChildFormState>(
+    key: K,
+    value: ChildFormState[K]
+  ) {
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
   }
 
-  async function addChild(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function toggleSubject(subject: string) {
+    setForm((current) => ({
+      ...current,
+      subjects: current.subjects.includes(subject)
+        ? current.subjects.filter((item) => item !== subject)
+        : [...current.subjects, subject],
+    }));
+  }
+
+  function resetForm() {
+    setForm(emptyForm);
+    setMessage("");
+    setError("");
+  }
+
+  function editChild(child: Child) {
+    const avatarValue = child.avatar_url || child.avatar || "/avatars/1.svg";
+    const avatarType = child.avatar_type === "upload" ? "upload" : defaultAvatars.includes(avatarValue) ? "default" : "url";
+
+    setForm({
+      id: child.id,
+      child_name: child.child_name || "",
+      age: child.age || "",
+      avatar_url: avatarValue,
+      avatar_type: avatarType,
+      subjects: child.subjects || [],
+      school: child.school || "",
+      level: child.level || "",
+      reading_level: child.reading_level || "",
+      math_level: child.math_level || "",
+      learning_goal: child.learning_goal || "",
+      parent_notes: child.parent_notes || "",
+    });
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
     setError("");
     setMessage("");
 
-    const { error: insertError } = await supabase.from("children").insert({
+    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"];
+
+    if (!allowedTypes.includes(file.type)) {
+      setError("Please upload PNG, JPG, WEBP or SVG file.");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Avatar image must be less than 2MB.");
+      return;
+    }
+
+    setUploadingAvatar(true);
+
+    const fileExt = file.name.split(".").pop() || "png";
+    const fileName = `${parentId}/${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(storageBucket)
+      .upload(fileName, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      setUploadingAvatar(false);
+      setError(
+        `${uploadError.message}. Make sure Supabase Storage bucket '${storageBucket}' exists and is public.`
+      );
+      return;
+    }
+
+    const { data } = supabase.storage.from(storageBucket).getPublicUrl(fileName);
+
+    setForm((current) => ({
+      ...current,
+      avatar_url: data.publicUrl,
+      avatar_type: "upload",
+    }));
+
+    setUploadingAvatar(false);
+    setMessage("Avatar uploaded successfully.");
+  }
+
+  async function saveChild(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setSaving(true);
+    setError("");
+    setMessage("");
+
+    const payload = {
       parent_id: parentId,
-      child_name: childName,
-      age,
-      avatar,
-      subjects: selectedSubjects,
-    });
+      child_name: form.child_name.trim(),
+      age: form.age.trim() || null,
+      avatar: form.avatar_url.trim() || null,
+      avatar_url: form.avatar_url.trim() || null,
+      avatar_type: form.avatar_type,
+      subjects: form.subjects,
+      school: form.school.trim() || null,
+      level: form.level.trim() || null,
+      reading_level: form.reading_level.trim() || null,
+      math_level: form.math_level.trim() || null,
+      learning_goal: form.learning_goal.trim() || null,
+      parent_notes: form.parent_notes.trim() || null,
+    };
+
+    if (!payload.child_name) {
+      setSaving(false);
+      setError("Please enter child name.");
+      return;
+    }
+
+    if (form.id) {
+      const { error: updateError } = await supabase
+        .from("children")
+        .update(payload)
+        .eq("id", form.id);
+
+      setSaving(false);
+
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+
+      setMessage("Child profile updated successfully.");
+      resetForm();
+      await loadChildren();
+      return;
+    }
+
+    const { error: insertError } = await supabase.from("children").insert(payload);
+
+    setSaving(false);
 
     if (insertError) {
       setError(insertError.message);
@@ -86,163 +359,907 @@ function ChildrenContent({ parentId }: { parentId: string }) {
     }
 
     setMessage("Child profile added successfully.");
-    setChildName("");
-    setAge("");
-    setAvatar("👧");
-    setSelectedSubjects([]);
-    loadChildren();
+    resetForm();
+    await loadChildren();
   }
 
   async function deleteChild(id: string) {
+    const confirmDelete = window.confirm("Delete this child profile?");
+    if (!confirmDelete) return;
+
+    setDeletingId(id);
+    setError("");
+
     const { error: deleteError } = await supabase
       .from("children")
       .delete()
       .eq("id", id);
+
+    setDeletingId("");
 
     if (deleteError) {
       setError(deleteError.message);
       return;
     }
 
-    loadChildren();
+    await loadChildren();
   }
 
   return (
-    <main className="page-shell py-8">
-      <section className="rounded-[2rem] bg-indigo-600 p-6 text-white shadow-xl">
-        <p className="tracking-[0.25em] text-yellow-200">PARENT AREA</p>
-        <h1 className="font-display mt-2 text-5xl">My Children</h1>
-        <p className="mt-2 text-indigo-100">
-          Add child profile, avatar, age and selected subjects.
-        </p>
-      </section>
+    <main className="min-h-screen bg-[#fbfaf7] text-slate-900">
+      <div className="grid min-h-screen xl:grid-cols-[280px_1fr]">
+        <ChildrenSidebar totalChildren={children.length} />
 
-      <form
-        onSubmit={addChild}
-        className="mt-8 rounded-[2rem] bg-white p-6 shadow-sm"
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <input
-            value={childName}
-            onChange={(event) => setChildName(event.target.value)}
-            placeholder="Child name"
-            className="rounded-2xl border px-4 py-3"
-            required
-          />
-
-          <input
-            value={age}
-            onChange={(event) => setAge(event.target.value)}
-            placeholder="Age e.g. 5"
-            className="rounded-2xl border px-4 py-3"
-          />
-        </div>
-
-        <div className="mt-5">
-          <p className="font-bold text-indigo-700">Choose Avatar</p>
-          <div className="mt-3 flex flex-wrap gap-3">
-            {avatars.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setAvatar(item)}
-                className={`rounded-2xl px-5 py-4 text-3xl ${
-                  avatar === item
-                    ? "bg-yellow-200 ring-4 ring-indigo-300"
-                    : "bg-slate-100"
-                }`}
+        <section className="px-4 py-6 lg:px-8">
+          <header className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div>
+              <Link
+                href="/dashboard"
+                className="mb-4 inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
-                {item}
-              </button>
-            ))}
-          </div>
-        </div>
+                <ArrowLeft size={20} />
+                Back Dashboard
+              </Link>
 
-        <div className="mt-5">
-          <p className="font-bold text-indigo-700">Selected Subjects</p>
-          <div className="mt-3 flex flex-wrap gap-3">
-            {subjects.map((subject) => (
-              <button
-                key={subject}
-                type="button"
-                onClick={() => toggleSubject(subject)}
-                className={`rounded-2xl px-4 py-3 font-bold ${
-                  selectedSubjects.includes(subject)
-                    ? "bg-indigo-600 text-white"
-                    : "bg-indigo-100 text-indigo-700"
-                }`}
-              >
-                {subject}
-              </button>
-            ))}
-          </div>
-        </div>
+              <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+                CHILD PROFILE CENTER
+              </p>
 
-        {error ? (
-          <div className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-red-700">
-            {error}
-          </div>
-        ) : null}
+              <h1 className="mt-1 text-4xl font-black text-indigo-700 sm:text-5xl">
+                My Children
+              </h1>
 
-        {message ? (
-          <div className="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-emerald-700">
-            {message}
-          </div>
-        ) : null}
-
-        <button
-          type="submit"
-          className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-bold text-white"
-        >
-          <Plus size={20} />
-          Add Child
-        </button>
-      </form>
-
-      <section className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {children.map((child) => (
-          <div
-            key={child.id}
-            className="rounded-[2rem] bg-white p-6 shadow-sm"
-          >
-            <div className="text-6xl">{child.avatar || "👧"}</div>
-
-            <h2 className="mt-4 text-3xl font-bold text-indigo-700">
-              {child.child_name}
-            </h2>
-
-            <p className="mt-1 text-slate-600">Age: {child.age || "-"}</p>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {(child.subjects || []).map((subject) => (
-                <span
-                  key={subject}
-                  className="rounded-2xl bg-yellow-100 px-3 py-2 text-sm font-bold text-yellow-800"
-                >
-                  {subject}
-                </span>
-              ))}
+              <p className="mt-2 max-w-3xl text-slate-600">
+                Add child profile, upload avatar, set learning level, goal,
+                notes and selected subjects.
+              </p>
             </div>
 
-            <button
-              onClick={() => deleteChild(child.id)}
-              className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-red-100 px-4 py-3 font-bold text-red-700"
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  resetForm();
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-black text-white shadow-sm transition hover:bg-indigo-700"
+              >
+                <Plus size={18} />
+                Add Child
+              </button>
+
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+              >
+                Dashboard
+              </Link>
+            </div>
+          </header>
+
+          <section className="grid gap-4 md:grid-cols-4">
+            <StatCard label="Children" value={String(stats.children)} />
+            <StatCard label="Subjects" value={String(stats.subjects)} />
+            <StatCard label="Progress" value={`${stats.averageProgress}%`} />
+            <StatCard label="Goals" value={String(stats.weeklyGoals)} />
+          </section>
+
+          {children.length > 0 ? (
+            <section className="mt-6 rounded-[2rem] border border-indigo-100 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+                    CHILD SWITCHER
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black text-indigo-700">
+                    Choose active child
+                  </h2>
+                </div>
+                <Users className="text-indigo-600" size={30} />
+              </div>
+
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {children.map((child) => {
+                  const avatar = child.avatar_url || child.avatar || "";
+                  const active = child.id === activeChild?.id;
+
+                  return (
+                    <button
+                      key={child.id}
+                      type="button"
+                      onClick={() => setActiveChildId(child.id)}
+                      className={`flex min-w-[220px] items-center gap-3 rounded-2xl border p-3 text-left transition ${
+                        active
+                          ? "border-indigo-600 bg-indigo-50 ring-4 ring-indigo-100"
+                          : "border-indigo-100 bg-white hover:bg-indigo-50"
+                      }`}
+                    >
+                      <AvatarImage src={avatar} name={child.child_name} size="sm" />
+                      <div>
+                        <p className="font-black text-indigo-700">{child.child_name}</p>
+                        <p className="text-sm font-bold text-slate-500">
+                          Age {child.age || "-"} • {child.level || "Level"}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="mt-6 grid gap-6 2xl:grid-cols-[1.05fr_0.95fr]">
+            <form
+              onSubmit={saveChild}
+              className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm"
             >
-              <Trash2 size={18} />
+              <div className="mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+                    {form.id ? "EDIT CHILD" : "ADD CHILD"}
+                  </p>
+                  <h2 className="mt-1 text-3xl font-black text-indigo-700">
+                    {form.id ? "Update Profile" : "Create Profile"}
+                  </h2>
+                </div>
+
+                {form.id ? (
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-100 text-slate-600"
+                  >
+                    <X size={20} />
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <InputField
+                  label="Child Name"
+                  value={form.child_name}
+                  onChange={(value) => updateForm("child_name", value)}
+                  placeholder="e.g. Noah"
+                  required
+                />
+
+                <InputField
+                  label="Age"
+                  value={form.age}
+                  onChange={(value) => updateForm("age", value)}
+                  placeholder="e.g. 5"
+                />
+
+                <SelectField
+                  label="Level / Grade"
+                  value={form.level}
+                  onChange={(value) => updateForm("level", value)}
+                  options={levels}
+                  placeholder="Select level"
+                />
+
+                <InputField
+                  label="School"
+                  value={form.school}
+                  onChange={(value) => updateForm("school", value)}
+                  placeholder="e.g. PASTI / Preschool"
+                />
+
+                <SelectField
+                  label="Reading Level"
+                  value={form.reading_level}
+                  onChange={(value) => updateForm("reading_level", value)}
+                  options={readingLevels}
+                  placeholder="Select reading level"
+                />
+
+                <SelectField
+                  label="Math Level"
+                  value={form.math_level}
+                  onChange={(value) => updateForm("math_level", value)}
+                  options={mathLevels}
+                  placeholder="Select math level"
+                />
+              </div>
+
+              <section className="mt-6 rounded-[2rem] border border-indigo-200 bg-white p-5">
+                <div className="mb-5">
+                  <h3 className="text-xl font-black text-indigo-700">Avatar</h3>
+                  <p className="mt-1 text-sm font-bold text-slate-500">
+                    Choose a default avatar or upload your own image.
+                  </p>
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-[1fr_auto_1fr]">
+                  <div>
+                    <p className="font-black text-slate-700">Choose default avatar</p>
+
+                    <div className="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-4">
+                      {defaultAvatars.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() =>
+                            setForm((current) => ({
+                              ...current,
+                              avatar_url: item,
+                              avatar_type: "default",
+                            }))
+                          }
+                          className={`relative overflow-hidden rounded-2xl border bg-slate-50 p-2 transition ${
+                            form.avatar_url === item
+                              ? "border-indigo-600 ring-4 ring-indigo-100"
+                              : "border-indigo-100 hover:border-indigo-300"
+                          }`}
+                        >
+                          <div className="grid h-20 place-items-center rounded-xl bg-white">
+                            <img
+                              src={item}
+                              alt=""
+                              className="h-16 w-16 rounded-xl object-contain"
+                            />
+                          </div>
+
+                          {form.avatar_url === item ? (
+                            <span className="absolute bottom-2 left-2 grid h-7 w-7 place-items-center rounded-full bg-indigo-600 text-white">
+                              <CheckCircle2 size={16} />
+                            </span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="hidden items-center xl:flex">
+                    <div className="grid h-12 w-12 place-items-center rounded-full border border-indigo-100 bg-white text-xs font-black text-slate-500">
+                      OR
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="font-black text-slate-700">Upload your own avatar</p>
+
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="mt-4 flex min-h-[160px] w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/40 px-4 py-6 text-center transition hover:bg-indigo-50"
+                    >
+                      {uploadingAvatar ? (
+                        <>
+                          <Loader2 className="animate-spin text-indigo-600" size={38} />
+                          <p className="mt-3 font-black text-indigo-700">
+                            Uploading avatar...
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <ImagePlus className="text-indigo-600" size={44} />
+                          <p className="mt-3 font-black text-indigo-700">
+                            Click to upload image
+                          </p>
+                          <p className="mt-1 text-sm font-bold text-slate-500">
+                            PNG, JPG, WEBP or SVG. Max 2MB.
+                          </p>
+                        </>
+                      )}
+                    </button>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                      className="hidden"
+                      onChange={uploadAvatar}
+                    />
+
+                    {form.avatar_url ? (
+                      <div className="mt-4 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-white p-3">
+                        <AvatarImage src={form.avatar_url} name="Avatar preview" size="sm" />
+                        <div className="flex-1">
+                          <p className="font-black text-indigo-700">
+                            {form.avatar_type === "upload"
+                              ? "Uploaded avatar selected"
+                              : form.avatar_type === "default"
+                                ? "Default avatar selected"
+                                : "Avatar URL selected"}
+                          </p>
+                          <p className="break-all text-xs text-slate-500">
+                            {form.avatar_url}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((current) => ({
+                              ...current,
+                              avatar_url: "",
+                              avatar_type: "url",
+                            }))
+                          }
+                          className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-500"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <InputField
+                    label="Avatar Image URL (optional)"
+                    value={form.avatar_type === "url" ? form.avatar_url : ""}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        avatar_url: value,
+                        avatar_type: "url",
+                      }))
+                    }
+                    placeholder="Paste image URL e.g. https://example.com/avatar.png"
+                    icon={<Camera size={20} />}
+                  />
+                  <p className="mt-2 text-sm font-bold text-slate-400">
+                    Uploaded or selected avatar will be saved automatically.
+                  </p>
+                </div>
+              </section>
+
+              <div className="mt-5">
+                <InputField
+                  label="Learning Goal"
+                  value={form.learning_goal}
+                  onChange={(value) => updateForm("learning_goal", value)}
+                  placeholder="e.g. Read 20 pages this week"
+                  icon={<Trophy size={20} />}
+                />
+              </div>
+
+              <div className="mt-5">
+                <label className="block">
+                  <span className="text-sm font-black text-slate-600">
+                    Parent Notes
+                  </span>
+                  <textarea
+                    value={form.parent_notes}
+                    onChange={(event) =>
+                      updateForm("parent_notes", event.target.value)
+                    }
+                    placeholder="e.g. Loves math, needs spelling practice..."
+                    className="mt-2 min-h-28 w-full rounded-2xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                  />
+                </label>
+              </div>
+
+              <section className="mt-5">
+                <p className="font-black text-indigo-700">Selected Subjects</p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {subjects.map((subject) => (
+                    <button
+                      key={subject}
+                      type="button"
+                      onClick={() => toggleSubject(subject)}
+                      className={`rounded-2xl px-4 py-3 font-black transition ${
+                        form.subjects.includes(subject)
+                          ? "bg-indigo-600 text-white"
+                          : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                      }`}
+                    >
+                      {subject}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              {error ? (
+                <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 font-bold text-red-700">
+                  {error}
+                </div>
+              ) : null}
+
+              {message ? (
+                <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 font-bold text-emerald-700">
+                  {message}
+                </div>
+              ) : null}
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="submit"
+                  disabled={saving || uploadingAvatar}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saving ? (
+                    <Loader2 className="animate-spin" size={20} />
+                  ) : form.id ? (
+                    <Save size={20} />
+                  ) : (
+                    <Plus size={20} />
+                  )}
+                  {saving ? "Saving..." : form.id ? "Update Child" : "Add Child"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-6 py-4 font-black text-slate-700 transition hover:bg-slate-200"
+                >
+                  Clear Form
+                </button>
+              </div>
+            </form>
+
+            <section className="space-y-6">
+              <LivePreviewCard form={form} activeChild={activeChild} />
+
+              <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+                      CHILDREN
+                    </p>
+                    <h2 className="mt-1 text-3xl font-black text-indigo-700">
+                      Profiles
+                    </h2>
+                  </div>
+                  <Users className="text-indigo-600" size={34} />
+                </div>
+
+                {loadingChildren ? (
+                  <LoadingCard />
+                ) : children.length === 0 ? (
+                  <EmptyState />
+                ) : (
+                  <div className="space-y-5">
+                    {children.map((child) => (
+                      <ChildProfileCard
+                        key={child.id}
+                        child={child}
+                        deleting={deletingId === child.id}
+                        onEdit={() => editChild(child)}
+                        onDelete={() => deleteChild(child.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            </section>
+          </section>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function ChildrenSidebar({ totalChildren }: { totalChildren: number }) {
+  return (
+    <aside className="hidden border-r border-indigo-100 bg-white p-6 xl:block">
+      <Link href="/dashboard" className="flex items-center gap-3">
+        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-600 text-yellow-200 shadow-lg">
+          <Sparkles size={26} />
+        </div>
+
+        <div>
+          <p className="text-xl font-black tracking-[0.18em] text-slate-900">
+            FD ARCADIA
+          </p>
+          <p className="text-sm font-black tracking-[0.25em] text-indigo-600">
+            CHILDREN
+          </p>
+        </div>
+      </Link>
+
+      <nav className="mt-10 space-y-2">
+        <SidebarLink href="/dashboard" icon={<Home size={22} />}>
+          Dashboard
+        </SidebarLink>
+        <SidebarLink href="/children" icon={<Users size={22} />} active>
+          My Children
+        </SidebarLink>
+        <SidebarLink href="/custom-worksheet" icon={<FileText size={22} />}>
+          Custom Worksheet
+        </SidebarLink>
+        <SidebarLink href="/flashcard-library" icon={<BookOpen size={22} />}>
+          Flashcard Library
+        </SidebarLink>
+      </nav>
+
+      <div className="mt-10 rounded-[2rem] bg-gradient-to-br from-indigo-600 to-violet-700 p-6 text-white shadow-xl">
+        <Baby className="text-yellow-200" size={30} />
+        <p className="mt-4 font-black">Child Profiles</p>
+        <h3 className="mt-1 text-xl font-black">{totalChildren} Children</h3>
+        <p className="mt-2 text-sm text-indigo-100">
+          Manage learning profile and progress goals.
+        </p>
+      </div>
+    </aside>
+  );
+}
+
+function SidebarLink({
+  href,
+  icon,
+  active,
+  children,
+}: {
+  href: string;
+  icon: ReactNode;
+  active?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-4 rounded-2xl px-4 py-3 font-black transition ${
+        active
+          ? "bg-indigo-50 text-indigo-700"
+          : "text-slate-600 hover:bg-slate-50 hover:text-indigo-700"
+      }`}
+    >
+      {icon}
+      {children}
+    </Link>
+  );
+}
+
+function LivePreviewCard({
+  form,
+  activeChild,
+}: {
+  form: ChildFormState;
+  activeChild?: Child;
+}) {
+  const previewName = form.child_name || activeChild?.child_name || "Child Name";
+  const previewAge = form.age || activeChild?.age || "-";
+  const previewAvatar = form.avatar_url || activeChild?.avatar_url || activeChild?.avatar || "";
+  const previewReading = form.reading_level || activeChild?.reading_level || "Reading level";
+  const previewMath = form.math_level || activeChild?.math_level || "Math level";
+  const previewGoal = form.learning_goal || activeChild?.learning_goal || "Set learning goal";
+  const previewSubjects = form.subjects.length
+    ? form.subjects
+    : activeChild?.subjects || [];
+
+  return (
+    <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+            LIVE PREVIEW
+          </p>
+          <h2 className="mt-1 text-3xl font-black text-indigo-700">
+            Profile Preview
+          </h2>
+        </div>
+        <UserRound className="text-indigo-600" size={34} />
+      </div>
+
+      <div className="rounded-[2rem] bg-gradient-to-br from-indigo-50 to-yellow-50 p-5">
+        <div className="flex flex-col items-center text-center">
+          <AvatarImage src={previewAvatar} name={previewName} size="lg" />
+          <h3 className="mt-4 text-3xl font-black text-indigo-700">
+            {previewName}
+          </h3>
+          <p className="mt-1 font-bold text-slate-600">Age: {previewAge}</p>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <MiniInfo label="Reading" value={previewReading} />
+          <MiniInfo label="Math" value={previewMath} />
+        </div>
+
+        <div className="mt-4 rounded-2xl bg-white p-4">
+          <p className="text-sm font-black text-yellow-700">Learning Goal</p>
+          <p className="mt-1 text-sm font-bold text-slate-600">{previewGoal}</p>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {previewSubjects.length ? (
+            previewSubjects.map((subject) => (
+              <span
+                key={subject}
+                className="rounded-2xl bg-yellow-100 px-3 py-2 text-xs font-black text-yellow-800"
+              >
+                {subject}
+              </span>
+            ))
+          ) : (
+            <span className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500">
+              No subject selected
+            </span>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ChildProfileCard({
+  child,
+  deleting,
+  onEdit,
+  onDelete,
+}: {
+  child: Child;
+  deleting: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const subjectsCount = child.subjects?.length || 0;
+  const progress = Math.min(100, 35 + subjectsCount * 12);
+  const avatar = child.avatar_url || child.avatar || "";
+
+  return (
+    <article className="rounded-[2rem] border border-indigo-100 bg-[#fbfaf7] p-5">
+      <div className="flex flex-col gap-5 lg:flex-row">
+        <AvatarImage src={avatar} name={child.child_name} size="xl" />
+
+        <div className="flex-1">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-3xl font-black text-indigo-700">
+                {child.child_name}
+              </h3>
+              <p className="mt-1 font-bold text-slate-600">
+                Age: {child.age || "-"} • {child.level || "Level not set"}
+              </p>
+              <p className="mt-1 text-sm font-bold text-slate-500">
+                {child.school || "School not set"}
+              </p>
+            </div>
+
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">
+              Active
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <MiniInfo label="Reading" value={child.reading_level || "-"} />
+            <MiniInfo label="Math" value={child.math_level || "-"} />
+            <MiniInfo label="Progress" value={`${progress}%`} />
+          </div>
+
+          <div className="mt-5 h-3 overflow-hidden rounded-full bg-white">
+            <div
+              className="h-full rounded-full bg-indigo-600"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+
+          {child.learning_goal ? (
+            <div className="mt-4 rounded-2xl bg-yellow-50 p-4">
+              <p className="text-sm font-black text-yellow-800">Weekly Goal</p>
+              <p className="mt-1 text-sm text-slate-600">{child.learning_goal}</p>
+            </div>
+          ) : null}
+
+          {child.parent_notes ? (
+            <div className="mt-3 rounded-2xl bg-indigo-50 p-4">
+              <p className="text-sm font-black text-indigo-700">Parent Notes</p>
+              <p className="mt-1 text-sm text-slate-600">{child.parent_notes}</p>
+            </div>
+          ) : null}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(child.subjects || []).map((subject) => (
+              <span
+                key={subject}
+                className="rounded-2xl bg-yellow-100 px-3 py-2 text-sm font-black text-yellow-800"
+              >
+                {subject}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <QuickButton href="/learning-hub" icon={<BookOpenCheck size={16} />}>
+              Learning Hub
+            </QuickButton>
+            <QuickButton href="/custom-worksheet" icon={<FileText size={16} />}>
+              Worksheet
+            </QuickButton>
+            <QuickButton href="/flashcard-library" icon={<BookOpen size={16} />}>
+              Flashcard
+            </QuickButton>
+            <QuickButton href="/profile" icon={<BarChart3 size={16} />}>
+              Report
+            </QuickButton>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onEdit}
+              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 font-black text-white"
+            >
+              <Pencil size={17} />
+              Edit
+            </button>
+
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={deleting}
+              className="inline-flex items-center gap-2 rounded-2xl bg-red-50 px-4 py-3 font-black text-red-600 disabled:opacity-60"
+            >
+              {deleting ? (
+                <Loader2 className="animate-spin" size={17} />
+              ) : (
+                <Trash2 size={17} />
+              )}
               Delete
             </button>
           </div>
-        ))}
-
-        {children.length === 0 ? (
-          <div className="rounded-[2rem] bg-white p-10 text-center shadow-sm">
-            <Baby className="mx-auto text-slate-400" size={44} />
-            <h2 className="mt-3 text-2xl font-bold text-slate-600">
-              No child profile yet.
-            </h2>
-          </div>
-        ) : null}
-      </section>
-    </main>
+        </div>
+      </div>
+    </article>
   );
-}      
+}
+
+function AvatarImage({
+  src,
+  name,
+  size,
+}: {
+  src: string;
+  name: string;
+  size: "sm" | "lg" | "xl";
+}) {
+  const dimension =
+    size === "sm" ? "h-14 w-14" : size === "lg" ? "h-32 w-32" : "h-36 w-36";
+
+  return (
+    <div
+      className={`relative shrink-0 overflow-hidden rounded-[2rem] bg-sky-100 ${dimension}`}
+    >
+      {src ? (
+        <img
+          src={src}
+          alt={name}
+          className="h-full w-full object-cover"
+          onError={(event) => {
+            event.currentTarget.style.display = "none";
+          }}
+        />
+      ) : (
+        <div className="grid h-full w-full place-items-center text-indigo-600">
+          <UserRound size={size === "sm" ? 28 : 60} />
+        </div>
+      )}
+
+      {size !== "sm" ? (
+        <div className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-2xl bg-white text-indigo-600 shadow">
+          <UserRound size={20} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function QuickButton({
+  href,
+  icon,
+  children,
+}: {
+  href: string;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-3 py-3 text-sm font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+    >
+      {icon}
+      {children}
+    </Link>
+  );
+}
+
+function InputField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required,
+  icon,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  required?: boolean;
+  icon?: ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-black text-slate-600">{label}</span>
+      <div className="mt-2 flex items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-4 py-3 transition focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-100">
+        {icon ? <span className="text-indigo-600">{icon}</span> : null}
+        <input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          required={required}
+          className="w-full bg-transparent font-bold text-slate-800 outline-none placeholder:text-slate-400"
+        />
+      </div>
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-black text-slate-600">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full rounded-2xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[1.5rem] border border-indigo-100 bg-white p-5 shadow-sm">
+      <p className="text-sm font-black tracking-[0.18em] text-yellow-600">
+        {label.toUpperCase()}
+      </p>
+      <p className="mt-2 text-3xl font-black text-indigo-700">{value}</p>
+    </div>
+  );
+}
+
+function MiniInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white px-4 py-3">
+      <p className="text-xs font-black tracking-[0.16em] text-yellow-600">
+        {label.toUpperCase()}
+      </p>
+      <p className="mt-1 text-sm font-black text-indigo-700">{value}</p>
+    </div>
+  );
+}
+
+function LoadingCard() {
+  return (
+    <div className="rounded-[1.5rem] bg-indigo-50 p-8 text-center">
+      <Loader2 className="mx-auto animate-spin text-indigo-600" size={36} />
+      <p className="mt-3 font-bold text-slate-500">Loading children...</p>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="rounded-[1.5rem] bg-indigo-50 p-10 text-center">
+      <Baby className="mx-auto text-indigo-400" size={44} />
+      <h2 className="mt-3 text-2xl font-black text-indigo-700">
+        No child profile yet
+      </h2>
+      <p className="mt-2 text-slate-500">
+        Add your first child profile using the form.
+      </p>
+    </div>
+  );
+}
