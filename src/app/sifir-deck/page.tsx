@@ -557,7 +557,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
           </section>
 
           <section className="mt-8 rounded-[2rem] border border-indigo-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-black uppercase tracking-[0.25em] text-yellow-300">
+            <p className="text-sm font-black uppercase tracking-[0.25em] text-slate-950">
               {t.level}
             </p>
 
@@ -591,7 +591,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
                 onClick={() => chooseSifir(num)}
                 className="group aspect-square rounded-[2rem] border border-indigo-100 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:bg-indigo-50 hover:shadow-lg"
               >
-                <span className="block text-xs font-black uppercase tracking-[0.25em] text-yellow-300">
+                <span className="block text-xs font-black uppercase tracking-[0.25em] text-slate-950">
                   SIFIR
                 </span>
 
