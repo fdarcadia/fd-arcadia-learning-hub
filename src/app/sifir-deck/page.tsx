@@ -50,6 +50,44 @@ const QUESTION_FONT_STYLE: CSSProperties = {
 
 const sifirOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
+function getSifirCardTheme(num: number) {
+  const themes = [
+    "border-rose-200 bg-rose-100 hover:bg-rose-200",
+    "border-orange-200 bg-orange-100 hover:bg-orange-200",
+    "border-amber-200 bg-amber-100 hover:bg-amber-200",
+    "border-yellow-200 bg-yellow-100 hover:bg-yellow-200",
+    "border-lime-200 bg-lime-100 hover:bg-lime-200",
+    "border-emerald-200 bg-emerald-100 hover:bg-emerald-200",
+    "border-teal-200 bg-teal-100 hover:bg-teal-200",
+    "border-cyan-200 bg-cyan-100 hover:bg-cyan-200",
+    "border-sky-200 bg-sky-100 hover:bg-sky-200",
+    "border-blue-200 bg-blue-100 hover:bg-blue-200",
+    "border-violet-200 bg-violet-100 hover:bg-violet-200",
+    "border-fuchsia-200 bg-fuchsia-100 hover:bg-fuchsia-200",
+  ];
+
+  return themes[(num - 1) % themes.length];
+}
+
+function getSifirNumberTheme(num: number) {
+  const themes = [
+    "text-rose-600",
+    "text-orange-600",
+    "text-amber-600",
+    "text-yellow-600",
+    "text-lime-700",
+    "text-emerald-600",
+    "text-teal-600",
+    "text-cyan-600",
+    "text-sky-600",
+    "text-blue-600",
+    "text-violet-600",
+    "text-fuchsia-600",
+  ];
+
+  return themes[(num - 1) % themes.length];
+}
+
 const text = {
   bm: {
     chooseTitle: "Premium Sifir Deck",
@@ -88,7 +126,7 @@ const text = {
     upgrade: "Upgrade Premium",
   },
   en: {
-    chooseTitle: "Premium Times Table Deck",
+    chooseTitle: "Times Table Deck",
     chooseSubtitle: "Practise times tables 1 to 12 with cards, vertical mode and spin wheel.",
     back: "Back",
     level: "Level",
@@ -163,6 +201,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
   const [showResult, setShowResult] = useState(false);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const answerLockedRef = useRef(false);
   const current = cards[index];
   const t = text[uiLanguage];
 
@@ -218,8 +257,11 @@ function SifirDeckGame({ userId }: { userId: string }) {
     }
 
     if (timeLeft <= 0) {
+      if (answerLockedRef.current) return;
+
+      answerLockedRef.current = true;
       setStatus("timeup");
-      setWrongCount((prev) => prev + 1);
+      setWrongCount((prev) => Math.min(prev + 1, cards.length));
       setAnsweredCurrent(true);
 
       const timeout = setTimeout(() => {
@@ -356,6 +398,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
     setWrongCount(0);
     setShowResult(false);
     setAnsweredCurrent(false);
+    answerLockedRef.current = false;
     setTimeLeft(timerSeconds);
   }
 
@@ -369,6 +412,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
     setWrongCount(0);
     setShowResult(false);
     setAnsweredCurrent(false);
+    answerLockedRef.current = false;
     setTimeLeft(timerSeconds);
   }
 
@@ -399,17 +443,22 @@ function SifirDeckGame({ userId }: { userId: string }) {
   function checkAnswer() {
     if (!current || !input || isSpinning) return;
 
+    // Synchronous lock prevents double clicks or repeated Enter presses
+    // from counting the same wheel question more than once.
+    if (mode === "wheel" && answerLockedRef.current) return;
+
     const isCorrect = input.trim() === String(current.answer || "").trim();
     setStatus(isCorrect ? "correct" : "wrong");
 
     if (mode === "wheel") {
+      answerLockedRef.current = true;
       setAnsweredCurrent(true);
 
       if (isCorrect) {
-        setCorrectCount((prev) => prev + 1);
+        setCorrectCount((prev) => Math.min(prev + 1, cards.length));
         setTimeout(() => autoSpinNextQuestion(), 1000);
       } else {
-        setWrongCount((prev) => prev + 1);
+        setWrongCount((prev) => Math.min(prev + 1, cards.length));
       }
 
       return;
@@ -434,6 +483,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
     setTimeout(() => {
       setIndex((prev) => prev + 1);
       setAnsweredCurrent(false);
+      answerLockedRef.current = false;
       setTimeLeft(timerSeconds);
       setIsSpinning(false);
       inputRef.current?.focus();
@@ -461,6 +511,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
     setStatus("idle");
     setInput("");
     setAnsweredCurrent(false);
+    answerLockedRef.current = false;
     setTimeLeft(timerSeconds);
     setWheelRotation((prev) => prev + 1800 + Math.floor(Math.random() * 1080));
 
@@ -484,6 +535,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
     setInput("");
     setStatus("idle");
     setAnsweredCurrent(false);
+    answerLockedRef.current = false;
     setTimeLeft(timerSeconds);
   }
 
@@ -492,8 +544,11 @@ function SifirDeckGame({ userId }: { userId: string }) {
     return parseQuestion(current.question);
   }, [current]);
 
+  const safeCorrectCount = Math.min(correctCount, cards.length);
   const scorePercent =
-    cards.length > 0 ? Math.round((correctCount / cards.length) * 100) : 0;
+    cards.length > 0
+      ? Math.min(100, Math.round((safeCorrectCount / cards.length) * 100))
+      : 0;
 
   if (accessLoading) {
     return (
@@ -589,20 +644,24 @@ function SifirDeckGame({ userId }: { userId: string }) {
                 key={num}
                 type="button"
                 onClick={() => chooseSifir(num)}
-                className="group aspect-square rounded-[2rem] border border-indigo-100 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:bg-indigo-50 hover:shadow-lg"
+                className={`group aspect-square rounded-full border-2 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.10)] transition duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-[0_18px_36px_rgba(15,23,42,0.16)] ${getSifirCardTheme(
+                  num
+                )}`}
               >
-                <span className="block text-xs font-black uppercase tracking-[0.25em] text-slate-950">
+                <span className="block text-base font-black uppercase tracking-[0.12em] text-slate-900 sm:text-lg">
                   SIFIR
                 </span>
 
                 <span
-                  className="mt-3 block text-6xl font-black text-indigo-700 sm:text-7xl"
+                  className={`mt-1 block text-6xl font-black sm:text-7xl ${getSifirNumberTheme(
+                    num
+                  )}`}
                   style={QUESTION_FONT_STYLE}
                 >
                   {num}
                 </span>
 
-                <span className="mt-3 inline-flex rounded-full bg-yellow-300 px-3 py-1 text-xs font-black text-slate-950">
+                <span className="mt-1 inline-flex rounded-full bg-white px-4 py-2 text-sm font-black text-slate-900 shadow-[0_8px_18px_rgba(15,23,42,0.18)] ring-1 ring-black/5 transition group-hover:-translate-y-0.5 group-hover:shadow-[0_12px_22px_rgba(15,23,42,0.22)]">
                   Start
                 </span>
               </button>
@@ -1310,39 +1369,103 @@ function ResultScreen({
   onPlayAgain: () => void;
   onChooseOther: () => void;
 }) {
+  const resultMessage =
+    scorePercent === 100
+      ? "Excellent! Perfect score!"
+      : scorePercent >= 80
+        ? "Great job! You are doing very well."
+        : scorePercent >= 50
+          ? "Good effort! Keep practising."
+          : "Keep trying. You can improve with practice.";
+
   return (
-    <section className="mt-8 rounded-[2.5rem] border border-indigo-100 bg-white p-8 text-center shadow-xl">
-      <Trophy className="mx-auto fill-yellow-300 text-yellow-300" size={72} />
-      <h2 className="mt-4 text-5xl font-black text-indigo-700">{t.result}</h2>
-      <p className="mt-4 text-6xl font-black text-yellow-300">{scorePercent}%</p>
+    <section className="mt-8 overflow-hidden rounded-[2.5rem] border border-indigo-100 bg-white text-center shadow-[0_22px_70px_rgba(79,70,229,0.14)]">
+      <div className="bg-gradient-to-br from-indigo-50 via-white to-violet-50 px-6 py-10 sm:px-10">
+        <div className="relative mx-auto flex h-28 w-28 items-center justify-center rounded-[2rem] bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 shadow-[0_18px_45px_rgba(79,70,229,0.35)]">
+          <div className="absolute inset-2 rounded-[1.6rem] border border-white/20" />
+          <Trophy
+            className="relative z-10 fill-white text-white drop-shadow-[0_8px_12px_rgba(15,23,42,0.28)]"
+            size={54}
+          />
+        </div>
 
-      <div className="mx-auto mt-8 grid max-w-xl gap-4 sm:grid-cols-2">
-        <Stat label={t.correctCount} value={correctCount} />
-        <Stat label={t.wrongCount} value={wrongCount} />
-      </div>
+        <p className="mt-6 text-sm font-black uppercase tracking-[0.28em] text-violet-500">
+          FD Arcadia Achievement
+        </p>
 
-      <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={onPlayAgain}
-          className="rounded-2xl bg-yellow-300 px-6 py-4 font-black text-slate-950"
+        <h2
+          className="mt-2 text-5xl font-black text-indigo-700 sm:text-6xl"
+          style={QUESTION_FONT_STYLE}
         >
-          {t.playAgain}
-        </button>
+          {t.result}
+        </h2>
 
-        <button
-          type="button"
-          onClick={onChooseOther}
-          className="rounded-2xl border border-indigo-100 bg-indigo-50 px-6 py-4 font-black text-indigo-700 hover:bg-indigo-100"
+        <p
+          className="mt-4 bg-gradient-to-r from-indigo-700 via-violet-600 to-purple-700 bg-clip-text text-7xl font-black text-transparent sm:text-8xl"
+          style={QUESTION_FONT_STYLE}
         >
-          {t.chooseOther}
-        </button>
+          {scorePercent}%
+        </p>
+
+        <p className="mx-auto mt-3 max-w-xl text-base font-bold text-slate-500 sm:text-lg">
+          {resultMessage}
+        </p>
+
+        <div className="mx-auto mt-8 grid max-w-xl gap-4 sm:grid-cols-2">
+          <div className="rounded-[1.6rem] border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600">
+              {t.correctCount}
+            </p>
+            <p
+              className="mt-2 text-4xl font-black text-emerald-700"
+              style={QUESTION_FONT_STYLE}
+            >
+              {correctCount}
+            </p>
+          </div>
+
+          <div className="rounded-[1.6rem] border border-rose-100 bg-rose-50 p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-rose-500">
+              {t.wrongCount}
+            </p>
+            <p
+              className="mt-2 text-4xl font-black text-rose-600"
+              style={QUESTION_FONT_STYLE}
+            >
+              {wrongCount}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={onPlayAgain}
+            className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-8 py-4 font-black text-white shadow-[0_12px_30px_rgba(79,70,229,0.25)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(79,70,229,0.32)]"
+          >
+            {t.playAgain}
+          </button>
+
+          <button
+            type="button"
+            onClick={onChooseOther}
+            className="rounded-2xl border border-indigo-200 bg-white px-8 py-4 font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50"
+          >
+            {t.chooseOther}
+          </button>
+        </div>
       </div>
     </section>
   );
 }
 
-function StatusBox({ type, message }: { type: "correct" | "wrong"; message: string }) {
+function StatusBox({
+  type,
+  message,
+}: {
+  type: "correct" | "wrong";
+  message: string;
+}) {
   return (
     <div
       className={`mt-6 rounded-[2rem] p-5 text-center text-2xl font-black ${
