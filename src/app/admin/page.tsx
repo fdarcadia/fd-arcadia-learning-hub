@@ -2,19 +2,29 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BookOpen,
   BookOpenCheck,
   Calculator,
   CalendarDays,
+  CheckCircle2,
+  ChevronDown,
   FileText,
   Gift,
+  Home,
+  LockKeyhole,
+  LogOut,
+  MoreVertical,
   Search,
+  Settings,
   ShieldCheck,
   Sparkles,
   Star,
   UploadCloud,
+  Users,
+  XCircle,
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { ProtectedPage } from "@/components/ProtectedPage";
@@ -25,6 +35,7 @@ type Profile = {
   email: string | null;
   full_name: string | null;
   user_type: string | null;
+  avatar_url?: string | null;
   learning_hub_unlocked: boolean;
   custom_worksheet_unlocked: boolean;
   flashcard_unlocked: boolean;
@@ -120,7 +131,7 @@ function addMonths(dateString: string, months: number) {
 
 function getEndDate(packageType: string, startDate: string) {
   const selectedPackage = packageOptions.find(
-    (option) => option.value === packageType
+    (option) => option.value === packageType,
   );
 
   if (!selectedPackage) return startDate;
@@ -183,19 +194,59 @@ function getPackageUnlocks(packageType: string) {
   }
 }
 
+function formatPackageName(packageType: string | null) {
+  if (!packageType) return "No Package";
+  return (
+    packageOptions.find((option) => option.value === packageType)?.label ||
+    packageType.replaceAll("_", " ")
+  );
+}
+
+function getPackageBadgeStyle(packageType: string | null) {
+  if (!packageType) return "bg-slate-100 text-slate-600";
+  if (
+    packageType.includes("premium") ||
+    packageType.includes("6month") ||
+    packageType === "full_package"
+  ) {
+    return "bg-emerald-100 text-emerald-700";
+  }
+  if (packageType.includes("monthly")) return "bg-blue-100 text-blue-700";
+  if (packageType.includes("weekly") || packageType.includes("trial")) {
+    return "bg-orange-100 text-orange-700";
+  }
+  return "bg-indigo-100 text-indigo-700";
+}
+
+function isExpired(endDate: string | null) {
+  if (!endDate) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return endDate < today;
+}
+
+function getDaysLeft(endDate: string | null) {
+  if (!endDate) return "-";
+  const today = new Date();
+  const end = new Date(endDate);
+  const diff = Math.ceil(
+    (end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (diff < 0) return "Expired";
+  if (diff === 0) return "Ends today";
+  return `${diff} days left`;
+}
+
 export default function AdminPage() {
   return (
     <ProtectedPage>
       {(user) =>
         user.email === ADMIN_EMAIL ? (
-          <AdminContent />
+          <AdminContent adminEmail={user.email ?? ADMIN_EMAIL} />
         ) : (
           <>
             <Navbar />
             <main className="page-shell py-10">
-              <h1 className="text-3xl font-bold text-red-600">
-                Access denied
-              </h1>
+              <h1 className="text-3xl font-bold text-red-600">Access denied</h1>
               <p className="mt-2 text-slate-600">
                 Only FD Arcadia admin can open this page.
               </p>
@@ -207,9 +258,12 @@ export default function AdminPage() {
   );
 }
 
-function AdminContent() {
+function AdminContent({ adminEmail }: { adminEmail: string }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [search, setSearch] = useState("");
+  const [subscriptionFilter, setSubscriptionFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [accessFilter, setAccessFilter] = useState("all");
   const [error, setError] = useState("");
 
   async function loadProfiles() {
@@ -230,23 +284,74 @@ function AdminContent() {
     loadProfiles();
   }, []);
 
+  const stats = useMemo(() => {
+    return {
+      total: profiles.length,
+      trial: profiles.filter(
+        (profile) =>
+          String(profile.package_type || "").includes("trial") ||
+          String(profile.package_type || "").includes("weekly"),
+      ).length,
+      monthly: profiles.filter((profile) =>
+        String(profile.package_type || "").includes("monthly"),
+      ).length,
+      premium: profiles.filter(
+        (profile) =>
+          String(profile.package_type || "").includes("6month") ||
+          profile.package_type === "full_package",
+      ).length,
+      expired: profiles.filter((profile) => isExpired(profile.subscription_end))
+        .length,
+    };
+  }, [profiles]);
+
   const filteredProfiles = useMemo(() => {
     const keyword = search.toLowerCase();
 
     return profiles.filter((profile) => {
-      return (
+      const matchesKeyword =
         profile.email?.toLowerCase().includes(keyword) ||
         profile.full_name?.toLowerCase().includes(keyword) ||
         profile.user_type?.toLowerCase().includes(keyword) ||
-        profile.package_type?.toLowerCase().includes(keyword)
+        profile.package_type?.toLowerCase().includes(keyword);
+
+      const matchesSubscription =
+        subscriptionFilter === "all" ||
+        profile.package_type === subscriptionFilter;
+
+      const expired = isExpired(profile.subscription_end);
+      const hasPackage = Boolean(profile.package_type);
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && hasPackage && !expired) ||
+        (statusFilter === "expired" && expired) ||
+        (statusFilter === "no_package" && !hasPackage);
+
+      const accessValues = [
+        profile.learning_hub_unlocked,
+        profile.custom_worksheet_unlocked,
+        profile.flashcard_unlocked,
+        profile.math_activity_unlocked,
+        profile.draw_learn_unlocked,
+        profile.sifir_deck_unlocked,
+        profile.freebies_unlocked,
+      ];
+
+      const matchesAccess =
+        accessFilter === "all" ||
+        (accessFilter === "unlocked" && accessValues.some(Boolean)) ||
+        (accessFilter === "locked" && accessValues.every((value) => !value));
+
+      return (
+        matchesKeyword && matchesSubscription && matchesStatus && matchesAccess
       );
     });
-  }, [profiles, search]);
+  }, [profiles, search, subscriptionFilter, statusFilter, accessFilter]);
 
   async function toggleAccess(
     id: string,
     field: AccessField,
-    currentValue: boolean
+    currentValue: boolean,
   ) {
     setError("");
 
@@ -265,14 +370,14 @@ function AdminContent() {
     }
 
     setProfiles((current) =>
-      current.map((profile) => (profile.id === id ? data : profile))
+      current.map((profile) => (profile.id === id ? data : profile)),
     );
   }
 
   async function savePackage(
     profile: Profile,
     packageType: string,
-    startDate: string
+    startDate: string,
   ) {
     if (!startDate) {
       setError("Please choose package start date.");
@@ -280,7 +385,7 @@ function AdminContent() {
     }
 
     const selectedPackage = packageOptions.find(
-      (option) => option.value === packageType
+      (option) => option.value === packageType,
     );
 
     const endDate = getEndDate(packageType, startDate);
@@ -307,7 +412,7 @@ function AdminContent() {
     }
 
     setProfiles((current) =>
-      current.map((item) => (item.id === profile.id ? data : item))
+      current.map((item) => (item.id === profile.id ? data : item)),
     );
 
     setError("");
@@ -339,295 +444,371 @@ function AdminContent() {
     }
 
     setProfiles((current) =>
-      current.map((item) => (item.id === profile.id ? data : item))
+      current.map((item) => (item.id === profile.id ? data : item)),
     );
   }
 
-  return (
-    <>
-      <AdminHeader />
+  function resetFilters() {
+    setSearch("");
+    setSubscriptionFilter("all");
+    setStatusFilter("all");
+    setAccessFilter("all");
+  }
 
-      <main className="page-shell py-8">
-        <section className="rounded-[2rem] bg-indigo-600 p-6 text-white shadow-xl">
-          <div className="flex items-center gap-3">
-            <ShieldCheck size={34} />
+  return (
+    <main className="min-h-screen bg-[#fbfaf7] text-slate-950">
+      <div className="grid min-h-screen xl:grid-cols-[290px_1fr]">
+        <AdminSidebar adminEmail={adminEmail} />
+
+        <section className="px-4 py-6 lg:px-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="tracking-[0.25em] text-yellow-200">ADMIN PANEL</p>
-              <h1 className="font-display mt-1 text-5xl">Manage Users</h1>
-              <p className="mt-2 text-indigo-100">
-                Manage parent subscription, manual payment confirmation and package unlocks.
+              <p className="text-sm font-black text-slate-500">
+                Admin / Subscriptions /{" "}
+                <span className="text-indigo-600">Parents</span>
+              </p>
+              <h1 className="mt-3 text-4xl font-black text-slate-950">
+                Parent Subscriptions
+              </h1>
+              <p className="mt-2 max-w-2xl text-slate-600">
+                Manage parent subscription and access to Learning Hub.
               </p>
             </div>
-          </div>
-        </section>
 
-        <MonthlyCalendarPreview />
-
-        <section className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <AdminQuickLink
-            href="/admin/learning-hub"
-            icon={BookOpenCheck}
-            title="Learning Hub"
-            description="Add month, week and Google Drive links."
-            color="text-yellow-700"
-          />
-
-          <AdminQuickLink
-            href="/admin/flashcard-library"
-            icon={BookOpen}
-            title="Flashcard Library"
-            description="Upload PDF, cover and manage book access."
-            color="text-indigo-600"
-          />
-
-          <AdminQuickLink
-            href="/admin/freebies"
-            icon={Gift}
-            title="Freebies"
-            description="Create folders and upload Google Drive free resources."
-            color="text-orange-600"
-          />
-
-          <AdminQuickLink
-            href="/admin/custom-worksheet"
-            icon={UploadCloud}
-            title="Worksheet Upload"
-            description="Add worksheet links by subject."
-            color="text-pink-600"
-          />
-
-          <AdminQuickLink
-            href="/admin/math-activity"
-            icon={Calculator}
-            title="Math Activity"
-            description="Create math questions and answers."
-            color="text-emerald-600"
-          />
-
-          <AdminQuickLink
-            href="/admin/sifir-deck"
-            icon={Star}
-            title="Sifir Deck"
-            description="Create multiplication card deck."
-            color="text-yellow-600"
-          />
-
-          <AdminQuickLink
-            href="/admin/calendar"
-            icon={CalendarDays}
-            title="Monthly Schedule"
-            description="Create and preview monthly class schedule."
-            color="text-indigo-600"
-          />
-
-          <AdminQuickLink
-            href="/admin/reports"
-            icon={FileText}
-            title="Reports"
-            description="View parent profile and access report."
-            color="text-purple-600"
-          />
-        </section>
-
-        <section className="mt-6 rounded-[2rem] bg-yellow-50 p-5 text-slate-700">
-          <h2 className="text-xl font-bold text-indigo-700">
-            Manual Payment Instruction
-          </h2>
-          <p className="mt-2">
-            Parent register account first, then WhatsApp admin with registered
-            email and payment proof. Admin will choose package here and unlock
-            access manually.
-          </p>
-        </section>
-
-        <div className="mt-6 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-white px-4 py-3 shadow-sm">
-          <Search className="text-indigo-500" size={22} />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search name, email, package or user type..."
-            className="w-full bg-transparent text-lg outline-none"
-          />
-        </div>
-
-        {error ? (
-          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
-            {error}
-          </div>
-        ) : null}
-
-        <section className="mt-8 grid gap-5">
-          {filteredProfiles.map((profile) => (
-            <UserCard
-              key={profile.id}
-              profile={profile}
-              onToggle={toggleAccess}
-              onSavePackage={savePackage}
-              onResetAccess={resetAccess}
-            />
-          ))}
-        </section>
-      </main>
-    </>
-  );
-}
-
-function AdminHeader() {
-  return (
-    <header className="border-b border-indigo-100 bg-white/90 backdrop-blur">
-      <div className="page-shell flex items-center justify-between py-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-indigo-600 text-white">
-            <ShieldCheck size={24} />
-          </div>
-          <div>
-            <p className="font-display text-2xl text-indigo-700">FD Arcadia</p>
-            <p className="text-xs font-bold tracking-[0.2em] text-yellow-600">
-              ADMIN
-            </p>
-          </div>
-        </Link>
-
-        <nav className="flex items-center gap-2">
-          <Link
-            href="/dashboard"
-            className="rounded-2xl bg-indigo-50 px-4 py-2 font-bold text-indigo-700 transition hover:bg-indigo-100"
-          >
-            Dashboard
-          </Link>
-
-          <Link
-            href="/logout"
-            className="rounded-2xl bg-yellow-100 px-4 py-2 font-bold text-yellow-800 transition hover:bg-yellow-200"
-          >
-            Logout
-          </Link>
-        </nav>
-      </div>
-    </header>
-  );
-}
-
-function MonthlyCalendarPreview() {
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-
-  const monthTitle = today.toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
-
-  const firstDay = new Date(year, month, 1);
-  const startDay = firstDay.getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  const calendarCells = Array.from({ length: 42 }, (_, index) => {
-    const dayNumber = index - startDay + 1;
-    const isCurrentMonth = dayNumber >= 1 && dayNumber <= daysInMonth;
-    const isToday = isCurrentMonth && dayNumber === today.getDate();
-
-    return {
-      key: index,
-      dayNumber: isCurrentMonth ? dayNumber : "",
-      isToday,
-      isCurrentMonth,
-    };
-  });
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveIndex((current) => (current + 1) % calendarCells.length);
-    }, 700);
-
-    return () => clearInterval(timer);
-  }, [calendarCells.length]);
-
-  return (
-    <Link
-      href="/admin/calendar"
-      className="mt-6 block overflow-hidden rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-2xl"
-    >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Sparkles className="text-yellow-500" size={24} />
-            <p className="tracking-[0.2em] text-sm font-bold text-yellow-600">
-              MONTHLY CALENDAR PREVIEW
-            </p>
-          </div>
-
-          <h2 className="mt-2 text-4xl font-bold text-indigo-700">
-            {monthTitle}
-          </h2>
-
-          <p className="mt-2 text-slate-600">
-            Tap here to edit monthly schedule by date.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-bold text-white">
-          Open Calendar
-          <ArrowRight size={20} />
-        </div>
-      </div>
-
-      <div className="mt-5 grid grid-cols-7 gap-2 text-center">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-          <div key={day} className="text-xs font-bold text-slate-400">
-            {day}
-          </div>
-        ))}
-
-        {calendarCells.map((cell, index) => {
-          const isMoving = index === activeIndex && cell.isCurrentMonth;
-
-          return (
-            <div
-              key={cell.key}
-              className={`grid h-11 place-items-center rounded-2xl text-sm font-bold transition-all duration-500 ${
-                cell.isToday
-                  ? "scale-105 bg-indigo-600 text-white shadow-lg"
-                  : isMoving
-                  ? "scale-105 bg-yellow-200 text-indigo-700 shadow-md"
-                  : cell.isCurrentMonth
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "bg-slate-50 text-slate-300"
-              }`}
+            <Link
+              href="#subscription-list"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 font-black text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-700"
             >
-              {cell.dayNumber}
+              + Add Subscription
+            </Link>
+          </div>
+
+          <section className="mt-8 grid gap-4 md:grid-cols-2 2xl:grid-cols-5">
+            <StatCard
+              icon={Users}
+              label="Total Parents"
+              value={stats.total}
+              note="All registered parents"
+              tone="indigo"
+            />
+            <StatCard
+              icon={ShieldCheck}
+              label="Trial"
+              value={stats.trial}
+              note="Trial / Weekly"
+              tone="green"
+            />
+            <StatCard
+              icon={CalendarDays}
+              label="Monthly"
+              value={stats.monthly}
+              note="Monthly package"
+              tone="blue"
+            />
+            <StatCard
+              icon={Sparkles}
+              label="Premium"
+              value={stats.premium}
+              note="Premium / Full"
+              tone="purple"
+            />
+            <StatCard
+              icon={LockKeyhole}
+              label="Expired"
+              value={stats.expired}
+              note="Subscription expired"
+              tone="orange"
+            />
+          </section>
+
+          <section className="mt-6 rounded-[1.5rem] border border-indigo-100 bg-white p-5 shadow-sm">
+            <div className="grid gap-4 lg:grid-cols-[1fr_220px_220px]">
+              <label className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-white px-4 py-3">
+                <Search size={20} className="text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search parent name or email..."
+                  className="w-full bg-transparent font-bold text-slate-700 outline-none placeholder:text-slate-400"
+                />
+              </label>
+
+              <select
+                value={subscriptionFilter}
+                onChange={(event) => setSubscriptionFilter(event.target.value)}
+                className="rounded-xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-700 outline-none"
+              >
+                <option value="all">All Subscription</option>
+                {packageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                className="rounded-xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-700 outline-none"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="expired">Expired</option>
+                <option value="no_package">No Package</option>
+              </select>
             </div>
-          );
-        })}
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-[190px_1fr_120px_120px]">
+              <select
+                value={accessFilter}
+                onChange={(event) => setAccessFilter(event.target.value)}
+                className="rounded-xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-700 outline-none"
+              >
+                <option value="all">All Access</option>
+                <option value="unlocked">Has Access</option>
+                <option value="locked">No Access</option>
+              </select>
+
+              <div className="hidden items-center gap-3 rounded-xl border border-indigo-100 bg-white px-4 py-3 text-sm font-bold text-slate-400 lg:flex">
+                Start Date <span className="text-slate-700">to</span> End Date
+                <CalendarDays className="ml-auto" size={18} />
+              </div>
+
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="rounded-xl bg-slate-100 px-4 py-3 font-black text-slate-600 transition hover:bg-slate-200"
+              >
+                Reset
+              </button>
+
+              <button
+                type="button"
+                className="rounded-xl bg-indigo-600 px-4 py-3 font-black text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-700"
+              >
+                Filter
+              </button>
+            </div>
+          </section>
+
+          {error ? (
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 font-bold text-red-700">
+              {error}
+            </div>
+          ) : null}
+
+          <section
+            id="subscription-list"
+            className="mt-6 rounded-[1.5rem] border border-indigo-100 bg-white shadow-sm"
+          >
+            <div className="hidden grid-cols-[1.2fr_0.7fr_1fr_0.7fr_0.7fr_0.6fr] gap-4 border-b border-indigo-100 px-6 py-4 text-xs font-black uppercase tracking-[0.12em] text-indigo-800 xl:grid">
+              <p>Parent</p>
+              <p>Subscription</p>
+              <p>Access</p>
+              <p>Start Date</p>
+              <p>End Date</p>
+              <p>Actions</p>
+            </div>
+
+            <div className="divide-y divide-indigo-100">
+              {filteredProfiles.map((profile) => (
+                <UserCard
+                  key={profile.id}
+                  profile={profile}
+                  onToggle={toggleAccess}
+                  onSavePackage={savePackage}
+                  onResetAccess={resetAccess}
+                />
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-4 px-6 py-5 text-sm font-bold text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+              <p>
+                Showing 1 to {filteredProfiles.length} of {profiles.length}{" "}
+                results
+              </p>
+              <div className="flex items-center gap-2">
+                {["‹", "1", "2", "3", "...", "›"].map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`grid h-9 min-w-9 place-items-center rounded-lg border px-3 ${
+                      item === "1"
+                        ? "border-indigo-600 text-indigo-700"
+                        : "border-indigo-100 text-slate-500"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        </section>
       </div>
-    </Link>
+    </main>
   );
 }
 
-function AdminQuickLink({
+function AdminSidebar({ adminEmail }: { adminEmail: string }) {
+  const router = useRouter();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
+
+  return (
+    <aside className="hidden border-r border-indigo-100 bg-white p-6 xl:flex xl:flex-col">
+      <Link href="/dashboard" className="flex items-center gap-3">
+        <div className="grid h-14 w-14 place-items-center rounded-xl bg-indigo-600 text-3xl shadow-lg shadow-indigo-100">
+          👑
+        </div>
+        <div>
+          <p className="text-2xl font-black tracking-wide text-slate-950">
+            FD ARCADIA
+          </p>
+          <p className="text-sm font-black tracking-[0.18em] text-indigo-600">
+            LEARNING HUB
+          </p>
+        </div>
+      </Link>
+
+      <nav className="mt-10 space-y-2 text-sm font-black text-slate-700">
+        <SidebarLink href="/dashboard" icon={Home} label="Dashboard" />
+        <SidebarLink href="/admin" icon={Users} label="Parents" active />
+        <SidebarLink href="/children" icon={Users} label="Children" />
+
+        <div className="pt-4">
+          <div className="flex items-center justify-between rounded-xl bg-indigo-50 px-4 py-3 text-indigo-700">
+            <span className="flex items-center gap-3">
+              <FileText size={20} /> Learning Hub Content
+            </span>
+            <ChevronDown size={18} />
+          </div>
+          <div className="ml-7 mt-2 space-y-1 border-l border-indigo-100 pl-4">
+            <Link
+              href="/admin/calendar"
+              className="block rounded-lg bg-indigo-50 px-4 py-2 text-indigo-700"
+            >
+              Week At A Glance
+            </Link>
+            <Link
+              href="/admin/learning-hub"
+              className="block rounded-lg px-4 py-2 hover:bg-slate-50"
+            >
+              All Content
+            </Link>
+            <Link
+              href="/admin/freebies"
+              className="block rounded-lg px-4 py-2 hover:bg-slate-50"
+            >
+              Categories
+            </Link>
+          </div>
+        </div>
+
+        <SidebarLink
+          href="/admin"
+          icon={CalendarDays}
+          label="Subscriptions"
+          active
+        />
+        <SidebarLink href="/admin/reports" icon={FileText} label="Reports" />
+        <SidebarLink
+          href="/admin/settings"
+          icon={Settings}
+          label="System Settings"
+        />
+      </nav>
+
+      <div className="mt-auto rounded-2xl border border-yellow-200 bg-yellow-50 p-5 text-center">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-indigo-600 text-2xl">
+          👑
+        </div>
+        <p className="mt-3 text-sm font-bold text-slate-700">
+          You are logged in as
+        </p>
+        <p className="font-black text-slate-950">Admin</p>
+        <p className="mt-2 break-words text-sm text-slate-600">{adminEmail}</p>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-100 bg-white px-4 py-3 font-black text-indigo-700 transition hover:bg-indigo-50"
+        >
+          <LogOut size={18} /> Logout
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function SidebarLink({
   href,
   icon: Icon,
-  title,
-  description,
-  color,
+  label,
+  active,
 }: {
   href: string;
   icon: React.ElementType;
-  title: string;
-  description: string;
-  color: string;
+  label: string;
+  active?: boolean;
 }) {
   return (
     <Link
       href={href}
-      className="rounded-[2rem] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+      className={`flex items-center justify-between rounded-xl px-4 py-3 transition ${
+        active
+          ? "bg-indigo-50 text-indigo-700"
+          : "hover:bg-slate-50 hover:text-indigo-700"
+      }`}
     >
-      <Icon className={color} size={34} />
-      <h2 className="mt-4 text-2xl font-bold text-indigo-700">{title}</h2>
-      <p className="mt-2 text-slate-600">{description}</p>
+      <span className="flex items-center gap-3">
+        <Icon size={20} /> {label}
+      </span>
+      {label === "Parents" || label === "Children" ? (
+        <ArrowRight size={16} />
+      ) : null}
     </Link>
+  );
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  note,
+  tone,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number;
+  note: string;
+  tone: "indigo" | "green" | "blue" | "purple" | "orange";
+}) {
+  const toneClass = {
+    indigo: "bg-indigo-100 text-indigo-700",
+    green: "bg-emerald-100 text-emerald-700",
+    blue: "bg-blue-100 text-blue-700",
+    purple: "bg-purple-100 text-purple-700",
+    orange: "bg-orange-100 text-orange-700",
+  }[tone];
+
+  return (
+    <div className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-4">
+        <div
+          className={`grid h-14 w-14 place-items-center rounded-full ${toneClass}`}
+        >
+          <Icon size={28} />
+        </div>
+        <div>
+          <p className="text-sm font-bold text-slate-600">{label}</p>
+          <p className="mt-1 text-3xl font-black text-slate-950">{value}</p>
+          <p className="mt-1 text-xs font-bold text-slate-500">{note}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -642,188 +823,291 @@ function UserCard({
   onSavePackage: (
     profile: Profile,
     packageType: string,
-    startDate: string
+    startDate: string,
   ) => void;
   onResetAccess: (profile: Profile) => void;
 }) {
   const [packageType, setPackageType] = useState(
-    profile.package_type || "math_package"
+    profile.package_type || "math_package",
   );
-
   const [startDate, setStartDate] = useState(
-    profile.subscription_start || new Date().toISOString().slice(0, 10)
+    profile.subscription_start || new Date().toISOString().slice(0, 10),
   );
+  const [editing, setEditing] = useState(false);
 
   const selectedPackage = packageOptions.find(
-    (option) => option.value === packageType
+    (option) => option.value === packageType,
   );
 
   const previewEndDate = startDate ? getEndDate(packageType, startDate) : "-";
+  const expired = isExpired(profile.subscription_end);
+  const active = Boolean(profile.package_type) && !expired;
 
   return (
-    <div className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <div className="px-5 py-5 transition hover:bg-indigo-50/30">
+      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.7fr_1fr_0.7fr_0.7fr_0.6fr] xl:items-center">
+        <div className="flex items-center gap-4">
+          <Avatar
+            src={profile.avatar_url || null}
+            name={profile.full_name || profile.email || "Parent"}
+          />
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-black text-slate-950">
+              {profile.full_name || "No name"}
+            </h2>
+            <p className="truncate text-sm font-bold text-slate-500">
+              {profile.email || "No email"}
+            </p>
+            <p className="text-xs font-bold text-slate-400">
+              {profile.user_type || "Not selected"}
+            </p>
+          </div>
+        </div>
+
         <div>
-          <h2 className="text-2xl font-bold text-indigo-700">
-            {profile.full_name || "No name"}
-          </h2>
-          <p className="text-slate-600">{profile.email}</p>
-          <p className="text-sm text-slate-500">
-            Type: {profile.user_type || "Not selected"}
+          <span
+            className={`inline-flex rounded-xl px-4 py-2 text-sm font-black ${getPackageBadgeStyle(profile.package_type)}`}
+          >
+            {formatPackageName(profile.package_type)}
+          </span>
+          {profile.package_note ? (
+            <p className="mt-2 text-xs font-bold text-slate-500">
+              {profile.package_note}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2 text-sm font-bold text-slate-700">
+          <AccessLine
+            label="Learning Hub"
+            active={profile.learning_hub_unlocked}
+          />
+          <AccessLine
+            label="Custom Worksheet"
+            active={profile.custom_worksheet_unlocked}
+          />
+          <AccessLine
+            label="Flashcard & Modul"
+            active={profile.flashcard_unlocked}
+          />
+        </div>
+
+        <div className="text-sm font-bold text-slate-700">
+          <p>{profile.subscription_start || "-"}</p>
+        </div>
+
+        <div className="text-sm font-bold text-slate-700">
+          <p>{profile.subscription_end || "-"}</p>
+          <p className={expired ? "text-red-600" : "text-emerald-600"}>
+            {getDaysLeft(profile.subscription_end)}
           </p>
         </div>
 
-        <div className="rounded-2xl bg-yellow-100 px-4 py-2 font-bold text-yellow-800">
-          {profile.package_type
-            ? profile.package_type.replaceAll("_", " ").toUpperCase()
-            : "NO PACKAGE"}
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl bg-yellow-50 p-4 text-sm text-slate-700">
-        <p>Package: {profile.package_type || "Not set"}</p>
-        <p>Note: {profile.package_note || "-"}</p>
-        <p>Start: {profile.subscription_start || "-"}</p>
-        <p>End: {profile.subscription_end || "-"}</p>
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <AccessButton
-          label="Learning Hub"
-          active={profile.learning_hub_unlocked}
-          onClick={() =>
-            onToggle(
-              profile.id,
-              "learning_hub_unlocked",
-              profile.learning_hub_unlocked
-            )
-          }
-        />
-
-        <AccessButton
-          label="Math Activity"
-          active={profile.math_activity_unlocked}
-          onClick={() =>
-            onToggle(
-              profile.id,
-              "math_activity_unlocked",
-              profile.math_activity_unlocked
-            )
-          }
-        />
-
-        <AccessButton
-          label="Draw & Learn"
-          active={profile.draw_learn_unlocked}
-          onClick={() =>
-            onToggle(
-              profile.id,
-              "draw_learn_unlocked",
-              profile.draw_learn_unlocked
-            )
-          }
-        />
-
-        <AccessButton
-          label="Sifir Deck"
-          active={profile.sifir_deck_unlocked}
-          onClick={() =>
-            onToggle(
-              profile.id,
-              "sifir_deck_unlocked",
-              profile.sifir_deck_unlocked
-            )
-          }
-        />
-
-        <AccessButton
-          label="Freebies"
-          active={profile.freebies_unlocked}
-          onClick={() =>
-            onToggle(
-              profile.id,
-              "freebies_unlocked",
-              profile.freebies_unlocked
-            )
-          }
-        />
-
-        <AccessButton
-          label="Custom Worksheet"
-          active={profile.custom_worksheet_unlocked}
-          onClick={() =>
-            onToggle(
-              profile.id,
-              "custom_worksheet_unlocked",
-              profile.custom_worksheet_unlocked
-            )
-          }
-        />
-
-        <AccessButton
-          label="Flashcard Page"
-          active={profile.flashcard_unlocked}
-          onClick={() =>
-            onToggle(
-              profile.id,
-              "flashcard_unlocked",
-              profile.flashcard_unlocked
-            )
-          }
-        />
-      </div>
-
-      <div className="mt-5 rounded-[1.5rem] border border-indigo-100 bg-indigo-50 p-4">
-        <div className="flex items-center gap-2 text-indigo-700">
-          <CalendarDays size={20} />
-          <p className="font-bold">Manual Package Unlock</p>
-        </div>
-
-        <p className="mt-2 text-sm text-slate-600">
-          Parent WhatsApp admin with payment proof. After confirmation, choose
-          package and click Save Package.
-        </p>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <select
-            value={packageType}
-            onChange={(event) => setPackageType(event.target.value)}
-            className="rounded-2xl border border-indigo-100 bg-white px-4 py-3 outline-none"
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-black ${
+              active
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-red-100 text-red-700"
+            }`}
           >
-            {packageOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-
-          <input
-            type="date"
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-            className="rounded-2xl border border-indigo-100 bg-white px-4 py-3 outline-none"
-          />
-
+            <span
+              className={`h-2 w-2 rounded-full ${active ? "bg-emerald-600" : "bg-red-600"}`}
+            />
+            {active ? "Active" : "Expired"}
+          </span>
           <button
-            onClick={() => onSavePackage(profile, packageType, startDate)}
-            className="rounded-2xl bg-indigo-600 px-4 py-3 font-bold text-white transition hover:bg-indigo-700"
+            type="button"
+            onClick={() => setEditing((current) => !current)}
+            className="rounded-lg border border-indigo-300 px-4 py-2 font-black text-indigo-700 transition hover:bg-indigo-50"
           >
-            Save Package
+            Edit
+          </button>
+          <button
+            type="button"
+            className="grid h-10 w-10 place-items-center rounded-lg border border-indigo-100 text-slate-500 transition hover:bg-slate-50"
+          >
+            <MoreVertical size={18} />
           </button>
         </div>
-
-        <div className="mt-3 rounded-2xl bg-white p-3 text-sm text-slate-600">
-          <p>Package detail: {selectedPackage?.note}</p>
-          <p>End date preview: {previewEndDate}</p>
-        </div>
-
-        <button
-          onClick={() => onResetAccess(profile)}
-          className="mt-4 rounded-2xl bg-red-100 px-4 py-3 font-bold text-red-700 transition hover:bg-red-200"
-        >
-          Reset / Lock All Access
-        </button>
       </div>
+
+      {editing ? (
+        <div className="mt-5 rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xl font-black text-indigo-700">
+                Edit Subscription
+              </h3>
+              <p className="mt-1 text-sm font-bold text-slate-500">
+                Choose package, toggle access and save manually after payment
+                confirmation.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="rounded-xl bg-slate-100 px-4 py-2 font-black text-slate-600"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <AccessButton
+              label="Learning Hub"
+              active={profile.learning_hub_unlocked}
+              onClick={() =>
+                onToggle(
+                  profile.id,
+                  "learning_hub_unlocked",
+                  profile.learning_hub_unlocked,
+                )
+              }
+            />
+            <AccessButton
+              label="Math Activity"
+              active={profile.math_activity_unlocked}
+              onClick={() =>
+                onToggle(
+                  profile.id,
+                  "math_activity_unlocked",
+                  profile.math_activity_unlocked,
+                )
+              }
+            />
+            <AccessButton
+              label="Draw & Learn"
+              active={profile.draw_learn_unlocked}
+              onClick={() =>
+                onToggle(
+                  profile.id,
+                  "draw_learn_unlocked",
+                  profile.draw_learn_unlocked,
+                )
+              }
+            />
+            <AccessButton
+              label="Sifir Deck"
+              active={profile.sifir_deck_unlocked}
+              onClick={() =>
+                onToggle(
+                  profile.id,
+                  "sifir_deck_unlocked",
+                  profile.sifir_deck_unlocked,
+                )
+              }
+            />
+            <AccessButton
+              label="Freebies"
+              active={profile.freebies_unlocked}
+              onClick={() =>
+                onToggle(
+                  profile.id,
+                  "freebies_unlocked",
+                  profile.freebies_unlocked,
+                )
+              }
+            />
+            <AccessButton
+              label="Custom Worksheet"
+              active={profile.custom_worksheet_unlocked}
+              onClick={() =>
+                onToggle(
+                  profile.id,
+                  "custom_worksheet_unlocked",
+                  profile.custom_worksheet_unlocked,
+                )
+              }
+            />
+            <AccessButton
+              label="Flashcard Page"
+              active={profile.flashcard_unlocked}
+              onClick={() =>
+                onToggle(
+                  profile.id,
+                  "flashcard_unlocked",
+                  profile.flashcard_unlocked,
+                )
+              }
+            />
+          </div>
+
+          <div className="mt-5 rounded-2xl bg-indigo-50 p-4">
+            <div className="flex items-center gap-2 text-indigo-700">
+              <CalendarDays size={20} />
+              <p className="font-black">Manual Package Unlock</p>
+            </div>
+
+            <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
+              <select
+                value={packageType}
+                onChange={(event) => setPackageType(event.target.value)}
+                className="rounded-xl border border-indigo-100 bg-white px-4 py-3 font-bold outline-none"
+              >
+                {packageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="rounded-xl border border-indigo-100 bg-white px-4 py-3 font-bold outline-none"
+              />
+
+              <button
+                type="button"
+                onClick={() => onSavePackage(profile, packageType, startDate)}
+                className="rounded-xl bg-indigo-600 px-4 py-3 font-black text-white transition hover:bg-indigo-700"
+              >
+                Save Package
+              </button>
+            </div>
+
+            <div className="mt-3 rounded-xl bg-white p-4 text-sm font-bold text-slate-600">
+              <p>Package detail: {selectedPackage?.note}</p>
+              <p>End date preview: {previewEndDate}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onResetAccess(profile)}
+              className="mt-4 rounded-xl bg-red-100 px-4 py-3 font-black text-red-700 transition hover:bg-red-200"
+            >
+              Reset / Lock All Access
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Avatar({ src, name }: { src: string | null; name: string }) {
+  return (
+    <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-100 text-xl font-black text-indigo-700">
+      {src ? (
+        <img src={src} alt={name} className="h-full w-full object-cover" />
+      ) : (
+        name.slice(0, 1).toUpperCase()
+      )}
+    </div>
+  );
+}
+
+function AccessLine({ label, active }: { label: string; active: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      {active ? (
+        <CheckCircle2 className="text-emerald-600" size={16} />
+      ) : (
+        <XCircle className="text-red-500" size={16} />
+      )}
+      <span>{label}</span>
     </div>
   );
 }
@@ -839,14 +1123,16 @@ function AccessButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`rounded-2xl px-4 py-4 font-bold transition ${
+      className={`flex items-center justify-between rounded-xl border px-4 py-4 text-left font-black transition ${
         active
-          ? "bg-emerald-100 text-emerald-700"
-          : "bg-slate-100 text-slate-500"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-slate-200 bg-slate-50 text-slate-500"
       }`}
     >
-      {label}: {active ? "Unlocked" : "Locked"}
+      <span>{label}</span>
+      {active ? <CheckCircle2 size={20} /> : <LockKeyhole size={20} />}
     </button>
   );
 }

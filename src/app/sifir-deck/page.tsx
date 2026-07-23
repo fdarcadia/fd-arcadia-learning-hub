@@ -497,7 +497,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
 
   if (accessLoading) {
     return (
-      <main className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+      <main className="min-h-screen bg-[#fbfaf7] px-4 py-10 text-slate-900">
         <div className="mx-auto flex max-w-5xl items-center justify-center py-32">
           <Loader2 className="mr-3 animate-spin" />
           Checking premium access...
@@ -512,19 +512,19 @@ function SifirDeckGame({ userId }: { userId: string }) {
 
   if (!selectedSifir) {
     return (
-      <main className="min-h-screen bg-slate-950 px-4 py-8 text-white">
+      <main className="min-h-screen bg-[#fbfaf7] text-slate-900">
         <div className="mx-auto max-w-6xl">
           <TopBar uiLanguage={uiLanguage} setUiLanguage={setUiLanguage} />
 
           <Link
             href="/dashboard"
-            className="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-5 py-3 font-bold text-white backdrop-blur hover:bg-white/20"
+            className="inline-flex items-center rounded-full border border-indigo-100 bg-white px-5 py-3 font-bold text-slate-700 shadow-sm transition hover:bg-indigo-50"
           >
             <ArrowLeft className="mr-2" size={18} />
             {t.back}
           </Link>
 
-          <section className="mt-10 overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-indigo-600 via-purple-700 to-slate-950 p-8 shadow-2xl">
+          <section className="mt-10 overflow-hidden rounded-[2.5rem] border border-indigo-100 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-8 text-white shadow-2xl">
             <div className="flex flex-wrap items-center justify-between gap-6">
               <div>
                 <div className="inline-flex items-center rounded-full bg-yellow-300 px-4 py-2 text-sm font-black text-slate-950">
@@ -544,7 +544,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
                 </p>
               </div>
 
-              <div className="rounded-[2rem] border border-white/20 bg-white/10 p-5 text-center backdrop-blur">
+              <div className="rounded-[2rem] border border-white/20 bg-white/15 p-5 text-center backdrop-blur">
                 <Sparkles className="mx-auto text-yellow-300" size={42} />
                 <p className="mt-3 text-sm font-bold uppercase tracking-[0.2em] text-indigo-100">
                   Spin Wheel
@@ -556,7 +556,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
             </div>
           </section>
 
-          <section className="mt-8 rounded-[2rem] border border-white/10 bg-white/10 p-5 shadow-xl backdrop-blur">
+          <section className="mt-8 rounded-[2rem] border border-indigo-100 bg-white p-5 shadow-sm">
             <p className="text-sm font-black uppercase tracking-[0.25em] text-yellow-300">
               {t.level}
             </p>
@@ -570,7 +570,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
                   className={`rounded-2xl px-5 py-4 font-black uppercase transition ${
                     difficulty === level
                       ? getLevelActiveClass(level)
-                      : "bg-white/10 text-white/60 hover:bg-white/20"
+                      : "bg-indigo-50 text-slate-500 hover:bg-indigo-100"
                   }`}
                 >
                   {level === "easy"
@@ -589,14 +589,14 @@ function SifirDeckGame({ userId }: { userId: string }) {
                 key={num}
                 type="button"
                 onClick={() => chooseSifir(num)}
-                className="group aspect-square rounded-[2rem] border border-white/10 bg-white/10 p-4 shadow-xl backdrop-blur transition hover:-translate-y-1 hover:bg-white/20"
+                className="group aspect-square rounded-[2rem] border border-indigo-100 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:bg-indigo-50 hover:shadow-lg"
               >
                 <span className="block text-xs font-black uppercase tracking-[0.25em] text-yellow-300">
                   SIFIR
                 </span>
 
                 <span
-                  className="mt-3 block text-6xl font-black text-white sm:text-7xl"
+                  className="mt-3 block text-6xl font-black text-indigo-700 sm:text-7xl"
                   style={QUESTION_FONT_STYLE}
                 >
                   {num}
@@ -614,11 +614,11 @@ function SifirDeckGame({ userId }: { userId: string }) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white">
+    <main className="min-h-screen bg-[#fbfaf7] px-4 py-8 text-slate-900">
       <div className="mx-auto max-w-6xl">
         <TopBar uiLanguage={uiLanguage} setUiLanguage={setUiLanguage} />
 
-        <section className="rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-emerald-500 via-teal-700 to-slate-950 p-7 shadow-2xl">
+        <section className="rounded-[2.5rem] border border-indigo-100 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-7 text-white shadow-2xl">
           <div className="flex flex-wrap items-center justify-between gap-5">
             <div>
               <p className="text-sm font-black tracking-[0.25em] text-yellow-200">
@@ -632,7 +632,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
                 Sifir {selectedSifir}
               </h1>
 
-              <p className="mt-2 font-semibold text-emerald-50">
+              <p className="mt-2 font-semibold text-indigo-100">
                 {difficulty.toUpperCase()} • {cards.length} questions
               </p>
             </div>
@@ -640,7 +640,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
             <button
               type="button"
               onClick={backToChoose}
-              className="rounded-full bg-white px-5 py-3 font-black text-emerald-700 shadow"
+              className="rounded-full bg-white px-5 py-3 font-black text-indigo-700 shadow"
             >
               <ArrowLeft className="mr-2 inline" size={18} />
               {t.back}
@@ -648,7 +648,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
           </div>
         </section>
 
-        <section className="mt-6 rounded-[2rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
+        <section className="mt-6 rounded-[2rem] border border-indigo-100 bg-white p-4 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-3">
             {(["card", "vertical", "wheel"] as GameMode[]).map((m) => (
               <button
@@ -663,7 +663,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
                 className={`rounded-2xl px-5 py-4 font-black transition ${
                   mode === m
                     ? "bg-yellow-300 text-slate-950"
-                    : "bg-white/10 text-white hover:bg-white/20"
+                    : "bg-indigo-50 text-slate-600 hover:bg-indigo-100"
                 }`}
               >
                 {m === "card"
@@ -677,13 +677,13 @@ function SifirDeckGame({ userId }: { userId: string }) {
         </section>
 
         {loading ? (
-          <div className="mt-8 rounded-[2rem] bg-white/10 p-10 text-center font-bold">
+          <div className="mt-8 rounded-[2rem] border border-indigo-100 bg-white p-10 text-center font-bold text-slate-600 shadow-sm">
             {t.loading}
           </div>
         ) : cards.length === 0 ? (
-          <div className="mt-8 rounded-[2rem] border border-white/10 bg-white/10 p-10 text-center">
+          <div className="mt-8 rounded-[2rem] border border-indigo-100 bg-white p-10 text-center shadow-sm">
             <h2 className="text-3xl font-black">{t.noQuestion} {selectedSifir}.</h2>
-            <p className="mt-2 text-white/60">{t.emptyDesc}</p>
+            <p className="mt-2 text-slate-500">{t.emptyDesc}</p>
           </div>
         ) : showResult ? (
           <ResultScreen
@@ -695,13 +695,13 @@ function SifirDeckGame({ userId }: { userId: string }) {
             onChooseOther={backToChoose}
           />
         ) : (
-          <section className="mt-8 rounded-[2.5rem] border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur">
+          <section className="mt-8 rounded-[2.5rem] border border-indigo-100 bg-white p-6 shadow-xl">
             {mode !== "wheel" ? (
               <div className="mb-6 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={previousCard}
-                  className="rounded-2xl bg-white/10 px-5 py-3 font-bold"
+                  className="rounded-2xl bg-indigo-50 px-5 py-3 font-bold text-indigo-700 hover:bg-indigo-100"
                 >
                   {t.previous}
                 </button>
@@ -911,7 +911,7 @@ function TopBar({
         className={`rounded-full px-5 py-3 font-black ${
           uiLanguage === "bm"
             ? "bg-yellow-300 text-slate-950"
-            : "bg-white/10 text-white"
+            : "border border-indigo-100 bg-white text-slate-600 shadow-sm"
         }`}
       >
         BM
@@ -923,7 +923,7 @@ function TopBar({
         className={`rounded-full px-5 py-3 font-black ${
           uiLanguage === "en"
             ? "bg-yellow-300 text-slate-950"
-            : "bg-white/10 text-white"
+            : "border border-indigo-100 bg-white text-slate-600 shadow-sm"
         }`}
       >
         EN
@@ -942,19 +942,19 @@ function PremiumLocked({
   setUiLanguage: (language: UiLanguage) => void;
 }) {
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white">
+    <main className="min-h-screen bg-[#fbfaf7] px-4 py-8 text-slate-900">
       <div className="mx-auto max-w-5xl">
         <TopBar uiLanguage={uiLanguage} setUiLanguage={setUiLanguage} />
 
         <Link
           href="/dashboard"
-          className="inline-flex items-center rounded-full bg-white/10 px-5 py-3 font-bold text-white"
+          className="inline-flex items-center rounded-full border border-indigo-100 bg-white px-5 py-3 font-bold text-slate-700 shadow-sm hover:bg-indigo-50"
         >
           <ArrowLeft className="mr-2" size={18} />
           {t.back}
         </Link>
 
-        <section className="mt-12 rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-purple-700 via-indigo-700 to-slate-950 p-8 text-center shadow-2xl">
+        <section className="mt-12 rounded-[2.5rem] border border-indigo-100 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-8 text-center text-white shadow-2xl">
           <div className="mx-auto grid h-24 w-24 place-items-center rounded-full bg-yellow-300 text-slate-950">
             <Lock size={42} />
           </div>
@@ -965,17 +965,17 @@ function PremiumLocked({
           </p>
 
           <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl bg-white/10 p-5">
+            <div className="rounded-2xl bg-white/15 p-5">
               <Crown className="mx-auto text-yellow-300" />
               <p className="mt-2 font-black">Sifir 1–12</p>
             </div>
 
-            <div className="rounded-2xl bg-white/10 p-5">
+            <div className="rounded-2xl bg-white/15 p-5">
               <Star className="mx-auto text-yellow-300" />
               <p className="mt-2 font-black">Easy • Medium • Hard</p>
             </div>
 
-            <div className="rounded-2xl bg-white/10 p-5">
+            <div className="rounded-2xl bg-white/15 p-5">
               <RotateCw className="mx-auto text-yellow-300" />
               <p className="mt-2 font-black">Spin Wheel</p>
             </div>
@@ -983,7 +983,7 @@ function PremiumLocked({
 
           <Link
             href="/dashboard"
-            className="mt-8 inline-flex rounded-full bg-yellow-300 px-8 py-4 text-lg font-black text-slate-950 shadow-xl"
+            className="mt-8 inline-flex rounded-full bg-yellow-300 px-8 py-4 text-lg font-black text-slate-950 shadow-xl transition hover:bg-yellow-200"
           >
             {t.upgrade}
           </Link>
@@ -1018,7 +1018,7 @@ function CardQuestion({
           : "bg-gradient-to-br from-indigo-600 to-purple-700"
       }`}
     >
-      <p className="text-xl font-bold text-white/80">{label}</p>
+      <p className="text-xl font-bold text-white/90">{label}</p>
 
       <h2
         className="mt-6 text-6xl font-black text-white sm:text-7xl"
@@ -1042,7 +1042,7 @@ function VerticalQuestion({
   status: Status;
 }) {
   return (
-    <div className="mx-auto max-w-xl rounded-[2.5rem] border border-white/10 bg-white p-8 text-center text-slate-900 shadow-2xl">
+    <div className="mx-auto max-w-xl rounded-[2.5rem] border border-indigo-100 bg-white p-8 text-center text-slate-900 shadow-2xl">
       <div
         className="mx-auto w-72 text-right text-6xl font-black sm:text-7xl"
         style={QUESTION_FONT_STYLE}
@@ -1195,7 +1195,7 @@ function NumberPad({
   checkText: string;
 }) {
   return (
-    <div className="mx-auto mt-6 max-w-xl rounded-[2rem] bg-white/10 p-5 shadow-xl">
+    <div className="mx-auto mt-6 max-w-xl rounded-[2rem] border border-indigo-100 bg-indigo-50 p-5 shadow-sm">
       <div className="grid grid-cols-3 gap-4">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
           <button
@@ -1268,7 +1268,7 @@ function WheelStats({
   const percent = Math.max(0, Math.min(100, (timeLeft / timerSeconds) * 100));
 
   return (
-    <div className="mb-6 rounded-[2rem] bg-white/10 p-5">
+    <div className="mb-6 rounded-[2rem] border border-indigo-100 bg-indigo-50 p-5">
       <div className="grid gap-3 sm:grid-cols-4">
         <Stat label="QUESTION" value={`${currentIndex + 1}/${total}`} />
         <Stat label="TIME" value={`${timeLeft}s`} />
@@ -1276,7 +1276,7 @@ function WheelStats({
         <Stat label="WRONG" value={wrongCount} />
       </div>
 
-      <div className="mt-4 h-4 overflow-hidden rounded-full bg-white/20">
+      <div className="mt-4 h-4 overflow-hidden rounded-full bg-white">
         <div
           className="h-full rounded-full bg-yellow-300 transition-all"
           style={{ width: `${percent}%` }}
@@ -1311,9 +1311,9 @@ function ResultScreen({
   onChooseOther: () => void;
 }) {
   return (
-    <section className="mt-8 rounded-[2.5rem] border border-white/10 bg-white/10 p-8 text-center shadow-2xl">
+    <section className="mt-8 rounded-[2.5rem] border border-indigo-100 bg-white p-8 text-center shadow-xl">
       <Trophy className="mx-auto fill-yellow-300 text-yellow-300" size={72} />
-      <h2 className="mt-4 text-5xl font-black">{t.result}</h2>
+      <h2 className="mt-4 text-5xl font-black text-indigo-700">{t.result}</h2>
       <p className="mt-4 text-6xl font-black text-yellow-300">{scorePercent}%</p>
 
       <div className="mx-auto mt-8 grid max-w-xl gap-4 sm:grid-cols-2">
@@ -1333,7 +1333,7 @@ function ResultScreen({
         <button
           type="button"
           onClick={onChooseOther}
-          className="rounded-2xl bg-white/10 px-6 py-4 font-black text-white"
+          className="rounded-2xl border border-indigo-100 bg-indigo-50 px-6 py-4 font-black text-indigo-700 hover:bg-indigo-100"
         >
           {t.chooseOther}
         </button>
