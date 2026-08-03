@@ -11,6 +11,8 @@ type MainPackage =
   | "learning_hub"
   | "custom_worksheet"
   | "math_package"
+  | "flashcard_module"
+  | "digital_module"
   | "full_package";
 
 type PackageOption = {
@@ -98,6 +100,64 @@ const packageGroups: Record<
       },
     ],
   },
+  flashcard_module: {
+    title: "Flashcard Digital",
+    userType: "learning_hub",
+    description: "Koleksi Flashcard Digital FD Arcadia.",
+    options: [
+     {
+  value: "flashcard_rm6",
+  label: "Flashcard Digital",
+  price: "RM6",
+  description: "1 Buku (Softcopy)",
+},
+{
+  value: "flashcard_rm12",
+  label: "Flashcard Digital",
+  price: "RM12",
+  description: "2 Buku (Softcopy)",
+},
+{
+  value: "flashcard_rm17",
+  label: "Flashcard Digital",
+  price: "RM17",
+  description: "3 Buku (Softcopy)",
+},
+{
+  value: "flashcard_rm22",
+  label: "Flashcard Digital",
+  price: "RM22",
+  description: "4 Buku (Softcopy)",
+},
+{
+  value: "flashcard_rm27",
+  label: "Flashcard Digital",
+  price: "RM27",
+  description: "5 Buku (Softcopy)",
+},
+{
+  value: "flashcard_rm42",
+  label: "Flashcard Digital",
+  price: "RM42",
+  description: "8 Buku (Softcopy)",
+},
+    ],
+  },
+
+  digital_module: {
+    title: "Modul Digital",
+    userType: "learning_hub",
+    description: "3 Modul Digital FD Arcadia.",
+    options: [
+      {
+        value: "moduldigital_rm60",
+        label: "Modul Digital",
+        price: "RM60",
+        description: "Read Only No Download.",
+      },
+    ],
+  },
+
   full_package: {
     title: "Full Package",
     userType: "learning_hub",
@@ -239,7 +299,7 @@ export default function RegisterPage() {
               Choose package category
             </legend>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {(Object.keys(packageGroups) as MainPackage[]).map((type) => (
                 <label
                   key={type}
