@@ -50,8 +50,17 @@ const sidebarLinks = [
 ];
 
 function getBookNumber(title: string) {
-  const match = title.match(/Buku\s*(\d+)/i);
-  return match ? Number(match[1]) : 999;
+  const normalizedTitle = title.trim();
+
+  const bookMatch = normalizedTitle.match(/(?:Buku|Book)\s*[-.:]?\s*(\d+)/i);
+
+  if (bookMatch) {
+    return Number(bookMatch[1]);
+  }
+
+  const endingNumberMatch = normalizedTitle.match(/(\d+)\s*$/);
+
+  return endingNumberMatch ? Number(endingNumberMatch[1]) : Number.MAX_SAFE_INTEGER;
 }
 
 function getCategoryEmoji(category: string) {
@@ -81,6 +90,29 @@ function FlashcardLibrary({ userId }: { userId: string }) {
   const [error, setError] = useState("");
   const [searchText, setSearchText] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
+  const [favoriteBookIds, setFavoriteBookIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const storageKey = `fd-arcadia-flashcard-favorites-${userId}`;
+    const savedFavorites = window.localStorage.getItem(storageKey);
+
+    if (!savedFavorites) {
+      setFavoriteBookIds([]);
+      return;
+    }
+
+    try {
+      const parsedFavorites = JSON.parse(savedFavorites);
+
+      setFavoriteBookIds(
+        Array.isArray(parsedFavorites)
+          ? parsedFavorites.filter((id): id is string => typeof id === "string")
+          : [],
+      );
+    } catch {
+      setFavoriteBookIds([]);
+    }
+  }, [userId]);
 
   useEffect(() => {
     async function loadBooks() {
@@ -120,12 +152,24 @@ function FlashcardLibrary({ userId }: { userId: string }) {
       }
 
       const sortedBooks = ((bookData || []) as FlashcardBook[]).sort((a, b) => {
-        const orderA = a.display_order ?? getBookNumber(a.title);
-        const orderB = b.display_order ?? getBookNumber(b.title);
+        const bookNumberA = getBookNumber(a.title);
+        const bookNumberB = getBookNumber(b.title);
 
-        if (orderA !== orderB) return orderA - orderB;
+        if (bookNumberA !== bookNumberB) {
+          return bookNumberA - bookNumberB;
+        }
 
-        return getBookNumber(a.title) - getBookNumber(b.title);
+        const displayOrderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
+        const displayOrderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
+
+        if (displayOrderA !== displayOrderB) {
+          return displayOrderA - displayOrderB;
+        }
+
+        return a.title.localeCompare(b.title, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
       });
 
       setBooks(sortedBooks);
@@ -134,6 +178,19 @@ function FlashcardLibrary({ userId }: { userId: string }) {
 
     loadBooks();
   }, [userId]);
+
+  function toggleFavorite(bookId: string) {
+    setFavoriteBookIds((currentFavorites) => {
+      const nextFavorites = currentFavorites.includes(bookId)
+        ? currentFavorites.filter((id) => id !== bookId)
+        : [...currentFavorites, bookId];
+
+      const storageKey = `fd-arcadia-flashcard-favorites-${userId}`;
+      window.localStorage.setItem(storageKey, JSON.stringify(nextFavorites));
+
+      return nextFavorites;
+    });
+  }
 
   const categories = useMemo(() => {
     const unique = Array.from(
@@ -329,7 +386,13 @@ function FlashcardLibrary({ userId }: { userId: string }) {
             ) : (
               <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
                 {filteredBooks.map((book, index) => (
-                  <FlashcardBookCard key={book.id} book={book} index={index} />
+                  <FlashcardBookCard
+                    key={book.id}
+                    book={book}
+                    index={index}
+                    isFavorite={favoriteBookIds.includes(book.id)}
+                    onToggleFavorite={toggleFavorite}
+                  />
                 ))}
               </div>
             )}
@@ -507,9 +570,13 @@ function ContinueReadingCard({
 function FlashcardBookCard({
   book,
   index,
+  isFavorite,
+  onToggleFavorite,
 }: {
   book: FlashcardBook;
   index: number;
+  isFavorite: boolean;
+  onToggleFavorite: (bookId: string) => void;
 }) {
   const featured = index === 0;
   const emoji = getCategoryEmoji(book.category);
@@ -534,9 +601,24 @@ function FlashcardBookCard({
             {featured ? "FEATURED" : "PREMIUM"}
           </div>
 
-          <div className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-yellow-200 text-yellow-900 shadow-sm">
-            <Star size={18} />
-          </div>
+          <button
+            type="button"
+            aria-label={
+              isFavorite
+                ? `Remove ${book.title} from favourites`
+                : `Add ${book.title} to favourites`
+            }
+            aria-pressed={isFavorite}
+            title={isFavorite ? "Remove from favourites" : "Add to favourites"}
+            onClick={() => onToggleFavorite(book.id)}
+            className={`absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full shadow-sm transition hover:scale-110 focus:outline-none focus:ring-4 focus:ring-yellow-200 ${
+              isFavorite
+                ? "bg-yellow-300 text-yellow-900"
+                : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+            }`}
+          >
+            <Star size={18} fill={isFavorite ? "currentColor" : "none"} />
+          </button>
         </div>
 
         <div className="mt-5">
