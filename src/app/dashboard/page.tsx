@@ -65,6 +65,34 @@ type ChildProfile = {
   avatar_url?: string | null;
 };
 
+type ReadingModuleRow = {
+  id: string;
+  title: string;
+  total_pages: number | null;
+  display_order: number | null;
+  is_active: boolean;
+};
+
+type ReadingProgressRow = {
+  module_id: string;
+  last_page: number | null;
+  highest_page: number | null;
+  progress_percent: number | null;
+  last_opened_at: string | null;
+  completed_at: string | null;
+};
+
+type ReadingModuleSummary = {
+  moduleId: string;
+  title: string;
+  totalPages: number;
+  lastPage: number;
+  highestPage: number;
+  progressPercent: number;
+  lastOpenedAt: string | null;
+  completed: boolean;
+};
+
 const packageLabels: Record<string, string> = {
   math_package: "Math Package RM25",
   learning_hub_weekly: "Learning Hub Weekly RM30",
@@ -134,7 +162,7 @@ const moduleCards: {
   field: ParentAccessField | null;
   icon: React.ElementType;
   description: string;
-  packageGroup: "learning_hub" | "custom_worksheet" | "flashcard" | "math" | "free";
+  packageGroup: "learning_hub" | "custom_worksheet" | "flashcard" | "reading" | "math" | "free";
 }[] = [
   {
     title: "Learning Hub",
@@ -159,6 +187,14 @@ const moduleCards: {
     icon: BookOpen,
     description: "Digital flashcard books to view online and download.",
     packageGroup: "flashcard",
+  },
+  {
+    title: "Modul Membaca",
+    href: "/flashcard-modules",
+    field: "flashcard_modul_unlocked",
+    icon: BookOpenCheck,
+    description: "Interactive flipbooks with writing tools, auto save and reading progress.",
+    packageGroup: "reading",
   },
   {
     title: "Sifir Deck",
@@ -195,16 +231,95 @@ const moduleCards: {
 ];
 
 const adminCards = [
-  { title: "Manage Users", href: "/admin", icon: Users },
-  { title: "Learning Hub Upload", href: "/admin/learning-hub", icon: BookOpenCheck },
-  { title: "Flashcard Library", href: "/admin/flashcard-library", icon: BookOpen },
-  { title: "Freebies", href: "/admin/freebies", icon: Gift },
-  { title: "Worksheet Upload", href: "/admin/custom-worksheet", icon: UploadCloud },
-  { title: "Math Activity", href: "/admin/math-activity", icon: Calculator },
-  { title: "Sifir Deck", href: "/admin/sifir-deck", icon: Star },
-  { title: "Monthly Calendar", href: "/admin/calendar", icon: CalendarDays },
-  { title: "Reports", href: "/admin/reports", icon: BarChart3 },
-];
+  {
+    title: "Manage Parents",
+    href: "/admin",
+    icon: Users,
+    description: "Manage subscriptions, access and parent accounts.",
+    badge: "Users",
+    tone: "indigo",
+  },
+  {
+    title: "Learning Hub",
+    href: "/admin/learning-hub",
+    icon: BookOpenCheck,
+    description: "Upload weekly learning content, activities and resources.",
+    badge: "Content",
+    tone: "blue",
+  },
+  {
+    title: "Modul Membaca",
+    href: "/admin/flashcard-modules",
+    icon: BookOpenCheck,
+    description: "Upload, arrange and publish image-based interactive reading modules.",
+    badge: "3 Books",
+    tone: "violet",
+  },
+  {
+    title: "Reading Progress",
+    href: "/admin/flashcard-modules/progress",
+    icon: BarChart3,
+    description: "Monitor parent reading progress, last page and module completion.",
+    badge: "Analytics",
+    tone: "sky",
+  },
+  {
+    title: "Flashcard Library",
+    href: "/admin/flashcard-library",
+    icon: BookOpen,
+    description: "Manage flashcard books, Canva links and PDF resources.",
+    badge: "Library",
+    tone: "cyan",
+  },
+  {
+    title: "Worksheet Upload",
+    href: "/admin/custom-worksheet",
+    icon: UploadCloud,
+    description: "Upload custom worksheet resources by subject.",
+    badge: "Worksheet",
+    tone: "pink",
+  },
+  {
+    title: "Math Activity",
+    href: "/admin/math-activity",
+    icon: Calculator,
+    description: "Create and manage interactive mathematics activities.",
+    badge: "Math",
+    tone: "emerald",
+  },
+  {
+    title: "Sifir Deck",
+    href: "/admin/sifir-deck",
+    icon: Star,
+    description: "Create multiplication card decks and question sets.",
+    badge: "Practice",
+    tone: "amber",
+  },
+  {
+    title: "Monthly Calendar",
+    href: "/admin/calendar",
+    icon: CalendarDays,
+    description: "Manage monthly dates, schedule and learning calendar.",
+    badge: "Schedule",
+    tone: "orange",
+  },
+  {
+    title: "Freebies",
+    href: "/admin/freebies",
+    icon: Gift,
+    description: "Upload and organise free parent learning resources.",
+    badge: "Resources",
+    tone: "rose",
+  },
+  {
+    title: "Reports",
+    href: "/admin/reports",
+    icon: BarChart3,
+    description: "Review parent access, profiles and activity reports.",
+    badge: "Insights",
+    tone: "sky",
+  },
+] as const;
 
 export default function DashboardPage() {
   return (
@@ -221,52 +336,463 @@ export default function DashboardPage() {
 }
 
 function AdminDashboard({ email }: { email: string }) {
+  const router = useRouter();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
+
   return (
-    <main className="min-h-screen bg-[#fbfaf7] px-4 py-8 text-slate-900">
-      <div className="mx-auto max-w-7xl">
-        <section className="overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-indigo-600 via-violet-600 to-indigo-700 p-8 text-white shadow-xl">
-          <div className="flex items-center gap-3">
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/15">
-              <ShieldCheck className="text-yellow-200" size={34} />
-            </div>
+    <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
+      <div className="grid min-h-screen xl:grid-cols-[250px_minmax(0,1fr)]">
+        <AdminPremiumSidebar />
+
+        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
+          <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-sm font-black tracking-[0.25em] text-yellow-200">
-                ADMIN DASHBOARD
+              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-indigo-500">
+                FD Arcadia Control Centre
               </p>
-              <h1 className="mt-1 text-4xl font-black sm:text-5xl">
-                FD Arcadia Admin
+              <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">
+                Admin Dashboard
               </h1>
+              <p className="mt-1 text-sm font-semibold text-slate-400">
+                Manage content, access and parent-facing resources.
+              </p>
             </div>
-          </div>
 
-          <p className="mt-5 max-w-3xl text-lg leading-8 text-indigo-100">
-            Manage users, subscriptions, uploads, learning activities,
-            flashcards, calendar and reports.
-          </p>
+            <div className="flex items-center gap-2">
+              <div className="hidden rounded-xl border border-slate-200 bg-white px-4 py-2.5 sm:block">
+                <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+                  Signed in as
+                </p>
+                <p className="mt-0.5 text-xs font-black text-slate-700">{email}</p>
+              </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <span className="rounded-2xl bg-white px-4 py-2 font-black text-indigo-700">
-              Admin Account
-            </span>
-            <span className="rounded-2xl bg-yellow-200 px-4 py-2 font-black text-indigo-700">
-              {email}
-            </span>
-          </div>
-        </section>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 text-sm font-black text-red-600 transition hover:bg-red-100"
+              >
+                <LogOut size={16} />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            </div>
+          </header>
 
-        <section className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-          {adminCards.map((card) => (
-            <AdminCard key={card.title} {...card} />
-          ))}
+          <section className="relative mt-5 overflow-hidden rounded-[26px] bg-gradient-to-br from-[#10162f] via-[#24255b] to-[#171c42] px-6 py-6 text-white shadow-[0_20px_55px_rgba(15,23,42,0.18)]">
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
+
+            <div className="relative grid gap-6 xl:grid-cols-[1.1fr_0.9fr] xl:items-center">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/10 text-yellow-300">
+                    <ShieldCheck size={24} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-violet-300">
+                      Administration Portal
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black sm:text-3xl">
+                      Everything you need, in one place.
+                    </h2>
+                  </div>
+                </div>
+
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">
+                  Manage parent access, reading modules, worksheets, flashcards,
+                  activities, schedules and reports without a crowded interface.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-white/[0.06]">
+                <AdminHeroStat value={String(adminCards.length)} label="Managers" />
+                <AdminHeroStat value="Active" label="Portal" />
+                <AdminHeroStat value="Live" label="Parent View" />
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-500">
+                  Management Suite
+                </p>
+                <h2 className="mt-1 text-2xl font-black">Manage FD Arcadia</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  Choose a management area to continue.
+                </p>
+              </div>
+
+              <Link
+                href="/admin"
+                className="inline-flex self-start items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-black text-white transition hover:bg-slate-800 sm:self-auto"
+              >
+                <Users size={15} />
+                Manage Parents
+              </Link>
+            </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {adminCards.map((card) => (
+                <PremiumAdminCard key={card.title} {...card} />
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-6 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                  Parent Portal Preview
+                </p>
+                <h2 className="mt-1 text-xl font-black">Quick Preview</h2>
+              </div>
+
+              <div className="grid flex-1 gap-2 sm:grid-cols-2 lg:max-w-[720px] lg:grid-cols-4">
+                <PreviewCard href="/learning-hub" icon={BookOpenCheck} title="Learning Hub" description="Weekly content." />
+                <PreviewCard href="/flashcard-modules" icon={BookOpen} title="Modul Membaca" description="Reading modules." />
+                <PreviewCard href="/flashcard-library" icon={BookOpen} title="Flashcards" description="Digital library." />
+                <PreviewCard href="/custom-worksheet" icon={FileText} title="Worksheet" description="Assigned files." />
+              </div>
+            </div>
+          </section>
         </section>
       </div>
     </main>
   );
 }
 
+function ParentHeroMetric({
+  icon: Icon,
+  value,
+  label,
+}: {
+  icon: React.ElementType;
+  value: string;
+  label: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-4 text-center backdrop-blur">
+      <div className="mx-auto grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-white">
+        <Icon size={17} />
+      </div>
+      <p className="mt-2 text-xl font-black sm:text-2xl">{value}</p>
+      <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-indigo-100">{label}</p>
+    </div>
+  );
+}
+
+function AdminHeroStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="px-3 py-4 text-center">
+      <p className="text-xl font-black sm:text-2xl">{value}</p>
+      <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-slate-400">{label}</p>
+    </div>
+  );
+}
+
+function AdminPremiumSidebar() {
+  const links = [
+    { title: "Dashboard", href: "/dashboard", icon: Home },
+    { title: "Manage Parents", href: "/admin", icon: Users },
+    { title: "Reading Modules", href: "/admin/flashcard-modules", icon: BookOpenCheck },
+    { title: "Reading Progress", href: "/admin/flashcard-modules/progress", icon: BarChart3 },
+    { title: "Flashcard Library", href: "/admin/flashcard-library", icon: BookOpen },
+    { title: "Custom Worksheet", href: "/admin/custom-worksheet", icon: FileText },
+    { title: "Math Activity", href: "/admin/math-activity", icon: Calculator },
+    { title: "Sifir Deck", href: "/admin/sifir-deck", icon: Star },
+    { title: "Calendar", href: "/admin/calendar", icon: CalendarDays },
+    { title: "Freebies", href: "/admin/freebies", icon: Gift },
+  ];
+
+  return (
+    <aside className="hidden border-r border-indigo-950/10 bg-[#111735] px-4 py-6 text-white xl:flex xl:flex-col">
+      <Link href="/dashboard" className="flex items-center gap-3 px-2">
+        <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-indigo-950/30">
+          <ShieldCheck size={21} />
+        </div>
+        <div>
+          <p className="text-sm font-black tracking-[0.08em]">FD ARCADIA</p>
+          <p className="text-[9px] font-black tracking-[0.2em] text-violet-300">ADMIN PORTAL</p>
+        </div>
+      </Link>
+
+      <nav className="mt-8 space-y-1.5">
+        {links.map((item, index) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.title}
+              href={item.href}
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-black transition ${
+                index === 0
+                  ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-950/20"
+                  : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
+              }`}
+            >
+              <Icon size={18} />
+              {item.title}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="mt-auto rounded-[20px] border border-violet-400/20 bg-white/[0.05] p-4">
+        <div className="flex items-center gap-2 text-yellow-300">
+          <Crown size={17} />
+          <p className="text-xs font-black">Admin Access</p>
+        </div>
+        <p className="mt-2 text-[10px] leading-5 text-indigo-200">
+          Full management access to FD Arcadia portal.
+        </p>
+      </div>
+    </aside>
+  );
+}
+
+function HeroQuickButton({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex min-w-[120px] items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/15"
+    >
+      <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-yellow-200">
+        <Icon size={20} />
+      </div>
+
+      <span className="text-sm font-black">
+        {label}
+      </span>
+    </Link>
+  );
+}
+
+function AdminMetric({
+  icon: Icon,
+  title,
+  value,
+  description,
+  tone,
+}: {
+  icon: React.ElementType;
+  title: string;
+  value: string;
+  description: string;
+  tone: "indigo" | "violet" | "blue" | "emerald";
+}) {
+  const toneStyles = {
+    indigo: "bg-indigo-50 text-indigo-700",
+    violet: "bg-violet-50 text-violet-700",
+    blue: "bg-blue-50 text-blue-700",
+    emerald: "bg-emerald-50 text-emerald-700",
+  }[tone];
+
+  return (
+    <div className="rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start gap-4">
+        <div
+          className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${toneStyles}`}
+        >
+          <Icon size={23} />
+        </div>
+
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+            {title}
+          </p>
+
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {value}
+          </p>
+
+          <p className="mt-1 text-xs font-medium text-slate-500">
+            {description}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PremiumAdminCard({
+  title,
+  href,
+  icon: Icon,
+  description,
+  badge,
+  tone,
+}: {
+  title: string;
+  href: string;
+  icon: React.ElementType;
+  description: string;
+  badge: string;
+  tone:
+    | "indigo"
+    | "blue"
+    | "violet"
+    | "cyan"
+    | "pink"
+    | "emerald"
+    | "amber"
+    | "orange"
+    | "rose"
+    | "sky";
+}) {
+  const theme = {
+    indigo: {
+      icon: "bg-indigo-50 text-indigo-700",
+      badge: "bg-indigo-50 text-indigo-700",
+      hover: "hover:border-indigo-200",
+    },
+    blue: {
+      icon: "bg-blue-50 text-blue-700",
+      badge: "bg-blue-50 text-blue-700",
+      hover: "hover:border-blue-200",
+    },
+    violet: {
+      icon: "bg-violet-50 text-violet-700",
+      badge: "bg-violet-50 text-violet-700",
+      hover: "hover:border-violet-200",
+    },
+    cyan: {
+      icon: "bg-cyan-50 text-cyan-700",
+      badge: "bg-cyan-50 text-cyan-700",
+      hover: "hover:border-cyan-200",
+    },
+    pink: {
+      icon: "bg-pink-50 text-pink-700",
+      badge: "bg-pink-50 text-pink-700",
+      hover: "hover:border-pink-200",
+    },
+    emerald: {
+      icon: "bg-emerald-50 text-emerald-700",
+      badge: "bg-emerald-50 text-emerald-700",
+      hover: "hover:border-emerald-200",
+    },
+    amber: {
+      icon: "bg-amber-50 text-amber-700",
+      badge: "bg-amber-50 text-amber-700",
+      hover: "hover:border-amber-200",
+    },
+    orange: {
+      icon: "bg-orange-50 text-orange-700",
+      badge: "bg-orange-50 text-orange-700",
+      hover: "hover:border-orange-200",
+    },
+    rose: {
+      icon: "bg-rose-50 text-rose-700",
+      badge: "bg-rose-50 text-rose-700",
+      hover: "hover:border-rose-200",
+    },
+    sky: {
+      icon: "bg-sky-50 text-sky-700",
+      badge: "bg-sky-50 text-sky-700",
+      hover: "hover:border-sky-200",
+    },
+  }[tone];
+
+  return (
+    <Link
+      href={href}
+      className={`group relative overflow-hidden rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.05)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)] ${theme.hover}`}
+    >
+      <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-slate-50 transition duration-300 group-hover:scale-125" />
+
+      <div className="relative">
+        <div className="flex items-start justify-between gap-4">
+          <div
+            className={`grid h-13 w-13 place-items-center rounded-2xl p-3 ${theme.icon}`}
+          >
+            <Icon size={26} />
+          </div>
+
+          <span
+            className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] ${theme.badge}`}
+          >
+            {badge}
+          </span>
+        </div>
+
+        <h3 className="mt-5 text-xl font-black text-slate-950">
+          {title}
+        </h3>
+
+        <p className="mt-2 min-h-[52px] text-sm leading-6 text-slate-500">
+          {description}
+        </p>
+
+        <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+          <span className="text-sm font-black text-slate-700">
+            Open Manager
+          </span>
+
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-950 text-white transition group-hover:translate-x-1">
+            <ChevronRight size={17} />
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function PreviewCard({
+  href,
+  icon: Icon,
+  title,
+  description,
+}: {
+  href: string;
+  icon: React.ElementType;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 transition hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-indigo-50"
+    >
+      <div className="grid h-11 w-11 place-items-center rounded-xl bg-white text-indigo-700 shadow-sm">
+        <Icon size={21} />
+      </div>
+
+      <h3 className="mt-4 font-black text-slate-900">
+        {title}
+      </h3>
+
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        {description}
+      </p>
+
+      <div className="mt-4 flex items-center gap-1 text-xs font-black text-indigo-700">
+        Preview
+        <ChevronRight
+          size={14}
+          className="transition group-hover:translate-x-1"
+        />
+      </div>
+    </Link>
+  );
+}
+
 function ParentDashboard({ userId }: { userId: string }) {
   const [profile, setProfile] = useState<DashboardProfile | null>(null);
   const [children, setChildren] = useState<ChildProfile[]>([]);
+  const [readingModules, setReadingModules] = useState<ReadingModuleRow[]>([]);
+  const [readingProgress, setReadingProgress] = useState<ReadingProgressRow[]>([]);
+  const [readingLoading, setReadingLoading] = useState(true);
   const [selectedSubject, setSelectedSubject] = useState("Warm Up");
   const [error, setError] = useState("");
 
@@ -280,6 +806,7 @@ function ParentDashboard({ userId }: { userId: string }) {
 
       if (profileError) {
         setError(profileError.message);
+        setReadingLoading(false);
         return;
       }
 
@@ -292,6 +819,48 @@ function ParentDashboard({ userId }: { userId: string }) {
         .limit(8);
 
       setChildren((childrenData || []) as ChildProfile[]);
+
+      try {
+        setReadingLoading(true);
+
+        const { data: moduleData, error: moduleError } = await supabase
+          .from("flashcard_modules")
+          .select("id,title,total_pages,display_order,is_active")
+          .eq("is_active", true)
+          .order("display_order", { ascending: true });
+
+        if (moduleError) {
+          throw moduleError;
+        }
+
+        const modules = (moduleData || []) as ReadingModuleRow[];
+        setReadingModules(modules);
+
+        if (modules.length > 0) {
+          const { data: progressData, error: progressError } = await supabase
+            .from("flashcard_module_progress")
+            .select(
+              "module_id,last_page,highest_page,progress_percent,last_opened_at,completed_at"
+            )
+            .eq("user_id", userId)
+            .in(
+              "module_id",
+              modules.map((module) => module.id)
+            );
+
+          if (progressError) {
+            throw progressError;
+          }
+
+          setReadingProgress((progressData || []) as ReadingProgressRow[]);
+        } else {
+          setReadingProgress([]);
+        }
+      } catch (readingError) {
+        console.error("Reading dashboard load error:", readingError);
+      } finally {
+        setReadingLoading(false);
+      }
     }
 
     loadDashboardData();
@@ -311,15 +880,13 @@ function ParentDashboard({ userId }: { userId: string }) {
   const hasDrawLearn = Boolean(profile?.draw_learn_unlocked);
   const hasSifirDeck = Boolean(profile?.sifir_deck_unlocked);
   const hasFreebies = profile?.freebies_unlocked !== false;
-  const hasFlashcard = Boolean(
-    profile?.flashcard_unlocked || profile?.flashcard_modul_unlocked
-  );
+  const hasFlashcardLibrary = Boolean(profile?.flashcard_unlocked);
+  const hasReadingModules = Boolean(profile?.flashcard_modul_unlocked);
 
   const unlockedCount = moduleCards.filter((card) => {
     if (!card.field) return true;
-    if (card.field === "flashcard_unlocked" || card.field === "flashcard_modul_unlocked") {
-      return hasFlashcard;
-    }
+    if (card.field === "flashcard_unlocked") return hasFlashcardLibrary;
+    if (card.field === "flashcard_modul_unlocked") return hasReadingModules;
     if (card.field === "freebies_unlocked") return hasFreebies;
     return Boolean(profile?.[card.field]);
   }).length;
@@ -328,6 +895,76 @@ function ParentDashboard({ userId }: { userId: string }) {
     35,
     Math.round((unlockedCount / moduleCards.length) * 100)
   );
+
+  const readingSummaries = useMemo<ReadingModuleSummary[]>(() => {
+    const progressMap = new Map(
+      readingProgress.map((row) => [row.module_id, row])
+    );
+
+    return readingModules.map((module) => {
+      const saved = progressMap.get(module.id);
+      const totalPages = Math.max(1, Number(module.total_pages || 1));
+      const lastPage = Math.max(
+        1,
+        Math.min(totalPages, Number(saved?.last_page || 1))
+      );
+      const highestPage = Math.max(
+        saved ? 1 : 0,
+        Math.min(totalPages, Number(saved?.highest_page || 0))
+      );
+      const progressPercent = saved
+        ? Math.max(
+            0,
+            Math.min(
+              100,
+              Number.isFinite(Number(saved.progress_percent))
+                ? Number(saved.progress_percent)
+                : Math.round((highestPage / totalPages) * 100)
+            )
+          )
+        : 0;
+
+      return {
+        moduleId: module.id,
+        title: module.title,
+        totalPages,
+        lastPage,
+        highestPage,
+        progressPercent,
+        lastOpenedAt: saved?.last_opened_at || null,
+        completed: Boolean(saved?.completed_at) || progressPercent >= 100,
+      };
+    });
+  }, [readingModules, readingProgress]);
+
+  const latestReadingModule = useMemo(() => {
+    const started = readingSummaries.filter((item) => item.progressPercent > 0);
+
+    if (started.length === 0) {
+      return readingSummaries[0] || null;
+    }
+
+    return [...started].sort((a, b) => {
+      const aTime = a.lastOpenedAt ? new Date(a.lastOpenedAt).getTime() : 0;
+      const bTime = b.lastOpenedAt ? new Date(b.lastOpenedAt).getTime() : 0;
+      return bTime - aTime;
+    })[0];
+  }, [readingSummaries]);
+
+  const readingAverageProgress = useMemo(() => {
+    const started = readingSummaries.filter((item) => item.progressPercent > 0);
+
+    if (started.length === 0) return 0;
+
+    return Math.round(
+      started.reduce((sum, item) => sum + item.progressPercent, 0) /
+        started.length
+    );
+  }, [readingSummaries]);
+
+  const readingCompletedCount = readingSummaries.filter(
+    (item) => item.completed
+  ).length;
 
   const shouldShowLearningHubDashboard = hasLearningHub;
   const shouldShowCompactPackageDashboard = !hasLearningHub;
@@ -340,158 +977,325 @@ function ParentDashboard({ userId }: { userId: string }) {
 
   const whatsappLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${whatsappText}`;
 
+  const primaryChild = children[0] || null;
+  const primaryChildName =
+    primaryChild?.name ||
+    primaryChild?.child_name ||
+    primaryChild?.full_name ||
+    displayName;
+
+  const primaryChildLevel =
+    primaryChild?.level || primaryChild?.grade || "Learning Profile";
+
+  const primaryChildAge = primaryChild?.age
+    ? `Age ${primaryChild.age}`
+    : children.length > 0
+      ? "Age not set"
+      : "Parent Overview";
+
+  const dashboardModules = moduleCards.filter((card) => {
+    if (card.field === "flashcard_unlocked") return hasFlashcardLibrary;
+    if (card.field === "flashcard_modul_unlocked") return hasReadingModules;
+    if (card.field === "freebies_unlocked") return hasFreebies;
+    return card.field ? Boolean(profile?.[card.field]) : true;
+  });
+
   return (
-    <main className="min-h-screen bg-[#fbfaf7] text-slate-900">
-      <div className="grid min-h-screen xl:grid-cols-[290px_1fr]">
+    <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
+      <div className="grid min-h-screen xl:grid-cols-[250px_minmax(0,1fr)]">
         <ParentSidebar
           packageName={packageName}
           endDate={profile?.subscription_end || "-"}
           hasLearningHub={hasLearningHub}
           hasCustomWorksheet={hasCustomWorksheet}
-          hasFlashcard={hasFlashcard}
+          hasFlashcardLibrary={hasFlashcardLibrary}
+          hasReadingModules={hasReadingModules}
         />
 
-        <section className="px-4 py-6 lg:px-8">
+        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
           <TopHeader displayName={displayName} avatarUrl={profile?.avatar_url || null} />
 
           {error ? (
-            <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 font-bold text-red-700">
+            <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
               {error}
             </div>
           ) : null}
 
-          <section className="rounded-[2rem] border border-indigo-100 bg-white p-5 shadow-sm lg:p-6">
-            <div className="grid gap-7 2xl:grid-cols-[0.95fr_1.05fr]">
-              <ParentSummaryCard
-                displayName={displayName}
-                email={profile?.email || "-"}
-                avatarUrl={profile?.avatar_url || null}
-                packageName={packageName}
-                startDate={profile?.subscription_start || "-"}
-                endDate={profile?.subscription_end || "-"}
-                childrenCount={children.length}
-              />
+          <section className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#6253d9] via-[#5159c7] to-[#31549b] px-5 py-6 text-white shadow-[0_20px_55px_rgba(79,70,229,0.20)] sm:px-6">
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
 
-              {shouldShowLearningHubDashboard ? (
-                <OverallProgressPanel overallProgress={overallProgress} />
+            <div className="relative grid gap-6 xl:grid-cols-[1fr_1.35fr] xl:items-center">
+              <div className="flex items-center gap-4">
+                <Link
+                  href="/children"
+                  className="relative grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white/70 bg-white/15 text-5xl shadow-lg sm:h-28 sm:w-28"
+                >
+                  {primaryChild?.avatar_url ? (
+                    <img src={primaryChild.avatar_url} alt={primaryChildName} className="h-full w-full object-cover" />
+                  ) : profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt={displayName} className="h-full w-full object-cover" />
+                  ) : (
+                    <UserRound size={42} className="text-white/80" />
+                  )}
+                </Link>
+
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-100">
+                    {children.length > 0 ? "Learning Profile" : "Parent Account"}
+                  </p>
+                  <h2 className="mt-1 truncate text-3xl font-black sm:text-4xl">
+                    {primaryChildName}
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold text-indigo-100">
+                    {primaryChildLevel} • {primaryChildAge}
+                  </p>
+                  <div className="mt-3 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-black">
+                    {packageName}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <ParentHeroMetric icon={BookOpenCheck} value={String(unlockedCount)} label="Modules Unlocked" />
+                <ParentHeroMetric icon={CheckCircle2} value={`${readingCompletedCount}/${readingSummaries.length || 0}`} label="Reading Complete" />
+                <ParentHeroMetric icon={BarChart3} value={`${readingAverageProgress}%`} label="Reading Progress" />
+                <ParentHeroMetric icon={Users} value={String(children.length)} label="Children" />
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-5 grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+            <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-500">
+                    Learning Access
+                  </p>
+                  <h2 className="mt-1 text-xl font-black">My Learning Modules</h2>
+                </div>
+                <Link
+                  href="/pricing"
+                  className="rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 text-[10px] font-black text-violet-700 transition hover:bg-violet-100"
+                >
+                  View Plans
+                </Link>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {dashboardModules.slice(0, 6).map((card) => {
+                  const Icon = card.icon;
+                  const isReading = card.title === "Modul Membaca";
+                  const progressValue = isReading ? readingAverageProgress : 100;
+
+                  return (
+                    <Link
+                      key={card.title}
+                      href={card.href}
+                      className="group rounded-[18px] border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-600">
+                          <Icon size={20} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="truncate text-sm font-black text-slate-900">{card.title}</h3>
+                            <ChevronRight size={15} className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-600" />
+                          </div>
+                          <p className="mt-1 truncate text-[10px] font-semibold text-slate-400">
+                            {isReading
+                              ? readingAverageProgress > 0
+                                ? "Continue reading"
+                                : "Start reading"
+                              : "Ready to use"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className={`h-full rounded-full ${isReading ? "bg-violet-500" : "bg-emerald-500"}`}
+                            style={{ width: `${progressValue}%` }}
+                          />
+                        </div>
+                        <span className="text-[9px] font-black text-slate-400">
+                          {isReading ? `${progressValue}%` : "Ready"}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+
+                {dashboardModules.length === 0 ? (
+                  <div className="rounded-2xl bg-slate-50 p-5 text-sm font-semibold text-slate-500 md:col-span-2">
+                    No premium module unlocked yet. View plans to choose your learning package.
+                  </div>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-violet-500">
+                    This Week
+                  </p>
+                  <h2 className="mt-1 text-xl font-black">Weekly Progress</h2>
+                </div>
+                <BarChart3 size={20} className="text-violet-500" />
+              </div>
+
+              <div className="mt-5 space-y-4">
+                {subjectTabs.map((subject) => (
+                  <div key={subject.title}>
+                    <div className="mb-1.5 flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-2 text-xs font-black text-slate-700">
+                        <span>{subject.icon}</span>
+                        {subject.title}
+                      </span>
+                      <span className="text-[10px] font-black text-slate-400">{subject.progress}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500"
+                        style={{ width: `${subject.progress}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {hasLearningHub ? (
+                <Link
+                  href="/learning-hub"
+                  className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-violet-50 px-4 py-3 text-xs font-black text-violet-700 transition hover:bg-violet-100"
+                >
+                  View Learning Hub
+                  <ChevronRight size={14} />
+                </Link>
+              ) : null}
+            </section>
+          </section>
+
+          {hasReadingModules ? (
+            <ReadingProgressDashboard
+              loading={readingLoading}
+              modules={readingSummaries}
+              latestModule={latestReadingModule}
+              averageProgress={readingAverageProgress}
+              completedCount={readingCompletedCount}
+            />
+          ) : null}
+
+          {hasLearningHub ? (
+            <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-500">
+                    Daily Learning
+                  </p>
+                  <h2 className="mt-1 text-xl font-black">Today&apos;s Schedule</h2>
+                </div>
+                <Link href="/learning-hub" className="text-[10px] font-black text-indigo-600">
+                  View Full Schedule
+                </Link>
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                {dailySchedule.map((item, index) => (
+                  <div
+                    key={item.title}
+                    className="flex items-center gap-3 rounded-[16px] border border-slate-100 bg-slate-50 px-3 py-3"
+                  >
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-xl shadow-sm">
+                      {item.icon}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black text-slate-400">{item.time}</p>
+                      <p className="truncate text-xs font-black text-slate-800">{item.title}</p>
+                    </div>
+                    {index < 2 ? (
+                      <CheckCircle2 size={14} className="ml-auto shrink-0 text-emerald-500" />
+                    ) : (
+                      <Clock3 size={14} className="ml-auto shrink-0 text-indigo-400" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Family</p>
+                <h2 className="mt-1 text-xl font-black">My Children</h2>
+              </div>
+              <Link href="/children" className="rounded-xl bg-slate-950 px-3 py-2 text-[10px] font-black text-white">
+                Manage
+              </Link>
+            </div>
+
+            <div className="mt-4 flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {children.length > 0 ? (
+                children.map((child) => {
+                  const childName = child.name || child.child_name || child.full_name || "Child Profile";
+                  return (
+                    <Link
+                      key={child.id}
+                      href="/children"
+                      className="flex min-w-[230px] items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3"
+                    >
+                      <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-50 text-indigo-500">
+                        {child.avatar_url ? (
+                          <img src={child.avatar_url} alt={childName} className="h-full w-full object-cover" />
+                        ) : (
+                          <UserRound size={20} />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black">{childName}</p>
+                        <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">
+                          {child.level || child.grade || "Level not set"}{child.age ? ` • Age ${child.age}` : ""}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })
               ) : (
-                <CompactAccessPanel
-                  hasCustomWorksheet={hasCustomWorksheet}
-                  hasFlashcard={hasFlashcard}
-                  hasMathActivity={hasMathActivity}
-                  hasDrawLearn={hasDrawLearn}
-                  hasSifirDeck={hasSifirDeck}
-                  hasFreebies={hasFreebies}
-                  overallProgress={overallProgress}
-                />
+                <Link
+                  href="/children"
+                  className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-5 py-4 text-xs font-black text-slate-500"
+                >
+                  + Add your first child profile
+                </Link>
               )}
             </div>
           </section>
 
-          <ChildrenMiniSection children={children} />
-
-          {shouldShowLearningHubDashboard ? (
-            <>
-              <section className="mt-7 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-                <ContinueLearningCard />
-                <TodayScheduleCard />
-              </section>
-
-              <section className="mt-7 grid gap-6 xl:grid-cols-[1fr_1fr]">
-                <WeekProgressPanel />
-                <AchievementPanel />
-              </section>
-
-              <section className="mt-8">
-                <div className="mb-4">
-                  <h2 className="text-2xl font-black text-indigo-700">Subjects</h2>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-5">
-                  {subjectTabs.map((subject) => (
-                    <button
-                      key={subject.title}
-                      onClick={() => setSelectedSubject(subject.title)}
-                      className={`rounded-2xl border bg-white px-5 py-4 text-left font-black shadow-sm transition hover:-translate-y-1 ${
-                        selectedSubject === subject.title
-                          ? "border-indigo-500 text-indigo-700 ring-4 ring-indigo-50"
-                          : "border-indigo-100 text-slate-600"
-                      }`}
-                    >
-                      <span className="mr-3 text-3xl">{subject.icon}</span>
-                      {subject.title}
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <WeeklyTopicsSection selectedSubject={selectedSubject} />
-
-              <DailyScheduleBar />
-            </>
-          ) : null}
-
-          {shouldShowCompactPackageDashboard ? (
-            <CompactPackageSection
-              hasCustomWorksheet={hasCustomWorksheet}
-              hasFlashcard={hasFlashcard}
-              hasMathActivity={hasMathActivity}
-              hasDrawLearn={hasDrawLearn}
-              hasSifirDeck={hasSifirDeck}
-              hasFreebies={hasFreebies}
-            />
-          ) : null}
-
-          <LearningResources
-            profile={profile}
-            hasFlashcard={hasFlashcard}
-            hasFreebies={hasFreebies}
-            onlyUnlocked={shouldShowCompactPackageDashboard}
-          />
-
-          <section className="mt-8 grid gap-5 lg:grid-cols-[1fr_0.9fr]">
-            <section className="rounded-[2rem] border border-yellow-200 bg-yellow-50 p-6">
-              <h2 className="text-2xl font-black text-indigo-700">
-                Payment & Access Information
-              </h2>
-              <p className="mt-3 text-slate-700">
-                All package purchases are processed manually by FD Arcadia
-                Learning Hub.
+          <section className="mt-5 flex flex-col gap-3 rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Current Plan</p>
+              <p className="mt-1 text-sm font-black text-slate-800">{packageName}</p>
+              <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
+                Valid until {profile?.subscription_end || "-"}
               </p>
-              <ol className="mt-4 space-y-2 text-slate-700">
-                <li>1. Register your account.</li>
-                <li>2. Choose your preferred package.</li>
-                <li>3. WhatsApp admin with your registered email and payment proof.</li>
-                <li>4. Admin will unlock your package after confirmation.</li>
-              </ol>
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/pricing"
-                  className="inline-flex justify-center rounded-2xl bg-indigo-600 px-5 py-3 font-black text-white transition hover:bg-indigo-700"
-                >
-                  View Packages
-                </Link>
-                <a
-                  href={whatsappLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex justify-center rounded-2xl bg-green-500 px-5 py-3 font-black text-white transition hover:bg-green-600"
-                >
-                  WhatsApp Admin
-                </a>
-              </div>
-            </section>
+            </div>
 
-            <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
-              <h2 className="text-2xl font-black text-indigo-700">
-                Current Package Status
-              </h2>
-              <div className="mt-4 grid gap-4">
-                <StatusBox label="Package" value={packageName} />
-                <StatusBox label="Start Date" value={profile?.subscription_start || "-"} />
-                <StatusBox label="End Date" value={profile?.subscription_end || "-"} />
-              </div>
-            </section>
+            <div className="flex gap-2">
+              <Link href="/pricing" className="inline-flex items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-xs font-black text-indigo-700">
+                View Plans
+              </Link>
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-black text-white"
+              >
+                WhatsApp Admin
+              </a>
+            </div>
           </section>
         </section>
       </div>
@@ -504,90 +1308,69 @@ function ParentSidebar({
   endDate,
   hasLearningHub,
   hasCustomWorksheet,
-  hasFlashcard,
+  hasFlashcardLibrary,
+  hasReadingModules,
 }: {
   packageName: string;
   endDate: string;
   hasLearningHub: boolean;
   hasCustomWorksheet: boolean;
-  hasFlashcard: boolean;
+  hasFlashcardLibrary: boolean;
+  hasReadingModules: boolean;
 }) {
-  const sidebarLinks = [
-    { title: "Dashboard", href: "/dashboard", icon: Home, section: "main", show: true },
-    { title: "My Children", href: "/children", icon: Users, section: "main", show: true },
-
-    { title: "Month 1", href: "/learning-hub/month-1", icon: CalendarDays, section: "hub", show: hasLearningHub },
-    { title: "Month 2", href: "/learning-hub/month-2", icon: CalendarDays, section: "hub", show: hasLearningHub },
-    { title: "Month 3", href: "/learning-hub/month-3", icon: CalendarDays, section: "hub", show: hasLearningHub },
-    { title: "Month 4", href: "/learning-hub/month-4", icon: CalendarDays, section: "hub", show: hasLearningHub },
-    { title: "Month 5", href: "/learning-hub/month-5", icon: CalendarDays, section: "hub", show: hasLearningHub },
-    { title: "Month 6", href: "/learning-hub/month-6", icon: CalendarDays, section: "hub", show: hasLearningHub },
-
-    { title: "Custom Worksheet", href: "/custom-worksheet", icon: FileText, section: "extra", show: hasCustomWorksheet },
-    { title: "Flashcard Library", href: "/flashcard-library", icon: BookOpen, section: "extra", show: hasFlashcard },
-    { title: "Freebies", href: "/freebies", icon: Gift, section: "extra", show: true },
-    { title: "Progress Reports", href: "/profile", icon: BarChart3, section: "extra", show: true },
-  ];
-
-  const visibleLinks = sidebarLinks.filter((item) => item.show);
+  const links = [
+    { title: "Dashboard", href: "/dashboard", icon: Home, show: true },
+    { title: "Learning Hub", href: "/learning-hub", icon: BookOpenCheck, show: hasLearningHub },
+    { title: "Flashcard Library", href: "/flashcard-library", icon: BookOpen, show: hasFlashcardLibrary },
+    { title: "Modul Membaca", href: "/flashcard-modules", icon: BookOpenCheck, show: hasReadingModules },
+    { title: "Math Activity", href: "/math-activity", icon: Calculator, show: true },
+    { title: "Custom Worksheet", href: "/custom-worksheet", icon: FileText, show: hasCustomWorksheet },
+    { title: "Draw & Learn", href: "/worksheet", icon: Palette, show: true },
+    { title: "Sifir Deck", href: "/sifir-deck", icon: Star, show: true },
+    { title: "Freebies", href: "/freebies", icon: Gift, show: true },
+  ].filter((item) => item.show);
 
   return (
-    <aside className="hidden border-r border-indigo-100 bg-white p-6 xl:block">
-      <Link href="/dashboard" className="flex items-center gap-3">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-600 text-yellow-200 shadow-lg">
-          <Sparkles size={26} />
+    <aside className="hidden border-r border-indigo-950/10 bg-[#111735] px-4 py-6 text-white xl:flex xl:flex-col">
+      <Link href="/dashboard" className="flex items-center gap-3 px-2">
+        <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-indigo-950/30">
+          <BookOpen size={22} />
         </div>
         <div>
-          <p className="text-xl font-black tracking-[0.18em] text-slate-900">
-            FD ARCADIA
-          </p>
-          <p className="text-sm font-black tracking-[0.25em] text-indigo-600">
-            LEARNING HUB
-          </p>
+          <p className="text-sm font-black tracking-[0.08em]">FD ARCADIA</p>
+          <p className="text-[9px] font-black tracking-[0.2em] text-violet-300">PARENT PORTAL</p>
         </div>
       </Link>
 
-      <nav className="mt-10 space-y-2">
-        {visibleLinks.map((item, index) => {
+      <nav className="mt-8 space-y-1.5">
+        {links.map((item, index) => {
           const Icon = item.icon;
-          const active = index === 0 || (hasLearningHub && item.title === "Month 1");
-          const showLabel =
-            index === 2 || (index > 1 && visibleLinks[index - 1].section !== item.section);
-
           return (
-            <div key={item.title}>
-              {showLabel ? (
-                <p className="mb-2 mt-6 text-xs font-black tracking-[0.2em] text-slate-400">
-                  {item.section === "hub" ? "LEARNING HUB" : "MORE"}
-                </p>
-              ) : null}
-
-              <Link
-                href={item.href}
-                className={`flex items-center gap-4 rounded-2xl px-4 py-3 font-black transition ${
-                  active
-                    ? "bg-indigo-50 text-indigo-700"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-indigo-700"
-                }`}
-              >
-                <Icon size={22} />
-                {item.title}
-              </Link>
-            </div>
+            <Link
+              key={item.title}
+              href={item.href}
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-black transition ${
+                index === 0
+                  ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-950/20"
+                  : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
+              }`}
+            >
+              <Icon size={18} />
+              {item.title}
+            </Link>
           );
         })}
       </nav>
 
-      <div className="mt-10 rounded-[2rem] bg-gradient-to-br from-indigo-600 to-violet-700 p-6 text-white shadow-xl">
-        <Crown className="text-yellow-200" size={30} />
-        <p className="mt-4 font-black">You're on</p>
-        <h3 className="mt-1 text-xl font-black">{packageName}</h3>
-        <p className="mt-2 text-sm text-indigo-100">Valid until {endDate}</p>
-        <Link
-          href="/pricing"
-          className="mt-5 inline-flex rounded-xl bg-white px-5 py-3 font-black text-indigo-700"
-        >
-          View Plan
+      <div className="mt-auto rounded-[20px] border border-violet-400/20 bg-gradient-to-br from-violet-600/35 to-indigo-500/15 p-4">
+        <div className="flex items-center gap-2 text-yellow-300">
+          <Crown size={17} />
+          <p className="text-xs font-black">Your Plan</p>
+        </div>
+        <p className="mt-3 line-clamp-2 text-sm font-black text-white">{packageName}</p>
+        <p className="mt-1 text-[10px] font-semibold text-indigo-200">Valid until {endDate}</p>
+        <Link href="/pricing" className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-white px-3 py-2.5 text-xs font-black text-indigo-700">
+          View Plans
         </Link>
       </div>
     </aside>
@@ -609,63 +1392,102 @@ function TopHeader({
     router.refresh();
   }
 
+  const today = new Intl.DateTimeFormat("en-MY", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    weekday: "long",
+  }).format(new Date());
+
   return (
-    <header className="mb-8 flex items-center justify-between gap-4">
-      <div className="xl:hidden">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-indigo-600 text-yellow-200">
-            <Sparkles size={24} />
-          </div>
-          <div>
-            <p className="text-lg font-black tracking-[0.16em]">FD ARCADIA</p>
-            <p className="text-xs font-black tracking-[0.22em] text-indigo-600">
-              LEARNING HUB
-            </p>
-          </div>
-        </Link>
-      </div>
-
-      <div className="hidden xl:block">
-        <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
-          PARENT DASHBOARD
-        </p>
-        <h1 className="text-3xl font-black text-indigo-700">
-          Good Morning, {displayName} 👋
+    <header className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-500">Parent Dashboard</p>
+        <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">
+          Good morning, {displayName}! 👋
         </h1>
+        <p className="mt-1 text-sm font-semibold text-slate-400">
+          Here&apos;s your learning overview for today.
+        </p>
       </div>
 
-      <div className="ml-auto flex items-center gap-3">
-        <div className="relative grid h-11 w-11 place-items-center rounded-2xl bg-white text-slate-700 shadow-sm">
-          <Bell size={22} />
-          <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-red-500 text-xs font-black text-white">
-            3
-          </span>
+      <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-600 shadow-sm md:flex">
+          <CalendarDays size={15} className="text-indigo-500" />
+          {today}
         </div>
+
         <Link
-          href="/profile"
-          className="hidden rounded-2xl bg-white px-4 py-3 font-black text-slate-700 shadow-sm sm:block"
+  href="/profile"
+  title="My Profile"
+  aria-label="Open My Profile"
+  className="
+    group relative
+    grid h-11 w-11
+    place-items-center
+    overflow-visible
+    rounded-xl
+    border border-slate-200
+    bg-white
+    shadow-sm
+    transition-all duration-200
+    hover:-translate-y-0.5
+    hover:border-indigo-300
+    hover:shadow-md
+    focus:outline-none
+    focus:ring-4
+    focus:ring-indigo-100
+  "
+>
+  <div className="h-full w-full overflow-hidden rounded-xl">
+    {avatarUrl ? (
+      <img
+        src={avatarUrl}
+        alt={displayName}
+        className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
+      />
+    ) : (
+      <div className="grid h-full w-full place-items-center">
+        <UserRound size={18} className="text-slate-500" />
+      </div>
+    )}
+  </div>
+
+  {/* Active indicator */}
+  <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
+
+  {/* Tooltip */}
+  <span
+    className="
+      pointer-events-none
+      absolute right-0 top-[52px] z-[100]
+      whitespace-nowrap rounded-lg
+      bg-slate-950 px-2.5 py-1.5
+      text-[10px] font-black text-white
+      opacity-0 shadow-lg
+      transition
+      group-hover:opacity-100
+    "
+  >
+    My Profile
+  </span>
+</Link>
+
+        <Link
+          href="/pricing"
+          className="hidden h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 text-xs font-black text-white shadow-sm sm:inline-flex"
         >
-          Parent
+          <Crown size={15} />
+          View Plans
         </Link>
-        <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-2xl bg-yellow-100 text-3xl">
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={displayName}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span>👩</span>
-          )}
-        </div>
 
         <button
           type="button"
           onClick={handleLogout}
-          className="inline-flex items-center gap-2 rounded-2xl bg-red-500 px-4 py-3 font-black text-white shadow-sm transition hover:bg-red-600"
+          className="grid h-11 w-11 place-items-center rounded-xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
+          title="Logout"
         >
-          <LogOut size={18} />
-          <span className="hidden sm:inline">Logout</span>
+          <LogOut size={17} />
         </button>
       </div>
     </header>
@@ -909,7 +1731,8 @@ function OverallProgressPanel({ overallProgress }: { overallProgress: number }) 
 
 function CompactAccessPanel({
   hasCustomWorksheet,
-  hasFlashcard,
+  hasFlashcardLibrary,
+  hasReadingModules,
   hasMathActivity,
   hasDrawLearn,
   hasSifirDeck,
@@ -917,7 +1740,8 @@ function CompactAccessPanel({
   overallProgress,
 }: {
   hasCustomWorksheet: boolean;
-  hasFlashcard: boolean;
+  hasFlashcardLibrary: boolean;
+  hasReadingModules: boolean;
   hasMathActivity: boolean;
   hasDrawLearn: boolean;
   hasSifirDeck: boolean;
@@ -926,7 +1750,8 @@ function CompactAccessPanel({
 }) {
   const accessRows = [
     { title: "Custom Worksheet", unlocked: hasCustomWorksheet, icon: "📝" },
-    { title: "Flashcard Library", unlocked: hasFlashcard, icon: "📚" },
+    { title: "Flashcard Library", unlocked: hasFlashcardLibrary, icon: "🗂️" },
+    { title: "Modul Membaca", unlocked: hasReadingModules, icon: "📚" },
     { title: "Math Activity", unlocked: hasMathActivity, icon: "🔢" },
     { title: "Draw & Learn", unlocked: hasDrawLearn, icon: "🎨" },
     { title: "Sifir Deck", unlocked: hasSifirDeck, icon: "⭐" },
@@ -985,16 +1810,259 @@ function CompactAccessPanel({
   );
 }
 
+function formatDashboardReadingDate(value: string | null) {
+  if (!value) return "Not started";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Recently opened";
+  }
+
+  return new Intl.DateTimeFormat("en-MY", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function ReadingProgressDashboard({
+  loading,
+  modules,
+  latestModule,
+  averageProgress,
+  completedCount,
+}: {
+  loading: boolean;
+  modules: ReadingModuleSummary[];
+  latestModule: ReadingModuleSummary | null;
+  averageProgress: number;
+  completedCount: number;
+}) {
+  if (loading) {
+    return (
+      <section className="mt-7 overflow-hidden rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+        <div className="animate-pulse">
+          <div className="h-3 w-36 rounded-full bg-slate-200" />
+          <div className="mt-3 h-7 w-52 rounded-xl bg-slate-200" />
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="h-36 rounded-2xl bg-slate-100" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mt-7 overflow-hidden rounded-[2rem] border border-indigo-100 bg-white shadow-sm">
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-950 px-6 py-7 text-white lg:px-8">
+        <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-indigo-500/20 blur-3xl" />
+        <div className="absolute -bottom-24 left-1/3 h-60 w-60 rounded-full bg-violet-500/10 blur-3xl" />
+
+        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-indigo-200">
+                <BookOpenCheck size={22} />
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-indigo-300">
+                  Modul Membaca
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Interactive Reading Progress
+                </p>
+              </div>
+            </div>
+
+            <h2 className="mt-5 text-2xl font-black sm:text-3xl">
+              Continue Your Reading
+            </h2>
+
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+              Writing, last page and completion progress are saved automatically.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <ReadingHeroStat
+              value={`${averageProgress}%`}
+              label="Average"
+            />
+            <ReadingHeroStat
+              value={`${completedCount}/${modules.length || 3}`}
+              label="Completed"
+            />
+            <ReadingHeroStat
+              value={latestModule ? `P${latestModule.lastPage}` : "—"}
+              label="Last Page"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5 lg:p-6">
+        {latestModule ? (
+          <div className="rounded-[1.6rem] border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-violet-50 p-5">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white shadow-sm">
+                  <BookOpen size={22} />
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500">
+                    {latestModule.progressPercent > 0
+                      ? "Continue Reading"
+                      : "Start Reading"}
+                  </p>
+
+                  <h3 className="mt-1 text-xl font-black text-slate-950">
+                    {latestModule.title}
+                  </h3>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {latestModule.progressPercent > 0
+                      ? `Resume from Page ${latestModule.lastPage} of ${latestModule.totalPages}`
+                      : `${latestModule.totalPages} pages ready to read`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="min-w-[180px]">
+                  <div className="mb-1.5 flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    <span>Progress</span>
+                    <span>{latestModule.progressPercent}%</span>
+                  </div>
+
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className={`h-full rounded-full ${
+                        latestModule.completed ? "bg-emerald-500" : "bg-indigo-600"
+                      }`}
+                      style={{ width: `${latestModule.progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <Link
+                  href={`/flashcard-modules/${latestModule.moduleId}/read`}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+                >
+                  {latestModule.completed
+                    ? "Read Again"
+                    : latestModule.progressPercent > 0
+                      ? "Continue"
+                      : "Start"}
+                  <ChevronRight size={16} />
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-[1.6rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+            <BookOpenCheck className="mx-auto text-slate-300" size={30} />
+            <p className="mt-3 font-black text-slate-700">
+              Reading modules are being prepared
+            </p>
+          </div>
+        )}
+
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          {modules.map((module) => (
+            <Link
+              key={module.moduleId}
+              href={`/flashcard-modules/${module.moduleId}/read`}
+              className="group rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-slate-900">
+                    {module.title}
+                  </p>
+                  <p className="mt-1 text-[10px] font-bold text-slate-400">
+                    {module.completed
+                      ? "Completed"
+                      : module.progressPercent > 0
+                        ? `Page ${module.lastPage} / ${module.totalPages}`
+                        : "Not Started"}
+                  </p>
+                </div>
+
+                {module.completed ? (
+                  <CheckCircle2 size={19} className="shrink-0 text-emerald-600" />
+                ) : (
+                  <ChevronRight
+                    size={17}
+                    className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-600"
+                  />
+                )}
+              </div>
+
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className={`h-full rounded-full ${
+                    module.completed ? "bg-emerald-500" : "bg-indigo-600"
+                  }`}
+                  style={{ width: `${module.progressPercent}%` }}
+                />
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-2 text-[10px] font-bold text-slate-400">
+                <span>{module.progressPercent}% complete</span>
+                <span>{formatDashboardReadingDate(module.lastOpenedAt)}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <Link
+            href="/flashcard-modules"
+            className="inline-flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
+          >
+            Open Reading Library
+            <ChevronRight size={14} />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ReadingHeroStat({
+  value,
+  label,
+}: {
+  value: string;
+  label: string;
+}) {
+  return (
+    <div className="min-w-[78px] rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-3 text-center backdrop-blur">
+      <p className="text-lg font-black sm:text-xl">{value}</p>
+      <p className="mt-1 text-[8px] font-black uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
+    </div>
+  );
+}
+
 function CompactPackageSection({
   hasCustomWorksheet,
-  hasFlashcard,
+  hasFlashcardLibrary,
+  hasReadingModules,
   hasMathActivity,
   hasDrawLearn,
   hasSifirDeck,
   hasFreebies,
 }: {
   hasCustomWorksheet: boolean;
-  hasFlashcard: boolean;
+  hasFlashcardLibrary: boolean;
+  hasReadingModules: boolean;
   hasMathActivity: boolean;
   hasDrawLearn: boolean;
   hasSifirDeck: boolean;
@@ -1013,7 +2081,14 @@ function CompactPackageSection({
       description: "Open your assigned reading flashcards.",
       href: "/flashcard-library",
       icon: BookOpen,
-      unlocked: hasFlashcard,
+      unlocked: hasFlashcardLibrary,
+    },
+    {
+      title: "Modul Membaca",
+      description: "Continue your interactive reading books and saved progress.",
+      href: "/flashcard-modules",
+      icon: BookOpenCheck,
+      unlocked: hasReadingModules,
     },
     {
       title: "Math Activity",
@@ -1343,20 +2418,25 @@ function DailyScheduleBar() {
 
 function LearningResources({
   profile,
-  hasFlashcard,
+  hasFlashcardLibrary,
+  hasReadingModules,
   hasFreebies,
   onlyUnlocked,
 }: {
   profile: DashboardProfile | null;
-  hasFlashcard: boolean;
+  hasFlashcardLibrary: boolean;
+  hasReadingModules: boolean;
   hasFreebies: boolean;
   onlyUnlocked: boolean;
 }) {
   const cardsToShow = onlyUnlocked
     ? moduleCards.filter((card) => {
         if (!card.field) return true;
-        if (card.field === "flashcard_unlocked" || card.field === "flashcard_modul_unlocked") {
-          return hasFlashcard;
+        if (card.field === "flashcard_unlocked") {
+          return hasFlashcardLibrary;
+        }
+        if (card.field === "flashcard_modul_unlocked") {
+          return hasReadingModules;
         }
         if (card.field === "freebies_unlocked") return hasFreebies;
         return Boolean(profile?.[card.field]);
@@ -1370,13 +2450,15 @@ function LearningResources({
       <div className="mt-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
         {cardsToShow.map((card) => {
           const unlocked =
-            card.field === "flashcard_unlocked" || card.field === "flashcard_modul_unlocked"
-              ? hasFlashcard
-              : card.field === "freebies_unlocked"
-                ? hasFreebies
-                : card.field
-                  ? Boolean(profile?.[card.field])
-                  : true;
+            card.field === "flashcard_unlocked"
+              ? hasFlashcardLibrary
+              : card.field === "flashcard_modul_unlocked"
+                ? hasReadingModules
+                : card.field === "freebies_unlocked"
+                  ? hasFreebies
+                  : card.field
+                    ? Boolean(profile?.[card.field])
+                    : true;
 
           const Icon = card.icon;
 

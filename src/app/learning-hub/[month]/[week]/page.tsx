@@ -373,14 +373,14 @@ function WeekAtGlanceContent() {
   const progress = displayItems.length ? Math.round((readyItems / displayItems.length) * 100) : 0;
 
   return (
-    <main className="min-h-screen bg-[#fbfaf7] text-slate-900">
-      <div className="grid min-h-screen xl:grid-cols-[280px_1fr]">
+    <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
+      <div className="grid min-h-screen xl:grid-cols-[250px_minmax(0,1fr)]">
         <ParentSidebar monthNo={monthNo} weekNo={weekNo} monthParam={monthParam} progress={items.length ? progress : 75} />
 
-        <section className="px-4 py-6 lg:px-8">
+        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
           <TopHeader monthNo={monthNo} weekNo={weekNo} monthParam={monthParam} />
 
-          <section className="mb-6 grid gap-4 md:grid-cols-3">
+          <section className="mb-5 grid gap-3 sm:grid-cols-3">
             <SmallStat label="Activities" value={String(displayItems.length)} />
             <SmallStat label="Ready Links" value={String(readyItems)} />
             <SmallStat label={items.length ? "Progress" : "Demo Preview"} value={items.length ? `${progress}%` : "ON"} />
@@ -393,12 +393,12 @@ function WeekAtGlanceContent() {
           ) : (
             <>
               {items.length === 0 ? (
-                <div className="mb-5 rounded-2xl border border-yellow-200 bg-yellow-50 px-5 py-4 text-sm font-bold text-yellow-900">
+                <div className="mb-5 flex flex-col gap-3 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900 sm:flex-row sm:items-center sm:justify-between">
                   Demo preview is showing because admin has not uploaded Week At A Glance items yet.
                   <button
                     type="button"
                     onClick={() => setShowDemoIfEmpty(false)}
-                    className="ml-3 rounded-xl bg-white px-3 py-1 font-black text-yellow-900"
+                    className="rounded-xl bg-white px-3 py-2 text-[10px] font-black text-amber-800 shadow-sm"
                   >
                     Hide demo
                   </button>
@@ -428,23 +428,23 @@ function ParentSidebar({
   progress: number;
 }) {
   return (
-    <aside className="hidden border-r border-indigo-100 bg-white p-6 xl:block">
-      <Link href="/dashboard" className="flex items-center gap-3">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-600 text-yellow-200 shadow-lg">
+    <aside className="hidden border-r border-indigo-950/10 bg-[#111735] px-4 py-6 text-white xl:flex xl:flex-col">
+      <Link href="/dashboard" className="flex items-center gap-3 px-2">
+        <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-indigo-950/30">
           <Sparkles size={26} />
         </div>
 
         <div>
-          <p className="text-xl font-black tracking-[0.18em] text-slate-900">
+          <p className="text-sm font-black tracking-[0.08em] text-white">
             FD ARCADIA
           </p>
-          <p className="text-sm font-black tracking-[0.25em] text-indigo-600">
+          <p className="text-[9px] font-black tracking-[0.2em] text-violet-300">
             LEARNING HUB
           </p>
         </div>
       </Link>
 
-      <nav className="mt-10 space-y-2">
+      <nav className="mt-8 space-y-1.5">
         {sidebarLinks.map((item) => {
           const Icon = item.icon;
           const active = item.title === "Learning Hub";
@@ -453,10 +453,10 @@ function ParentSidebar({
             <Link
               key={item.title}
               href={item.href}
-              className={`flex items-center gap-4 rounded-2xl px-4 py-3 font-black transition ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-black transition ${
                 active
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-indigo-700"
+                  ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-950/20"
+                  : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
               }`}
             >
               <Icon size={22} />
@@ -465,7 +465,7 @@ function ParentSidebar({
           );
         })}
 
-        <p className="mb-2 mt-6 text-xs font-black tracking-[0.2em] text-slate-400">
+        <p className="mb-2 mt-7 px-3 text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
           MONTH {monthNo || "-"}
         </p>
 
@@ -473,53 +473,53 @@ function ParentSidebar({
           <Link
             key={week}
             href={`/learning-hub/${monthParam}/week-${week}`}
-            className={`flex items-center justify-between rounded-2xl px-4 py-3 font-black transition ${
+            className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-bold transition ${
               week === weekNo
-                ? "bg-indigo-50 text-indigo-700"
-                : "text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+                ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-950/20"
+                : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
             }`}
           >
             <span>Week {week}</span>
             {week === weekNo ? (
-              <span className="h-3 w-3 rounded-full bg-indigo-600" />
+              <span className="h-2.5 w-2.5 rounded-full bg-violet-400" />
             ) : week < weekNo ? (
-              <CheckCircle2 size={18} className="text-emerald-600" />
+              <CheckCircle2 size={18} className="text-emerald-400" />
             ) : (
-              <Clock3 size={18} className="text-yellow-600" />
+              <Clock3 size={18} className="text-slate-500" />
             )}
           </Link>
         ))}
       </nav>
 
-      <div className="mt-10 rounded-[2rem] bg-gradient-to-br from-indigo-600 to-violet-700 p-6 text-white shadow-xl">
-        <Star className="text-yellow-200" size={30} />
-        <p className="mt-4 font-black">Learning Journey</p>
-        <h3 className="mt-1 text-xl font-black">Keep going!</h3>
-        <p className="mt-2 text-sm text-indigo-100">
+      <div className="mt-auto rounded-[18px] border border-white/10 bg-white/[0.05] p-4 text-white">
+        <Star className="text-yellow-300" size={17} />
+        <p className="mt-3 text-xs font-black">Learning Journey</p>
+        <h3 className="mt-1 text-lg font-black">Keep going!</h3>
+        <p className="mt-1 text-[10px] leading-5 text-slate-400">
           Week {weekNo || "-"} is {progress}% ready.
         </p>
-        <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/20">
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
           <div
-            className="h-full rounded-full bg-yellow-200"
+            className="h-full rounded-full bg-gradient-to-r from-violet-400 to-indigo-300"
             style={{ width: `${progress}%` }}
           />
         </div>
         <Link
           href={`/learning-hub/${monthParam}`}
-          className="mt-5 inline-flex rounded-xl bg-white px-5 py-3 font-black text-indigo-700"
+          className="mt-3 inline-flex items-center text-[10px] font-black text-violet-300 transition hover:text-white"
         >
           Back Month
         </Link>
       </div>
 
-      <div className="mt-6 rounded-[2rem] bg-yellow-50 p-6 shadow-sm">
-        <h3 className="font-black text-slate-900">Need Help?</h3>
-        <p className="mt-2 text-sm text-slate-600">
+      <div className="mt-4 rounded-[18px] border border-white/10 bg-white/[0.04] p-4">
+        <h3 className="text-xs font-black text-white">Need Help?</h3>
+        <p className="mt-1 text-[10px] leading-5 text-slate-400">
           Contact FD Arcadia admin if any file link cannot open.
         </p>
         <Link
           href="/pricing"
-          className="mt-4 inline-flex rounded-xl bg-white px-5 py-3 font-black text-indigo-700"
+          className="mt-3 inline-flex text-[10px] font-black text-violet-300 transition hover:text-white"
         >
           Contact Us
         </Link>
@@ -538,49 +538,54 @@ function TopHeader({
   monthParam: string;
 }) {
   return (
-    <header className="mb-7 flex flex-col gap-5 2xl:flex-row 2xl:items-start 2xl:justify-between">
+    <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
       <div>
         <Link
           href={`/learning-hub/${monthParam}`}
-          className="mb-4 inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          className="inline-flex items-center gap-2 text-xs font-black text-indigo-600 transition hover:text-indigo-700"
         >
-          <ArrowLeft size={20} />
-          Back to Weeks
+          <ArrowLeft size={14} />
+          Back to Month {monthNo || "-"}
         </Link>
 
-        <h1 className="text-5xl font-black tracking-tight text-slate-950 sm:text-6xl 2xl:text-7xl">
-          WEEK AT A GLANCE
+        <p className="mt-3 text-[9px] font-black uppercase tracking-[0.2em] text-indigo-500">
+          FD Arcadia Learning Hub
+        </p>
+
+        <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+          Week {weekNo || "-"} at a Glance
         </h1>
-        <p className="mt-2 text-3xl font-black text-indigo-600">
-          Month {monthNo || "-"} - Week {weekNo || "-"}
+
+        <p className="mt-1 text-sm font-semibold text-slate-400">
+          Month {monthNo || "-"} • Daily activities, files and learning resources.
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="rounded-[2rem] border border-indigo-100 bg-white p-5 shadow-sm">
-          <p className="text-center text-sm font-black tracking-[0.2em] text-indigo-600">
-            WEEK OF
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
+            Week Of
           </p>
-          <div className="mt-2 flex items-center justify-center gap-3 rounded-2xl bg-indigo-50 px-6 py-4 font-black text-slate-900">
-            <span>Set in Admin</span>
-            <CalendarDays className="text-indigo-600" size={22} />
+          <div className="mt-1 flex items-center gap-2 text-xs font-black text-slate-700">
+            <CalendarDays size={14} className="text-indigo-500" />
+            Set in Admin
           </div>
         </div>
 
         <Link
-          href={`/learning-hub/${monthParam}/week-${weekNo}`}
-          className="grid h-20 w-20 place-items-center rounded-[1.5rem] border border-indigo-100 bg-white text-indigo-700 shadow-sm"
+          href={`/learning-hub/${monthParam}`}
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-4 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
         >
-          <LayoutList size={30} />
-          <span className="text-xs font-black">List View</span>
+          <LayoutList size={15} />
+          Month View
         </Link>
 
         <Link
           href="/dashboard"
-          className="grid h-20 w-20 place-items-center rounded-[1.5rem] border border-indigo-100 bg-white text-indigo-700 shadow-sm"
+          className="inline-flex h-11 items-center gap-2 rounded-xl bg-slate-950 px-4 text-xs font-black text-white transition hover:bg-slate-800"
         >
-          <Home size={30} />
-          <span className="text-xs font-black">Home</span>
+          <Home size={15} />
+          Dashboard
         </Link>
       </div>
     </header>
@@ -593,8 +598,8 @@ function WeekGrid({
   itemsByCell: Map<string, WeekAtGlanceItem[]>;
 }) {
   return (
-    <section className="overflow-x-auto pb-3">
-      <div className="min-w-[1320px] rounded-[1.8rem] border border-indigo-100 bg-white p-3 shadow-sm">
+    <section className="overflow-x-auto pb-2">
+      <div className="min-w-[1320px] rounded-[22px] border border-slate-200 bg-white p-3 shadow-sm">
         <div className="grid grid-cols-[80px_130px_180px_180px_180px_180px_70px_340px] gap-2">
           <div className="rounded-2xl bg-white" />
 
@@ -602,7 +607,7 @@ function WeekGrid({
             <SubjectHeader key={subject.key} subject={subject} />
           ))}
 
-          <div className="grid place-items-center rounded-2xl bg-yellow-100 px-2 py-4 text-center font-black text-slate-900 [writing-mode:vertical-rl] rotate-180">
+          <div className="grid place-items-center rounded-[16px] bg-amber-100 px-2 py-4 text-center text-xs font-black tracking-wide text-amber-900 [writing-mode:vertical-rl] rotate-180">
             LUNCH & REST
             <span className="mt-2 text-xs font-bold">1:15 - 2:30pm</span>
           </div>
@@ -630,9 +635,9 @@ function RowForDay({
   return (
     <>
       <div
-        className={`grid min-h-[150px] place-items-center rounded-2xl px-3 py-4 text-center font-black ${day.color}`}
+        className={`grid min-h-[142px] place-items-center rounded-[16px] px-3 py-4 text-center font-black ${day.color}`}
       >
-        <span className="[writing-mode:vertical-rl] rotate-180 text-lg">
+        <span className="[writing-mode:vertical-rl] rotate-180 text-sm tracking-[0.1em]">
           {day.label}
         </span>
       </div>
@@ -650,7 +655,7 @@ function RowForDay({
         );
       })}
 
-      <div className="min-h-[150px] rounded-2xl bg-yellow-50" />
+      <div className="min-h-[142px] rounded-[16px] bg-amber-50" />
 
       <LanguageCell day={day} itemsByCell={itemsByCell} />
     </>
@@ -689,14 +694,14 @@ function LanguageCell({
 function SubjectHeader({ subject }: { subject: SubjectConfig }) {
   return (
     <div
-      className={`rounded-2xl border border-indigo-100 px-3 py-4 text-center shadow-sm ${subject.headerClass}`}
+      className={`rounded-[16px] border border-slate-200 px-3 py-3 text-center ${subject.headerClass}`}
     >
-      <div className="text-3xl">{subject.icon}</div>
-      <h3 className="mt-1 text-xl font-black text-slate-950">
+      <div className="text-2xl">{subject.icon}</div>
+      <h3 className="mt-1 text-sm font-black text-slate-900">
         {subject.label}
       </h3>
       {subject.time ? (
-        <p className="mt-1 text-xs font-bold text-slate-500">{subject.time}</p>
+        <p className="mt-1 text-[9px] font-bold text-slate-400">{subject.time}</p>
       ) : null}
     </div>
   );
@@ -726,10 +731,10 @@ function ActivityCell({
 
 function EmptyMiniCell({ label }: { label: string }) {
   return (
-    <div className="grid min-h-[150px] place-items-center rounded-2xl border border-dashed border-indigo-100 bg-slate-50 p-3">
+    <div className="grid min-h-[142px] place-items-center rounded-[16px] border border-dashed border-slate-200 bg-slate-50 p-3">
       <div className="text-center">
         <p className="text-xs font-bold text-slate-300">{label}</p>
-        <div className="mx-auto mt-3 grid h-8 w-8 place-items-center rounded-full border border-indigo-100 bg-white text-indigo-400">
+        <div className="mx-auto mt-3 grid h-8 w-8 place-items-center rounded-full border border-slate-200 bg-white text-slate-300">
           <Plus size={16} />
         </div>
       </div>
@@ -751,53 +756,53 @@ function ActivityMiniCard({
 
   return (
     <article
-      className={`relative rounded-2xl border border-indigo-100 bg-white p-3 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-md ${
+      className={`relative rounded-[16px] border border-slate-200 bg-white p-3 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${
         compact ? "min-h-[150px]" : "min-h-[150px]"
       }`}
     >
       {item.thumbnail_url ? (
         isEmojiThumb ? (
-          <div className="mx-auto grid h-14 w-16 place-items-center rounded-xl bg-indigo-50 text-4xl">
+          <div className="mx-auto grid h-12 w-14 place-items-center rounded-xl bg-indigo-50 text-3xl">
             {item.thumbnail_url}
           </div>
         ) : (
           <img
             src={item.thumbnail_url}
             alt=""
-            className="mx-auto h-14 w-20 rounded-xl object-cover"
+            className="mx-auto h-12 w-16 rounded-xl object-cover"
           />
         )
       ) : (
-        <div className="mx-auto grid h-14 w-16 place-items-center rounded-xl bg-indigo-50 text-4xl">
+        <div className="mx-auto grid h-12 w-14 place-items-center rounded-xl bg-indigo-50 text-3xl">
           {getSubjectEmoji(item.subject)}
         </div>
       )}
 
-      <h4 className="mt-2 line-clamp-2 text-sm font-black leading-5 text-slate-950">
+      <h4 className="mt-2 line-clamp-2 text-xs font-black leading-4 text-slate-900">
         {item.title || "Untitled"}
       </h4>
 
       {item.description ? (
-        <p className="mt-1 line-clamp-2 text-xs leading-4 text-slate-500">
+        <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-500">
           {item.description}
         </p>
       ) : null}
 
       <div className="mt-2 flex flex-wrap justify-center gap-1">
         {item.time_start || item.time_end ? (
-          <span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-black text-indigo-700">
+          <span className="rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-black text-indigo-700">
             {item.time_start || ""} {item.time_end ? `- ${item.time_end}` : ""}
           </span>
         ) : null}
 
         {item.difficulty ? (
-          <span className="rounded-full bg-yellow-100 px-2 py-1 text-[10px] font-black text-yellow-800">
+          <span className="rounded-full bg-amber-50 px-2 py-1 text-[9px] font-black text-amber-700">
             {item.difficulty}
           </span>
         ) : null}
 
         {item.estimated_minutes ? (
-          <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">
+          <span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-700">
             {item.estimated_minutes} min
           </span>
         ) : null}
@@ -808,13 +813,13 @@ function ActivityMiniCard({
           href={item.link_url || "#"}
           target="_blank"
           rel="noreferrer"
-          className={`mx-auto mt-3 inline-flex h-9 items-center justify-center gap-1 rounded-full px-3 text-xs font-black shadow-sm transition ${button.className}`}
+          className={`mx-auto mt-3 inline-flex h-8 items-center justify-center gap-1 rounded-xl px-3 text-[10px] font-black shadow-sm transition ${button.className}`}
         >
           <ButtonIcon size={15} />
           {item.button_text || button.label}
         </a>
       ) : (
-        <div className="mx-auto mt-3 inline-flex h-9 items-center justify-center gap-1 rounded-full bg-indigo-50 px-3 text-xs font-black text-indigo-500">
+        <div className="mx-auto mt-3 inline-flex h-8 items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 text-[10px] font-black text-slate-400">
           <ButtonIcon size={15} />
           {item.button_text || button.label}
         </div>
@@ -836,18 +841,18 @@ function getSubjectEmoji(subject: string | null | undefined) {
 
 function SmallStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[1.5rem] border border-indigo-100 bg-white p-5 shadow-sm">
-      <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+    <div className="rounded-[18px] border border-slate-200 bg-white p-4 shadow-sm">
+      <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
         {label.toUpperCase()}
       </p>
-      <p className="mt-2 text-3xl font-black text-indigo-700">{value}</p>
+      <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
     </div>
   );
 }
 
 function LoadingState() {
   return (
-    <div className="rounded-[2rem] bg-white p-12 text-center shadow-sm">
+    <div className="rounded-[22px] border border-slate-200 bg-white p-10 text-center shadow-sm">
       <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
       <p className="mt-4 font-bold text-slate-500">Loading week content...</p>
     </div>
@@ -862,7 +867,7 @@ function EmptyState({
   weekNo: number;
 }) {
   return (
-    <div className="rounded-[2rem] bg-white p-12 text-center shadow-sm">
+    <div className="rounded-[22px] border border-slate-200 bg-white p-10 text-center shadow-sm">
       <FileText className="mx-auto text-slate-400" size={44} />
 
       <h2 className="mt-3 text-2xl font-black text-slate-600">
@@ -879,15 +884,15 @@ function EmptyState({
 
 function BottomGuide() {
   return (
-    <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.55fr]">
-      <div className="rounded-[1.7rem] border border-indigo-100 bg-white p-5 shadow-sm">
+    <section className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.7fr]">
+      <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-start gap-4">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-50 text-indigo-600">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
             <Sparkles size={24} />
           </div>
           <div>
-            <h3 className="font-black text-indigo-700">How to use?</h3>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
+            <h3 className="text-sm font-black text-slate-900">How to use?</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
               Click the button in each box to open the activity, worksheet, video
               or learning resource.
             </p>
@@ -895,8 +900,8 @@ function BottomGuide() {
         </div>
       </div>
 
-      <div className="rounded-[1.7rem] border border-indigo-100 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center gap-4 text-sm font-black text-slate-600">
+      <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3 text-[10px] font-black text-slate-500">
           <span className="inline-flex items-center gap-2">
             <PlayCircle size={18} className="text-indigo-600" />
             Play Video

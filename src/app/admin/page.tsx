@@ -17,6 +17,7 @@ import {
   LockKeyhole,
   LogOut,
   MoreVertical,
+  RefreshCw,
   Search,
   Settings,
   ShieldCheck,
@@ -39,6 +40,7 @@ type Profile = {
   learning_hub_unlocked: boolean;
   custom_worksheet_unlocked: boolean;
   flashcard_unlocked: boolean;
+  flashcard_modul_unlocked: boolean;
   math_activity_unlocked: boolean;
   draw_learn_unlocked: boolean;
   sifir_deck_unlocked: boolean;
@@ -53,6 +55,7 @@ type AccessField =
   | "learning_hub_unlocked"
   | "custom_worksheet_unlocked"
   | "flashcard_unlocked"
+  | "flashcard_modul_unlocked"
   | "math_activity_unlocked"
   | "draw_learn_unlocked"
   | "sifir_deck_unlocked"
@@ -89,7 +92,7 @@ const packageOptions = [
     value: "full_package",
     label: "Full Package RM250",
     months: 6,
-    note: "Learning Hub + Math Activity + Draw & Learn + Sifir Deck + Freebies",
+    note: "Learning Hub + Math Activity + Draw & Learn + Sifir Deck + Freebies + Flashcard Library + Modul Membaca",
   },
   {
     value: "worksheet_trial",
@@ -146,6 +149,7 @@ function getPackageUnlocks(packageType: string) {
     learning_hub_unlocked: false,
     custom_worksheet_unlocked: false,
     flashcard_unlocked: false,
+    flashcard_modul_unlocked: false,
     math_activity_unlocked: false,
     draw_learn_unlocked: false,
     sifir_deck_unlocked: false,
@@ -178,6 +182,7 @@ function getPackageUnlocks(packageType: string) {
         sifir_deck_unlocked: true,
         freebies_unlocked: true,
         flashcard_unlocked: true,
+        flashcard_modul_unlocked: true,
       };
 
     case "worksheet_trial":
@@ -265,8 +270,12 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [accessFilter, setAccessFilter] = useState("all");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   async function loadProfiles() {
+    setLoading(true);
+    setError("");
+
     const { data, error: profileError } = await supabase
       .from("profiles")
       .select("*")
@@ -274,10 +283,12 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
 
     if (profileError) {
       setError(profileError.message);
+      setLoading(false);
       return;
     }
 
     setProfiles((data || []) as Profile[]);
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -300,8 +311,19 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
           String(profile.package_type || "").includes("6month") ||
           profile.package_type === "full_package",
       ).length,
+      active: profiles.filter(
+        (profile) => Boolean(profile.package_type) && !isExpired(profile.subscription_end),
+      ).length,
       expired: profiles.filter((profile) => isExpired(profile.subscription_end))
         .length,
+      expiringSoon: profiles.filter((profile) => {
+        if (!profile.subscription_end || isExpired(profile.subscription_end)) return false;
+        const days = Math.ceil(
+          (new Date(profile.subscription_end).getTime() - new Date().getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+        return days >= 0 && days <= 7;
+      }).length,
     };
   }, [profiles]);
 
@@ -331,6 +353,7 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
         profile.learning_hub_unlocked,
         profile.custom_worksheet_unlocked,
         profile.flashcard_unlocked,
+        profile.flashcard_modul_unlocked,
         profile.math_activity_unlocked,
         profile.draw_learn_unlocked,
         profile.sifir_deck_unlocked,
@@ -429,6 +452,7 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
         learning_hub_unlocked: false,
         custom_worksheet_unlocked: false,
         flashcard_unlocked: false,
+        flashcard_modul_unlocked: false,
         math_activity_unlocked: false,
         draw_learn_unlocked: false,
         sifir_deck_unlocked: false,
@@ -456,193 +480,203 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
   }
 
   return (
-    <main className="min-h-screen bg-[#fbfaf7] text-slate-950">
-      <div className="grid min-h-screen xl:grid-cols-[290px_1fr]">
+    <main className="min-h-screen bg-[#f6f7fb] text-slate-950">
+      <div className="grid min-h-screen xl:grid-cols-[255px_minmax(0,1fr)]">
         <AdminSidebar adminEmail={adminEmail} />
 
-        <section className="px-4 py-6 lg:px-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
+          <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <p className="text-sm font-black text-slate-500">
-                Admin / Subscriptions /{" "}
-                <span className="text-indigo-600">Parents</span>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-violet-500">
+                Admin Workspace · Parent Management
               </p>
-              <h1 className="mt-3 text-4xl font-black text-slate-950">
+              <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
                 Parent Subscriptions
               </h1>
-              <p className="mt-2 max-w-2xl text-slate-600">
-                Manage parent subscription and access to Learning Hub.
+              <p className="mt-1 max-w-3xl text-sm font-semibold text-slate-400">
+                Manage packages, access permissions and subscription status from one place.
               </p>
             </div>
 
-            <Link
-              href="#subscription-list"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 font-black text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-700"
-            >
-              + Add Subscription
-            </Link>
-          </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={loadProfiles}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+                Refresh
+              </button>
 
-          <section className="mt-8 grid gap-4 md:grid-cols-2 2xl:grid-cols-5">
-            <StatCard
-              icon={Users}
-              label="Total Parents"
-              value={stats.total}
-              note="All registered parents"
-              tone="indigo"
-            />
-            <StatCard
-              icon={ShieldCheck}
-              label="Trial"
-              value={stats.trial}
-              note="Trial / Weekly"
-              tone="green"
-            />
-            <StatCard
-              icon={CalendarDays}
-              label="Monthly"
-              value={stats.monthly}
-              note="Monthly package"
-              tone="blue"
-            />
-            <StatCard
-              icon={Sparkles}
-              label="Premium"
-              value={stats.premium}
-              note="Premium / Full"
-              tone="purple"
-            />
-            <StatCard
-              icon={LockKeyhole}
-              label="Expired"
-              value={stats.expired}
-              note="Subscription expired"
-              tone="orange"
-            />
+              <Link
+                href="/admin/flashcard-modules/progress"
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-slate-800"
+              >
+                <BookOpenCheck size={15} />
+                Reading Progress
+              </Link>
+            </div>
+          </header>
+
+          {/* PREMIUM SUMMARY */}
+          <section className="relative mt-5 overflow-hidden rounded-[26px] bg-gradient-to-br from-[#111735] via-[#25265f] to-[#5145a6] p-5 text-white shadow-[0_20px_55px_rgba(15,23,42,0.16)] sm:p-6">
+            <div className="absolute -right-16 -top-20 h-60 w-60 rounded-full bg-fuchsia-500/20 blur-3xl" />
+            <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/10 text-violet-200">
+                    <Users size={21} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-violet-300">
+                      Parent Control Centre
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black">
+                      {stats.total} registered parents
+                    </h2>
+                  </div>
+                </div>
+                <p className="mt-3 max-w-xl text-xs leading-5 text-slate-300">
+                  Quickly spot active subscriptions, expiring accounts and parents who need access updates.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <MiniStat label="Active" value={stats.active} tone="emerald" />
+                <MiniStat label="Premium" value={stats.premium} tone="violet" />
+                <MiniStat label="Expiring ≤7d" value={stats.expiringSoon} tone="amber" />
+                <MiniStat label="Expired" value={stats.expired} tone="rose" />
+              </div>
+            </div>
           </section>
 
-          <section className="mt-6 rounded-[1.5rem] border border-indigo-100 bg-white p-5 shadow-sm">
-            <div className="grid gap-4 lg:grid-cols-[1fr_220px_220px]">
-              <label className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-white px-4 py-3">
-                <Search size={20} className="text-slate-400" />
+          {/* COLOURFUL STATS */}
+          <section className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+            <StatCard icon={Users} label="Total Parents" value={stats.total} note="Registered accounts" tone="indigo" />
+            <StatCard icon={ShieldCheck} label="Trial / Weekly" value={stats.trial} note="Short-term access" tone="green" />
+            <StatCard icon={CalendarDays} label="Monthly" value={stats.monthly} note="Monthly package" tone="blue" />
+            <StatCard icon={Sparkles} label="Premium" value={stats.premium} note="6 months / full" tone="purple" />
+            <StatCard icon={LockKeyhole} label="Expired" value={stats.expired} note="Needs review" tone="orange" />
+          </section>
+
+          {/* SMART FILTERS */}
+          <section className="mt-5 rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_220px_170px_160px_auto]">
+              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+                <Search size={16} className="text-slate-400" />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search parent name or email..."
-                  className="w-full bg-transparent font-bold text-slate-700 outline-none placeholder:text-slate-400"
+                  placeholder="Search parent, email or package..."
+                  className="w-full bg-transparent text-xs font-bold text-slate-700 outline-none placeholder:text-slate-400"
                 />
               </label>
 
               <select
                 value={subscriptionFilter}
                 onChange={(event) => setSubscriptionFilter(event.target.value)}
-                className="rounded-xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-700 outline-none"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none"
               >
-                <option value="all">All Subscription</option>
+                <option value="all">All Packages</option>
                 {packageOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
 
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="rounded-xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-700 outline-none"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="expired">Expired</option>
                 <option value="no_package">No Package</option>
               </select>
-            </div>
 
-            <div className="mt-4 grid gap-4 lg:grid-cols-[190px_1fr_120px_120px]">
               <select
                 value={accessFilter}
                 onChange={(event) => setAccessFilter(event.target.value)}
-                className="rounded-xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-700 outline-none"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none"
               >
                 <option value="all">All Access</option>
                 <option value="unlocked">Has Access</option>
                 <option value="locked">No Access</option>
               </select>
 
-              <div className="hidden items-center gap-3 rounded-xl border border-indigo-100 bg-white px-4 py-3 text-sm font-bold text-slate-400 lg:flex">
-                Start Date <span className="text-slate-700">to</span> End Date
-                <CalendarDays className="ml-auto" size={18} />
-              </div>
-
               <button
                 type="button"
                 onClick={resetFilters}
-                className="rounded-xl bg-slate-100 px-4 py-3 font-black text-slate-600 transition hover:bg-slate-200"
+                className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-200"
               >
                 Reset
               </button>
+            </div>
 
-              <button
-                type="button"
-                className="rounded-xl bg-indigo-600 px-4 py-3 font-black text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-700"
-              >
-                Filter
-              </button>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setStatusFilter("active")} className="rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-black text-emerald-700">
+                  Active {stats.active}
+                </button>
+                <button type="button" onClick={() => setSubscriptionFilter("full_package")} className="rounded-full bg-violet-50 px-3 py-1.5 text-[10px] font-black text-violet-700">
+                  Full Package
+                </button>
+                <button type="button" onClick={() => setStatusFilter("expired")} className="rounded-full bg-rose-50 px-3 py-1.5 text-[10px] font-black text-rose-700">
+                  Expired {stats.expired}
+                </button>
+              </div>
+
+              <p className="text-[10px] font-black text-slate-400">
+                Showing {filteredProfiles.length} of {profiles.length} parents
+              </p>
             </div>
           </section>
 
           {error ? (
-            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 font-bold text-red-700">
+            <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs font-bold text-red-700">
               {error}
             </div>
           ) : null}
 
-          <section
-            id="subscription-list"
-            className="mt-6 rounded-[1.5rem] border border-indigo-100 bg-white shadow-sm"
-          >
-            <div className="hidden grid-cols-[1.2fr_0.7fr_1fr_0.7fr_0.7fr_0.6fr] gap-4 border-b border-indigo-100 px-6 py-4 text-xs font-black uppercase tracking-[0.12em] text-indigo-800 xl:grid">
-              <p>Parent</p>
-              <p>Subscription</p>
-              <p>Access</p>
-              <p>Start Date</p>
-              <p>End Date</p>
-              <p>Actions</p>
-            </div>
-
-            <div className="divide-y divide-indigo-100">
-              {filteredProfiles.map((profile) => (
-                <UserCard
-                  key={profile.id}
-                  profile={profile}
-                  onToggle={toggleAccess}
-                  onSavePackage={savePackage}
-                  onResetAccess={resetAccess}
-                />
-              ))}
-            </div>
-
-            <div className="flex flex-col gap-4 px-6 py-5 text-sm font-bold text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-              <p>
-                Showing 1 to {filteredProfiles.length} of {profiles.length}{" "}
-                results
-              </p>
-              <div className="flex items-center gap-2">
-                {["‹", "1", "2", "3", "...", "›"].map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    className={`grid h-9 min-w-9 place-items-center rounded-lg border px-3 ${
-                      item === "1"
-                        ? "border-indigo-600 text-indigo-700"
-                        : "border-indigo-100 text-slate-500"
-                    }`}
-                  >
-                    {item}
-                  </button>
-                ))}
+          {/* PARENT LIST */}
+          <section id="subscription-list" className="mt-5 overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                  Parent Directory
+                </p>
+                <h2 className="mt-1 text-lg font-black text-slate-950">
+                  Manage Access & Packages
+                </h2>
+              </div>
+              <div className="hidden rounded-full bg-indigo-50 px-3 py-1.5 text-[10px] font-black text-indigo-700 sm:block">
+                Live Supabase Data
               </div>
             </div>
+
+            {loading ? (
+              <div className="p-10 text-center text-sm font-bold text-slate-400">
+                Loading parent accounts...
+              </div>
+            ) : filteredProfiles.length === 0 ? (
+              <div className="p-10 text-center">
+                <Users className="mx-auto text-slate-300" size={34} />
+                <p className="mt-3 text-sm font-black text-slate-700">No parents found</p>
+                <p className="mt-1 text-xs text-slate-400">Try changing your search or filters.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {filteredProfiles.map((profile) => (
+                  <UserCard
+                    key={profile.id}
+                    profile={profile}
+                    onToggle={toggleAccess}
+                    onSavePackage={savePackage}
+                    onResetAccess={resetAccess}
+                  />
+                ))}
+              </div>
+            )}
           </section>
         </section>
       </div>
@@ -659,84 +693,54 @@ function AdminSidebar({ adminEmail }: { adminEmail: string }) {
   }
 
   return (
-    <aside className="hidden border-r border-indigo-100 bg-white p-6 xl:flex xl:flex-col">
-      <Link href="/dashboard" className="flex items-center gap-3">
-        <div className="grid h-14 w-14 place-items-center rounded-xl bg-indigo-600 text-3xl shadow-lg shadow-indigo-100">
-          👑
+    <aside className="hidden border-r border-indigo-950/10 bg-[#111735] px-4 py-6 text-white xl:flex xl:flex-col">
+      <Link href="/dashboard" className="flex items-center gap-3 px-2">
+        <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-indigo-950/30">
+          <ShieldCheck size={21} />
         </div>
         <div>
-          <p className="text-2xl font-black tracking-wide text-slate-950">
-            FD ARCADIA
-          </p>
-          <p className="text-sm font-black tracking-[0.18em] text-indigo-600">
-            LEARNING HUB
-          </p>
+          <p className="text-sm font-black tracking-[0.08em]">FD ARCADIA</p>
+          <p className="text-[9px] font-black tracking-[0.2em] text-violet-300">ADMIN</p>
         </div>
       </Link>
 
-      <nav className="mt-10 space-y-2 text-sm font-black text-slate-700">
+      <nav className="mt-8 space-y-1.5">
         <SidebarLink href="/dashboard" icon={Home} label="Dashboard" />
         <SidebarLink href="/admin" icon={Users} label="Parents" active />
+        <SidebarLink href="/admin/flashcard-modules/progress" icon={BookOpenCheck} label="Reading Progress" />
         <SidebarLink href="/children" icon={Users} label="Children" />
 
-        <div className="pt-4">
-          <div className="flex items-center justify-between rounded-xl bg-indigo-50 px-4 py-3 text-indigo-700">
-            <span className="flex items-center gap-3">
-              <FileText size={20} /> Learning Hub Content
-            </span>
-            <ChevronDown size={18} />
-          </div>
-          <div className="ml-7 mt-2 space-y-1 border-l border-indigo-100 pl-4">
-            <Link
-              href="/admin/calendar"
-              className="block rounded-lg bg-indigo-50 px-4 py-2 text-indigo-700"
-            >
-              Week At A Glance
-            </Link>
-            <Link
-              href="/admin/learning-hub"
-              className="block rounded-lg px-4 py-2 hover:bg-slate-50"
-            >
-              All Content
-            </Link>
-            <Link
-              href="/admin/freebies"
-              className="block rounded-lg px-4 py-2 hover:bg-slate-50"
-            >
-              Categories
-            </Link>
-          </div>
-        </div>
+        <p className="px-3 pb-1 pt-5 text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+          Content
+        </p>
+        <SidebarLink href="/admin/calendar" icon={CalendarDays} label="Week At A Glance" />
+        <SidebarLink href="/admin/learning-hub" icon={BookOpen} label="Learning Hub" />
+        <SidebarLink href="/admin/freebies" icon={Gift} label="Freebies" />
 
-        <SidebarLink
-          href="/admin"
-          icon={CalendarDays}
-          label="Subscriptions"
-          active
-        />
+        <p className="px-3 pb-1 pt-5 text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+          System
+        </p>
         <SidebarLink href="/admin/reports" icon={FileText} label="Reports" />
-        <SidebarLink
-          href="/admin/settings"
-          icon={Settings}
-          label="System Settings"
-        />
+        <SidebarLink href="/admin/settings" icon={Settings} label="Settings" />
       </nav>
 
-      <div className="mt-auto rounded-2xl border border-yellow-200 bg-yellow-50 p-5 text-center">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-indigo-600 text-2xl">
-          👑
+      <div className="mt-auto rounded-[20px] border border-violet-400/20 bg-white/[0.05] p-4">
+        <div className="flex items-center gap-3">
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-violet-500/20 text-violet-200">
+            <ShieldCheck size={17} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-[0.15em] text-violet-300">Administrator</p>
+            <p className="truncate text-[10px] font-bold text-slate-300">{adminEmail}</p>
+          </div>
         </div>
-        <p className="mt-3 text-sm font-bold text-slate-700">
-          You are logged in as
-        </p>
-        <p className="font-black text-slate-950">Admin</p>
-        <p className="mt-2 break-words text-sm text-slate-600">{adminEmail}</p>
+
         <button
           type="button"
           onClick={handleLogout}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-100 bg-white px-4 py-3 font-black text-indigo-700 transition hover:bg-indigo-50"
+          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-xs font-black text-slate-200 transition hover:bg-white/[0.1]"
         >
-          <LogOut size={18} /> Logout
+          <LogOut size={15} /> Logout
         </button>
       </div>
     </aside>
@@ -757,19 +761,45 @@ function SidebarLink({
   return (
     <Link
       href={href}
-      className={`flex items-center justify-between rounded-xl px-4 py-3 transition ${
+      className={`flex items-center justify-between rounded-xl px-3 py-3 text-xs font-black transition ${
         active
-          ? "bg-indigo-50 text-indigo-700"
-          : "hover:bg-slate-50 hover:text-indigo-700"
+          ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-950/20"
+          : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
       }`}
     >
       <span className="flex items-center gap-3">
-        <Icon size={20} /> {label}
+        <Icon size={18} /> {label}
       </span>
       {label === "Parents" || label === "Children" ? (
         <ArrowRight size={16} />
       ) : null}
     </Link>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "emerald" | "violet" | "amber" | "rose";
+}) {
+  const toneClass = {
+    emerald: "border-emerald-400/20 bg-emerald-400/10 text-emerald-200",
+    violet: "border-violet-400/20 bg-violet-400/10 text-violet-200",
+    amber: "border-amber-400/20 bg-amber-400/10 text-amber-200",
+    rose: "border-rose-400/20 bg-rose-400/10 text-rose-200",
+  }[tone];
+
+  return (
+    <div className={`min-w-[105px] rounded-2xl border px-3 py-3 ${toneClass}`}>
+      <p className="text-xl font-black text-white">{value}</p>
+      <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.08em]">
+        {label}
+      </p>
+    </div>
   );
 }
 
@@ -795,17 +825,17 @@ function StatCard({
   }[tone];
 
   return (
-    <div className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-4">
-        <div
-          className={`grid h-14 w-14 place-items-center rounded-full ${toneClass}`}
-        >
-          <Icon size={28} />
+    <div className="rounded-[18px] border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="flex items-center gap-3">
+        <div className={`grid h-10 w-10 place-items-center rounded-xl ${toneClass}`}>
+          <Icon size={18} />
         </div>
-        <div>
-          <p className="text-sm font-bold text-slate-600">{label}</p>
-          <p className="mt-1 text-3xl font-black text-slate-950">{value}</p>
-          <p className="mt-1 text-xs font-bold text-slate-500">{note}</p>
+        <div className="min-w-0">
+          <p className="text-[10px] font-black text-slate-500">{label}</p>
+          <div className="mt-0.5 flex items-end gap-2">
+            <p className="text-2xl font-black text-slate-950">{value}</p>
+            <p className="pb-1 text-[9px] font-bold text-slate-400">{note}</p>
+          </div>
         </div>
       </div>
     </div>
@@ -843,253 +873,178 @@ function UserCard({
   const expired = isExpired(profile.subscription_end);
   const active = Boolean(profile.package_type) && !expired;
 
+  const accessValues = [
+    profile.learning_hub_unlocked,
+    profile.custom_worksheet_unlocked,
+    profile.flashcard_unlocked,
+    profile.flashcard_modul_unlocked,
+    profile.math_activity_unlocked,
+    profile.draw_learn_unlocked,
+    profile.sifir_deck_unlocked,
+    profile.freebies_unlocked,
+  ];
+  const accessCount = accessValues.filter(Boolean).length;
+
   return (
-    <div className="px-5 py-5 transition hover:bg-indigo-50/30">
-      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.7fr_1fr_0.7fr_0.7fr_0.6fr] xl:items-center">
-        <div className="flex items-center gap-4">
-          <Avatar
-            src={profile.avatar_url || null}
-            name={profile.full_name || profile.email || "Parent"}
-          />
+    <article className="px-4 py-4 transition hover:bg-slate-50/70 sm:px-5">
+      <div className="grid gap-4 xl:grid-cols-[minmax(230px,1.25fr)_minmax(170px,.8fr)_130px_135px_170px] xl:items-center">
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar src={profile.avatar_url || null} name={profile.full_name || profile.email || "Parent"} />
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-black text-slate-950">
-              {profile.full_name || "No name"}
-            </h2>
-            <p className="truncate text-sm font-bold text-slate-500">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate text-sm font-black text-slate-950">
+                {profile.full_name || "No name"}
+              </h3>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-[8px] font-black uppercase text-slate-500">
+                {profile.user_type || "Parent"}
+              </span>
+            </div>
+            <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">
               {profile.email || "No email"}
-            </p>
-            <p className="text-xs font-bold text-slate-400">
-              {profile.user_type || "Not selected"}
             </p>
           </div>
         </div>
 
         <div>
-          <span
-            className={`inline-flex rounded-xl px-4 py-2 text-sm font-black ${getPackageBadgeStyle(profile.package_type)}`}
-          >
+          <span className={`inline-flex rounded-full px-3 py-1.5 text-[9px] font-black ${getPackageBadgeStyle(profile.package_type)}`}>
             {formatPackageName(profile.package_type)}
           </span>
-          {profile.package_note ? (
-            <p className="mt-2 text-xs font-bold text-slate-500">
-              {profile.package_note}
-            </p>
-          ) : null}
+          <p className="mt-1 line-clamp-1 text-[9px] font-semibold text-slate-400">
+            {profile.package_note || "No package assigned"}
+          </p>
         </div>
 
-        <div className="space-y-2 text-sm font-bold text-slate-700">
-          <AccessLine
-            label="Learning Hub"
-            active={profile.learning_hub_unlocked}
-          />
-          <AccessLine
-            label="Custom Worksheet"
-            active={profile.custom_worksheet_unlocked}
-          />
-          <AccessLine
-            label="Flashcard & Modul"
-            active={profile.flashcard_unlocked}
-          />
+        <div>
+          <div className="flex items-center justify-between text-[9px] font-black text-slate-500">
+            <span>Access</span>
+            <span>{accessCount}/8</span>
+          </div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
+              style={{ width: `${(accessCount / 8) * 100}%` }}
+            />
+          </div>
         </div>
 
-        <div className="text-sm font-bold text-slate-700">
-          <p>{profile.subscription_start || "-"}</p>
-        </div>
-
-        <div className="text-sm font-bold text-slate-700">
-          <p>{profile.subscription_end || "-"}</p>
-          <p className={expired ? "text-red-600" : "text-emerald-600"}>
+        <div className="text-[10px] font-bold text-slate-500">
+          <p>{profile.subscription_end || "No end date"}</p>
+          <p className={`mt-1 font-black ${expired ? "text-rose-600" : "text-emerald-600"}`}>
             {getDaysLeft(profile.subscription_end)}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-black ${
-              active
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-red-100 text-red-700"
-            }`}
-          >
-            <span
-              className={`h-2 w-2 rounded-full ${active ? "bg-emerald-600" : "bg-red-600"}`}
-            />
-            {active ? "Active" : "Expired"}
+        <div className="flex items-center justify-between gap-2 xl:justify-end">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[9px] font-black ${
+            active ? "bg-emerald-50 text-emerald-700" : profile.package_type ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-500"
+          }`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-500" : profile.package_type ? "bg-rose-500" : "bg-slate-400"}`} />
+            {active ? "Active" : profile.package_type ? "Expired" : "No Package"}
           </span>
+
           <button
             type="button"
             onClick={() => setEditing((current) => !current)}
-            className="rounded-lg border border-indigo-300 px-4 py-2 font-black text-indigo-700 transition hover:bg-indigo-50"
+            className={`rounded-xl px-3 py-2 text-[10px] font-black transition ${
+              editing
+                ? "bg-violet-100 text-violet-700"
+                : "bg-slate-950 text-white hover:bg-slate-800"
+            }`}
           >
-            Edit
-          </button>
-          <button
-            type="button"
-            className="grid h-10 w-10 place-items-center rounded-lg border border-indigo-100 text-slate-500 transition hover:bg-slate-50"
-          >
-            <MoreVertical size={18} />
+            {editing ? "Close" : "Manage"}
           </button>
         </div>
       </div>
 
       {editing ? (
-        <div className="mt-5 rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
+        <div className="mt-4 overflow-hidden rounded-[20px] border border-violet-100 bg-gradient-to-br from-violet-50/70 via-white to-indigo-50/60">
+          <div className="flex flex-col gap-3 border-b border-violet-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-xl font-black text-indigo-700">
-                Edit Subscription
-              </h3>
-              <p className="mt-1 text-sm font-bold text-slate-500">
-                Choose package, toggle access and save manually after payment
-                confirmation.
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">
+                Access Control
               </p>
+              <h4 className="mt-1 text-base font-black text-slate-950">
+                Manage {profile.full_name || "Parent"}
+              </h4>
             </div>
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              className="rounded-xl bg-slate-100 px-4 py-2 font-black text-slate-600"
-            >
-              Close
-            </button>
+            <div className="rounded-full bg-white px-3 py-1.5 text-[9px] font-black text-violet-700 shadow-sm">
+              {accessCount} of 8 features unlocked
+            </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <AccessButton
-              label="Learning Hub"
-              active={profile.learning_hub_unlocked}
-              onClick={() =>
-                onToggle(
-                  profile.id,
-                  "learning_hub_unlocked",
-                  profile.learning_hub_unlocked,
-                )
-              }
-            />
-            <AccessButton
-              label="Math Activity"
-              active={profile.math_activity_unlocked}
-              onClick={() =>
-                onToggle(
-                  profile.id,
-                  "math_activity_unlocked",
-                  profile.math_activity_unlocked,
-                )
-              }
-            />
-            <AccessButton
-              label="Draw & Learn"
-              active={profile.draw_learn_unlocked}
-              onClick={() =>
-                onToggle(
-                  profile.id,
-                  "draw_learn_unlocked",
-                  profile.draw_learn_unlocked,
-                )
-              }
-            />
-            <AccessButton
-              label="Sifir Deck"
-              active={profile.sifir_deck_unlocked}
-              onClick={() =>
-                onToggle(
-                  profile.id,
-                  "sifir_deck_unlocked",
-                  profile.sifir_deck_unlocked,
-                )
-              }
-            />
-            <AccessButton
-              label="Freebies"
-              active={profile.freebies_unlocked}
-              onClick={() =>
-                onToggle(
-                  profile.id,
-                  "freebies_unlocked",
-                  profile.freebies_unlocked,
-                )
-              }
-            />
-            <AccessButton
-              label="Custom Worksheet"
-              active={profile.custom_worksheet_unlocked}
-              onClick={() =>
-                onToggle(
-                  profile.id,
-                  "custom_worksheet_unlocked",
-                  profile.custom_worksheet_unlocked,
-                )
-              }
-            />
-            <AccessButton
-              label="Flashcard Page"
-              active={profile.flashcard_unlocked}
-              onClick={() =>
-                onToggle(
-                  profile.id,
-                  "flashcard_unlocked",
-                  profile.flashcard_unlocked,
-                )
-              }
-            />
-          </div>
-
-          <div className="mt-5 rounded-2xl bg-indigo-50 p-4">
-            <div className="flex items-center gap-2 text-indigo-700">
-              <CalendarDays size={20} />
-              <p className="font-black">Manual Package Unlock</p>
+          <div className="p-4">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <AccessButton label="Learning Hub" active={profile.learning_hub_unlocked} onClick={() => onToggle(profile.id, "learning_hub_unlocked", profile.learning_hub_unlocked)} />
+              <AccessButton label="Math Activity" active={profile.math_activity_unlocked} onClick={() => onToggle(profile.id, "math_activity_unlocked", profile.math_activity_unlocked)} />
+              <AccessButton label="Draw & Learn" active={profile.draw_learn_unlocked} onClick={() => onToggle(profile.id, "draw_learn_unlocked", profile.draw_learn_unlocked)} />
+              <AccessButton label="Sifir Deck" active={profile.sifir_deck_unlocked} onClick={() => onToggle(profile.id, "sifir_deck_unlocked", profile.sifir_deck_unlocked)} />
+              <AccessButton label="Freebies" active={profile.freebies_unlocked} onClick={() => onToggle(profile.id, "freebies_unlocked", profile.freebies_unlocked)} />
+              <AccessButton label="Custom Worksheet" active={profile.custom_worksheet_unlocked} onClick={() => onToggle(profile.id, "custom_worksheet_unlocked", profile.custom_worksheet_unlocked)} />
+              <AccessButton label="Flashcard Library" active={profile.flashcard_unlocked} onClick={() => onToggle(profile.id, "flashcard_unlocked", profile.flashcard_unlocked)} />
+              <AccessButton label="Modul Membaca" active={profile.flashcard_modul_unlocked} onClick={() => onToggle(profile.id, "flashcard_modul_unlocked", profile.flashcard_modul_unlocked)} />
             </div>
 
-            <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
-              <select
-                value={packageType}
-                onChange={(event) => setPackageType(event.target.value)}
-                className="rounded-xl border border-indigo-100 bg-white px-4 py-3 font-bold outline-none"
-              >
-                {packageOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+            <div className="mt-4 grid gap-3 rounded-[18px] border border-slate-200 bg-white p-4 lg:grid-cols-[minmax(240px,1fr)_170px_150px]">
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                  Package
+                </label>
+                <select
+                  value={packageType}
+                  onChange={(event) => setPackageType(event.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700 outline-none"
+                >
+                  {packageOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
 
-              <input
-                type="date"
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-                className="rounded-xl border border-indigo-100 bg-white px-4 py-3 font-bold outline-none"
-              />
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(event) => setStartDate(event.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700 outline-none"
+                />
+              </div>
 
               <button
                 type="button"
                 onClick={() => onSavePackage(profile, packageType, startDate)}
-                className="rounded-xl bg-indigo-600 px-4 py-3 font-black text-white transition hover:bg-indigo-700"
+                className="self-end rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:opacity-90"
               >
                 Save Package
               </button>
             </div>
 
-            <div className="mt-3 rounded-xl bg-white p-4 text-sm font-bold text-slate-600">
-              <p>Package detail: {selectedPackage?.note}</p>
-              <p>End date preview: {previewEndDate}</p>
-            </div>
+            <div className="mt-3 flex flex-col gap-3 rounded-[16px] bg-slate-950 px-4 py-3 text-white sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-[10px]">
+                <p className="font-black text-violet-300">{selectedPackage?.note}</p>
+                <p className="mt-1 text-slate-400">End date preview: {previewEndDate}</p>
+              </div>
 
-            <button
-              type="button"
-              onClick={() => onResetAccess(profile)}
-              className="mt-4 rounded-xl bg-red-100 px-4 py-3 font-black text-red-700 transition hover:bg-red-200"
-            >
-              Reset / Lock All Access
-            </button>
+              <button
+                type="button"
+                onClick={() => onResetAccess(profile)}
+                className="shrink-0 rounded-xl bg-rose-500/15 px-3 py-2 text-[10px] font-black text-rose-300 transition hover:bg-rose-500/25"
+              >
+                Reset & Lock All
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
-    </div>
+    </article>
   );
 }
 
 function Avatar({ src, name }: { src: string | null; name: string }) {
   return (
-    <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-100 text-xl font-black text-indigo-700">
+    <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-indigo-100 to-violet-100 text-sm font-black text-indigo-700 ring-2 ring-white shadow-sm">
       {src ? (
         <img src={src} alt={name} className="h-full w-full object-cover" />
       ) : (
@@ -1125,14 +1080,14 @@ function AccessButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center justify-between rounded-xl border px-4 py-4 text-left font-black transition ${
+      className={`flex items-center justify-between rounded-xl border px-3 py-3 text-left text-[10px] font-black transition ${
         active
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-          : "border-slate-200 bg-slate-50 text-slate-500"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm"
+          : "border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50/40"
       }`}
     >
       <span>{label}</span>
-      {active ? <CheckCircle2 size={20} /> : <LockKeyhole size={20} />}
+      {active ? <CheckCircle2 size={16} /> : <LockKeyhole size={15} />}
     </button>
   );
 }

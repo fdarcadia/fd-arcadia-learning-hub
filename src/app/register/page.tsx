@@ -254,172 +254,347 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="page-shell grid min-h-screen place-items-center py-10">
-      <section className="soft-card w-full max-w-4xl rounded-[2rem] p-6 sm:p-8">
-        <p className="text-emerald-700">Get started</p>
+    <main className="min-h-screen bg-[#f5f7fb] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[1380px] items-center">
+        <section className="grid w-full overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.13)] xl:grid-cols-[0.82fr_1.18fr]">
+          {/* LEFT PREMIUM PANEL */}
+          <aside className="relative hidden overflow-hidden bg-gradient-to-br from-[#111735] via-[#25265f] to-[#4c3fc9] p-9 text-white xl:flex xl:flex-col xl:justify-between">
+            <div className="absolute -right-28 -top-28 h-80 w-80 rounded-full bg-violet-400/20 blur-3xl" />
+            <div className="absolute -bottom-28 -left-24 h-80 w-80 rounded-full bg-indigo-300/10 blur-3xl" />
 
-        <h1 className="font-display mt-2 text-5xl text-indigo-700">
-          Register
-        </h1>
+            <div className="relative">
+              <Link href="/" className="inline-flex items-center gap-3">
+                {/* Optional custom logo:
+                <img
+                  src="/fd-arcadia-logo.png"
+                  alt="FD Arcadia"
+                  className="h-12 w-auto object-contain"
+                />
+                */}
+                <div className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/10 text-yellow-300 shadow-sm backdrop-blur">
+                  <ArrowRight size={22} />
+                </div>
 
-        <p className="mt-3 text-lg text-slate-600">
-          Create your parent account and choose your preferred FD Arcadia
-          package. Access will be unlocked after manual payment confirmation.
-        </p>
+                <div>
+                  <p className="text-sm font-black tracking-[0.12em]">
+                    FD ARCADIA
+                  </p>
+                  <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.22em] text-violet-300">
+                    Parent Registration
+                  </p>
+                </div>
+              </Link>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-          <TextInput
-            label="Full name"
-            value={fullName}
-            required
-            placeholder="Parent name"
-            onChange={setFullName}
-          />
+              <div className="mt-14 max-w-lg">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-200">
+                  Create Parent Account
+                </p>
 
-          <TextInput
-            label="Email"
-            type="email"
-            value={email}
-            required
-            placeholder="parent@email.com"
-            onChange={setEmail}
-          />
+                <h1 className="mt-3 text-4xl font-black leading-[1.08] tracking-tight sm:text-5xl">
+                  Choose the right learning access for your child.
+                </h1>
 
-          <TextInput
-            label="Password"
-            type="password"
-            value={password}
-            required
-            placeholder="Create password"
-            onChange={setPassword}
-          />
+                <p className="mt-4 max-w-md text-sm leading-7 text-slate-300">
+                  Register once, choose a package, then wait for admin payment
+                  confirmation before access is unlocked.
+                </p>
+              </div>
 
-          <fieldset>
-            <legend className="mb-3 text-sm font-bold text-emerald-700">
-              Choose package category
-            </legend>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {(Object.keys(packageGroups) as MainPackage[]).map((type) => (
-                <label
-                  key={type}
-                  className={`cursor-pointer rounded-2xl border p-4 transition ${
-                    mainPackage === type
-                      ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-md"
-                      : "border-indigo-100 bg-white text-slate-600 hover:border-indigo-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="mainPackage"
-                    value={type}
-                    checked={mainPackage === type}
-                    onChange={() => handleMainPackageChange(type)}
-                    className="sr-only"
-                  />
-
-                  <span className="block text-lg font-bold">
-                    {packageGroups[type].title}
-                  </span>
-
-                  <span className="mt-2 block text-sm leading-6">
-                    {packageGroups[type].description}
-                  </span>
-                </label>
-              ))}
+              <div className="mt-9 grid gap-3">
+                <RegisterFeature
+                  title="Choose your package"
+                  description="Select Learning Hub, worksheets, flashcards, math or a full package."
+                />
+                <RegisterFeature
+                  title="Manual verification"
+                  description="Access stays locked until FD Arcadia confirms payment."
+                />
+                <RegisterFeature
+                  title="Secure parent account"
+                  description="Your parent profile and package choice are saved to your account."
+                />
+              </div>
             </div>
-          </fieldset>
 
-          <fieldset>
-            <legend className="mb-3 text-sm font-bold text-emerald-700">
-              Choose package option
-            </legend>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {selectedGroup.options.map((option) => (
-                <label
-                  key={option.value}
-                  className={`cursor-pointer rounded-2xl border p-4 transition ${
-                    packageType === option.value
-                      ? "border-yellow-400 bg-yellow-50 text-indigo-700 shadow-md"
-                      : "border-indigo-100 bg-white text-slate-600 hover:border-indigo-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="packageType"
-                    value={option.value}
-                    checked={packageType === option.value}
-                    onChange={() => setPackageType(option.value)}
-                    className="sr-only"
-                  />
-
-                  <span className="block text-xl font-bold">
-                    {option.label}
-                  </span>
-
-                  <span className="mt-2 block text-3xl font-bold text-indigo-700">
-                    {option.price}
-                  </span>
-
-                  <span className="mt-2 block leading-7">
-                    {option.description}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <section className="rounded-[2rem] border border-yellow-200 bg-yellow-50 p-5">
-            <h2 className="text-xl font-bold text-indigo-700">
-              Manual Payment Notice
-            </h2>
-
-            <p className="mt-2 text-slate-700">
-              After registration, please WhatsApp admin with your registered
-              email and payment proof. Admin will unlock your selected package
-              after confirmation.
-            </p>
-
-            <div className="mt-4 rounded-2xl bg-white p-4">
-              <p className="text-sm font-bold text-yellow-600">
-                SELECTED PACKAGE
+            <div className="relative rounded-[20px] border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-200">
+                Selected Package
               </p>
-
-              <p className="mt-1 text-xl font-bold text-indigo-700">
-                {selectedPackage.label} — {selectedPackage.price}
+              <p className="mt-2 text-lg font-black text-white">
+                {selectedPackage.label}
               </p>
-
-              <p className="mt-1 text-slate-600">
+              <p className="mt-1 text-2xl font-black text-yellow-300">
+                {selectedPackage.price}
+              </p>
+              <p className="mt-1 text-[10px] leading-5 text-slate-400">
                 {selectedPackage.description}
               </p>
             </div>
-          </section>
+          </aside>
 
-          {error ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
-              {error}
+          {/* RIGHT REGISTRATION PANEL */}
+          <section className="p-5 sm:p-8 lg:p-10 xl:p-12">
+            <div className="mx-auto max-w-[760px]">
+              <div className="flex items-center justify-between gap-3">
+                <Link
+                  href="/"
+                  className="text-xs font-black text-slate-500 transition hover:text-indigo-600"
+                >
+                  ← Back to Home
+                </Link>
+
+                <Link
+                  href="/login"
+                  className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-indigo-700"
+                >
+                  Already registered?
+                </Link>
+              </div>
+
+              <div className="mt-8">
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-500">
+                  Get Started
+                </p>
+
+                <h2 className="mt-1 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
+                  Register
+                </h2>
+
+                <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+                  Create your parent account and choose your preferred FD Arcadia package.
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmit} className="mt-8 space-y-7">
+                <section className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-500">
+                    Account Details
+                  </p>
+
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <TextInput
+                        label="Full name"
+                        value={fullName}
+                        required
+                        placeholder="Parent name"
+                        onChange={setFullName}
+                      />
+                    </div>
+
+                    <TextInput
+                      label="Email"
+                      type="email"
+                      value={email}
+                      required
+                      placeholder="parent@email.com"
+                      onChange={setEmail}
+                    />
+
+                    <TextInput
+                      label="Password"
+                      type="password"
+                      value={password}
+                      required
+                      placeholder="Create password"
+                      onChange={setPassword}
+                    />
+                  </div>
+                </section>
+
+                <section className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-500">
+                      Step 1
+                    </p>
+                    <h3 className="mt-1 text-xl font-black text-slate-950">
+                      Choose Package Category
+                    </h3>
+                    <p className="mt-1 text-xs font-semibold text-slate-400">
+                      Select the type of learning access you want.
+                    </p>
+                  </div>
+
+                  <fieldset className="mt-5">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {(Object.keys(packageGroups) as MainPackage[]).map((type) => (
+                        <label
+                          key={type}
+                          className={`cursor-pointer rounded-[18px] border p-4 transition ${
+                            mainPackage === type
+                              ? "border-indigo-500 bg-indigo-50 shadow-sm ring-2 ring-indigo-100"
+                              : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/40"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="mainPackage"
+                            value={type}
+                            checked={mainPackage === type}
+                            onChange={() => handleMainPackageChange(type)}
+                            className="sr-only"
+                          />
+
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <span className="block text-sm font-black text-slate-900">
+                                {packageGroups[type].title}
+                              </span>
+
+                              <span className="mt-1.5 block text-[10px] font-semibold leading-5 text-slate-500">
+                                {packageGroups[type].description}
+                              </span>
+                            </div>
+
+                            <span
+                              className={`mt-0.5 h-3 w-3 shrink-0 rounded-full border ${
+                                mainPackage === type
+                                  ? "border-indigo-600 bg-indigo-600 ring-4 ring-indigo-100"
+                                  : "border-slate-300 bg-white"
+                              }`}
+                            />
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                </section>
+
+                <section className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-violet-500">
+                      Step 2
+                    </p>
+                    <h3 className="mt-1 text-xl font-black text-slate-950">
+                      Choose Package Option
+                    </h3>
+                    <p className="mt-1 text-xs font-semibold text-slate-400">
+                      Pick the option that matches your preferred access.
+                    </p>
+                  </div>
+
+                  <fieldset className="mt-5">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {selectedGroup.options.map((option) => (
+                        <label
+                          key={option.value}
+                          className={`cursor-pointer rounded-[18px] border p-4 transition ${
+                            packageType === option.value
+                              ? "border-violet-500 bg-violet-50 shadow-sm ring-2 ring-violet-100"
+                              : "border-slate-200 bg-white hover:border-violet-200 hover:bg-violet-50/30"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="packageType"
+                            value={option.value}
+                            checked={packageType === option.value}
+                            onChange={() => setPackageType(option.value)}
+                            className="sr-only"
+                          />
+
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <span className="block text-sm font-black text-slate-900">
+                                {option.label}
+                              </span>
+
+                              <span className="mt-2 block text-2xl font-black text-indigo-600">
+                                {option.price}
+                              </span>
+
+                              <span className="mt-2 block text-[10px] font-semibold leading-5 text-slate-500">
+                                {option.description}
+                              </span>
+                            </div>
+
+                            <span
+                              className={`mt-0.5 h-3 w-3 shrink-0 rounded-full border ${
+                                packageType === option.value
+                                  ? "border-violet-600 bg-violet-600 ring-4 ring-violet-100"
+                                  : "border-slate-300 bg-white"
+                              }`}
+                            />
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                </section>
+
+                <section className="rounded-[22px] border border-amber-200 bg-amber-50 p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-amber-600">
+                        Manual Payment
+                      </p>
+                      <h3 className="mt-1 text-lg font-black text-slate-900">
+                        Access unlocks after payment confirmation
+                      </h3>
+                      <p className="mt-2 max-w-xl text-xs font-semibold leading-5 text-slate-600">
+                        After registration, WhatsApp admin with your registered
+                        email and payment proof. Admin will unlock your selected package.
+                      </p>
+                    </div>
+
+                    <div className="min-w-[190px] rounded-[16px] bg-white p-4 shadow-sm">
+                      <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+                        Selected
+                      </p>
+                      <p className="mt-1 text-sm font-black text-slate-900">
+                        {selectedPackage.label}
+                      </p>
+                      <p className="mt-1 text-xl font-black text-indigo-600">
+                        {selectedPackage.price}
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                {error ? (
+                  <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                    {error}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3.5 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? <Loader2 className="animate-spin" size={18} /> : null}
+                  {loading ? "Creating account..." : "Register & Continue"}
+                  {!loading ? <ArrowRight size={17} /> : null}
+                </button>
+              </form>
+
+              <p className="mt-7 text-center text-sm font-semibold text-slate-500">
+                Already registered?{" "}
+                <Link className="font-black text-indigo-600" href="/login">
+                  Login here
+                </Link>
+              </p>
             </div>
-          ) : null}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="button-shadow flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 text-xl font-bold text-white transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {loading ? <Loader2 className="animate-spin" size={22} /> : null}
-            Register & Continue
-            {!loading ? <ArrowRight size={22} /> : null}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-slate-600">
-          Already registered?{" "}
-          <Link className="font-bold text-indigo-700" href="/login">
-            Login here
-          </Link>
-        </p>
-      </section>
+          </section>
+        </section>
+      </div>
     </main>
+  );
+}
+
+function RegisterFeature({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-[18px] border border-white/10 bg-white/[0.05] p-4 backdrop-blur">
+      <p className="text-xs font-black text-white">{title}</p>
+      <p className="mt-1 text-[10px] leading-5 text-slate-400">
+        {description}
+      </p>
+    </div>
   );
 }

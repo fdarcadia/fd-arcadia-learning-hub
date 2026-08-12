@@ -4,12 +4,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import {
   ArrowLeft,
+  ArrowRight,
   Check,
+  ChevronLeft,
+  ChevronRight,
+  CircleCheckBig,
+  CircleX,
+  ClipboardList,
   Clock,
   Crown,
-  Eraser,
+  Delete,
+  Flame,
   Loader2,
   Lock,
+  Rocket,
   RotateCw,
   Sparkles,
   Star,
@@ -114,6 +122,8 @@ const text = {
     previous: "Sebelum",
     next: "Seterusnya",
     spin: "Spin",
+    swipeHint: "Swipe atau jawab betul untuk kad seterusnya",
+    streak: "Streak",
     result: "Keputusan",
     correctCount: "Betul",
     wrongCount: "Salah",
@@ -150,6 +160,8 @@ const text = {
     previous: "Previous",
     next: "Next",
     spin: "Spin",
+    swipeHint: "Swipe or answer correctly for the next card",
+    streak: "Streak",
     result: "Result",
     correctCount: "Correct",
     wrongCount: "Wrong",
@@ -184,7 +196,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
   const [cards, setCards] = useState<SifirCard[]>([]);
   const [selectedSifir, setSelectedSifir] = useState<number | null>(null);
   const [index, setIndex] = useState(0);
-  const [uiLanguage, setUiLanguage] = useState<UiLanguage>("bm");
+  const [uiLanguage, setUiLanguage] = useState<UiLanguage>("en");
   const [mode, setMode] = useState<GameMode>("card");
   const [difficulty, setDifficulty] = useState<QuestionLevel>("easy");
   const [input, setInput] = useState("");
@@ -199,6 +211,11 @@ function SifirDeckGame({ userId }: { userId: string }) {
   const [wrongCount, setWrongCount] = useState(0);
   const [answeredCurrent, setAnsweredCurrent] = useState(false);
   const [showResult, setShowResult] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [slideState, setSlideState] = useState<"idle" | "out-left" | "out-right" | "in-right" | "in-left">("idle");
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchDeltaX, setTouchDeltaX] = useState(0);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const answerLockedRef = useRef(false);
@@ -206,8 +223,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
   const t = text[uiLanguage];
 
   useEffect(() => {
-    const browserLanguage = navigator.language.toLowerCase();
-    setUiLanguage(browserLanguage.includes("ms") ? "bm" : "en");
+    // English is the default UI. The existing EN/BM switch still lets users change language.
     checkAccess();
   }, []);
 
@@ -245,8 +261,10 @@ function SifirDeckGame({ userId }: { userId: string }) {
   });
 
   useEffect(() => {
+    const timedMode = mode === "wheel" || mode === "card";
+
     if (
-      mode !== "wheel" ||
+      !timedMode ||
       !selectedSifir ||
       !current ||
       isSpinning ||
@@ -262,11 +280,16 @@ function SifirDeckGame({ userId }: { userId: string }) {
       answerLockedRef.current = true;
       setStatus("timeup");
       setWrongCount((prev) => Math.min(prev + 1, cards.length));
+      setStreak(0);
       setAnsweredCurrent(true);
 
       const timeout = setTimeout(() => {
-        moveToNextWheelQuestion();
-      }, 1000);
+        if (mode === "wheel") {
+          moveToNextWheelQuestion();
+        } else {
+          animateToNextCard();
+        }
+      }, 900);
 
       return () => clearTimeout(timeout);
     }
@@ -396,6 +419,8 @@ function SifirDeckGame({ userId }: { userId: string }) {
     setStatus("idle");
     setCorrectCount(0);
     setWrongCount(0);
+    setStreak(0);
+    setBestStreak(0);
     setShowResult(false);
     setAnsweredCurrent(false);
     answerLockedRef.current = false;
@@ -410,6 +435,8 @@ function SifirDeckGame({ userId }: { userId: string }) {
     setStatus("idle");
     setCorrectCount(0);
     setWrongCount(0);
+    setStreak(0);
+    setBestStreak(0);
     setShowResult(false);
     setAnsweredCurrent(false);
     answerLockedRef.current = false;
@@ -422,56 +449,162 @@ function SifirDeckGame({ userId }: { userId: string }) {
   }
 
   function pressNumber(num: string) {
-    if (status === "correct" || isSpinning) return;
+    if (status === "correct" || isSpinning || slideState !== "idle" || showResult) return;
     setInput((prev) => `${prev}${num}`.replace(/[^0-9]/g, "").slice(0, 4));
     setStatus("idle");
   }
 
   function handleInputChange(value: string) {
-    if (isSpinning) return;
+    if (isSpinning || slideState !== "idle" || showResult) return;
     setInput(value.replace(/[^0-9]/g, "").slice(0, 4));
     setStatus("idle");
   }
 
   function clearInput() {
-    if (isSpinning) return;
+    if (isSpinning || slideState !== "idle" || showResult) return;
     setInput("");
     setStatus("idle");
     inputRef.current?.focus();
   }
 
   function checkAnswer() {
-    if (!current || !input || isSpinning) return;
-
-    // Synchronous lock prevents double clicks or repeated Enter presses
-    // from counting the same wheel question more than once.
-    if (mode === "wheel" && answerLockedRef.current) return;
+    if (!current || !input || isSpinning || slideState !== "idle" || showResult) return;
+    if (answerLockedRef.current) return;
 
     const isCorrect = input.trim() === String(current.answer || "").trim();
     setStatus(isCorrect ? "correct" : "wrong");
 
-    if (mode === "wheel") {
-      answerLockedRef.current = true;
-      setAnsweredCurrent(true);
+    if (!isCorrect) {
+      setWrongCount((prev) => Math.min(prev + 1, cards.length));
+      setStreak(0);
 
-      if (isCorrect) {
-        setCorrectCount((prev) => Math.min(prev + 1, cards.length));
-        setTimeout(() => autoSpinNextQuestion(), 1000);
-      } else {
-        setWrongCount((prev) => Math.min(prev + 1, cards.length));
-      }
-
+      // Wrong answers stay on the same question so the student can retry.
+      answerLockedRef.current = false;
+      setAnsweredCurrent(false);
+      inputRef.current?.focus();
       return;
     }
 
-    inputRef.current?.focus();
+    answerLockedRef.current = true;
+    setAnsweredCurrent(true);
+
+    setCorrectCount((prev) => Math.min(prev + 1, cards.length));
+    setStreak((prev) => {
+      const next = prev + 1;
+      setBestStreak((best) => Math.max(best, next));
+      return next;
+    });
+
+    // Show the green correct state briefly, then move automatically.
+    if (mode === "wheel") {
+      setTimeout(() => autoSpinNextQuestion(), 850);
+    } else {
+      setTimeout(() => animateToNextCard(), 700);
+    }
   }
 
-  function autoSpinNextQuestion() {
-    if (cards.length === 0) return;
+  function animateToNextCard() {
+    if (cards.length === 0 || slideState !== "idle") return;
 
     if (index + 1 >= cards.length) {
       setShowResult(true);
+      setAnsweredCurrent(true);
+      return;
+    }
+
+    setSlideState("out-left");
+
+    setTimeout(() => {
+      setIndex((prev) => prev + 1);
+      setInput("");
+      setStatus("idle");
+      setAnsweredCurrent(false);
+      answerLockedRef.current = false;
+      setTimeLeft(timerSeconds);
+      setSlideState("in-right");
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setSlideState("idle"));
+      });
+
+      inputRef.current?.focus();
+    }, 220);
+  }
+
+  function animateToPreviousCard() {
+    if (cards.length === 0 || slideState !== "idle" || index <= 0) return;
+
+    setSlideState("out-right");
+
+    setTimeout(() => {
+      setIndex((prev) => Math.max(0, prev - 1));
+      setInput("");
+      setStatus("idle");
+      setAnsweredCurrent(false);
+      answerLockedRef.current = false;
+      setTimeLeft(timerSeconds);
+      setSlideState("in-left");
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setSlideState("idle"));
+      });
+
+      inputRef.current?.focus();
+    }, 220);
+  }
+
+  function nextCard() {
+    if (cards.length === 0) return;
+    animateToNextCard();
+  }
+
+  function previousCard() {
+    if (cards.length === 0) return;
+    animateToPreviousCard();
+  }
+
+  function onCardTouchStart(clientX: number) {
+    if (mode !== "card" || slideState !== "idle") return;
+    setTouchStartX(clientX);
+    setTouchDeltaX(0);
+  }
+
+  function onCardTouchMove(clientX: number) {
+    if (touchStartX === null || mode !== "card" || slideState !== "idle") return;
+    setTouchDeltaX(clientX - touchStartX);
+  }
+
+  function onCardTouchEnd() {
+    if (touchStartX === null || mode !== "card" || slideState !== "idle") {
+      setTouchStartX(null);
+      setTouchDeltaX(0);
+      return;
+    }
+
+    if (touchDeltaX < -70) {
+      animateToNextCard();
+    } else if (touchDeltaX > 70) {
+      animateToPreviousCard();
+    }
+
+    setTouchStartX(null);
+    setTouchDeltaX(0);
+  }
+
+  function getSlideClass() {
+    if (slideState === "out-left") return "-translate-x-[115%] rotate-[-2deg] opacity-0";
+    if (slideState === "out-right") return "translate-x-[115%] rotate-[2deg] opacity-0";
+    if (slideState === "in-right") return "translate-x-[35%] opacity-0";
+    if (slideState === "in-left") return "-translate-x-[35%] opacity-0";
+    return "translate-x-0 rotate-0 opacity-100";
+  }
+
+  function autoSpinNextQuestion() {
+    if (cards.length === 0 || isSpinning || showResult) return;
+
+    if (index + 1 >= cards.length) {
+      setShowResult(true);
+      setAnsweredCurrent(true);
       return;
     }
 
@@ -488,20 +621,6 @@ function SifirDeckGame({ userId }: { userId: string }) {
       setIsSpinning(false);
       inputRef.current?.focus();
     }, 2200);
-  }
-
-  function nextCard() {
-    if (cards.length === 0) return;
-    setIndex(index + 1 >= cards.length ? 0 : index + 1);
-    setInput("");
-    setStatus("idle");
-  }
-
-  function previousCard() {
-    if (cards.length === 0) return;
-    setIndex(index - 1 < 0 ? cards.length - 1 : index - 1);
-    setInput("");
-    setStatus("idle");
   }
 
   function spinWheel() {
@@ -543,6 +662,26 @@ function SifirDeckGame({ userId }: { userId: string }) {
     if (!current) return { first: "?", second: "?" };
     return parseQuestion(current.question);
   }, [current]);
+
+  const verticalParts = useMemo(() => {
+    const firstNum = Number(questionParts.first);
+    const secondNum = Number(questionParts.second);
+
+    if (!Number.isFinite(firstNum) || !Number.isFinite(secondNum)) {
+      return questionParts;
+    }
+
+    // In vertical multiplication, prioritise a 2-digit value on top.
+    // If both are the same digit length, place the larger value on top.
+    const firstDigits = Math.abs(firstNum).toString().length;
+    const secondDigits = Math.abs(secondNum).toString().length;
+
+    if (secondDigits > firstDigits || (secondDigits === firstDigits && secondNum > firstNum)) {
+      return { first: questionParts.second, second: questionParts.first };
+    }
+
+    return questionParts;
+  }, [questionParts]);
 
   const safeCorrectCount = Math.min(correctCount, cards.length);
   const scorePercent =
@@ -611,61 +750,189 @@ function SifirDeckGame({ userId }: { userId: string }) {
             </div>
           </section>
 
-          <section className="mt-8 rounded-[2rem] border border-indigo-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-black uppercase tracking-[0.25em] text-slate-950">
-              {t.level}
-            </p>
+          <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="mt-1 h-8 w-1.5 rounded-full bg-indigo-600" />
+              <div>
+                <h2 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
+                  {uiLanguage === "en" ? "CHOOSE LEVEL" : "PILIH TAHAP"}
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  {uiLanguage === "en"
+                    ? "Pick a level that suits your practice today"
+                    : "Pilih tahap yang sesuai untuk latihan hari ini"}
+                </p>
+              </div>
+            </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {(["easy", "medium", "hard"] as QuestionLevel[]).map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => setDifficulty(level)}
-                  className={`rounded-2xl px-5 py-4 font-black uppercase transition ${
-                    difficulty === level
-                      ? getLevelActiveClass(level)
-                      : "bg-indigo-50 text-slate-500 hover:bg-indigo-100"
-                  }`}
-                >
-                  {level === "easy"
-                    ? `⭐ ${t.easy}`
-                    : level === "medium"
-                    ? `⭐⭐ ${t.medium}`
-                    : `⭐⭐⭐ ${t.hard}`}
-                </button>
-              ))}
+            <div className="mt-6 grid gap-4 lg:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => setDifficulty("easy")}
+                className={`relative overflow-hidden rounded-[26px] border-2 p-5 text-left transition duration-200 ${
+                  difficulty === "easy"
+                    ? "border-emerald-500 bg-gradient-to-br from-emerald-50 to-white shadow-[0_14px_36px_rgba(16,185,129,0.16)]"
+                    : "border-emerald-100 bg-gradient-to-br from-emerald-50/70 to-white hover:border-emerald-300"
+                }`}
+              >
+                {difficulty === "easy" && (
+                  <span className="absolute right-4 top-4 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-700 shadow-sm">
+                    Recommended
+                  </span>
+                )}
+
+                <div className="flex items-center gap-4">
+                  <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-600">
+                    <Sparkles size={28} />
+                  </div>
+
+                  <div>
+                    <p className="text-2xl font-black text-emerald-600">EASY</p>
+                    <p className="mt-1 text-sm font-bold text-slate-500">Basic Practice</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t border-emerald-100 pt-4 text-center">
+                  <span className="text-sm font-black text-emerald-600">12 Questions</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDifficulty("medium")}
+                className={`overflow-hidden rounded-[26px] border-2 p-5 text-left transition duration-200 ${
+                  difficulty === "medium"
+                    ? "border-orange-400 bg-gradient-to-br from-orange-50 to-white shadow-[0_14px_36px_rgba(249,115,22,0.15)]"
+                    : "border-orange-100 bg-gradient-to-br from-orange-50/70 to-white hover:border-orange-300"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-orange-100 text-orange-500">
+                    <Trophy size={28} />
+                  </div>
+
+                  <div>
+                    <p className="text-2xl font-black text-orange-500">MEDIUM</p>
+                    <p className="mt-1 text-sm font-bold text-slate-500">Mixed Challenge</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t border-orange-100 pt-4 text-center">
+                  <span className="text-sm font-black text-orange-500">Start</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDifficulty("hard")}
+                className={`overflow-hidden rounded-[26px] border-2 p-5 text-left transition duration-200 ${
+                  difficulty === "hard"
+                    ? "border-rose-400 bg-gradient-to-br from-rose-50 to-white shadow-[0_14px_36px_rgba(244,63,94,0.14)]"
+                    : "border-rose-100 bg-gradient-to-br from-rose-50/70 to-white hover:border-rose-300"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-rose-100 text-rose-500">
+                    <Rocket size={28} />
+                  </div>
+
+                  <div>
+                    <p className="text-2xl font-black text-rose-500">HARD</p>
+                    <p className="mt-1 text-sm font-bold text-slate-500">Advanced Practice</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t border-rose-100 pt-4 text-center">
+                  <span className="text-sm font-black text-rose-500">Start</span>
+                </div>
+              </button>
             </div>
           </section>
 
-          <section className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-            {sifirOptions.map((num) => (
-              <button
-                key={num}
-                type="button"
-                onClick={() => chooseSifir(num)}
-                className={`group aspect-square rounded-full border-2 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.10)] transition duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-[0_18px_36px_rgba(15,23,42,0.16)] ${getSifirCardTheme(
-                  num
-                )}`}
-              >
-                <span className="block text-base font-black uppercase tracking-[0.12em] text-slate-900 sm:text-lg">
-                  SIFIR
-                </span>
+          <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="mt-1 h-8 w-1.5 rounded-full bg-indigo-600" />
+                <div>
+                  <h2 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
+                    {uiLanguage === "en" ? "CHOOSE TIMES TABLE (SIFIR)" : "PILIH SIFIR"}
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-400">
+                    {uiLanguage === "en"
+                      ? "Select a times table from 1 to 12"
+                      : "Pilih sifir daripada 1 hingga 12"}
+                  </p>
+                </div>
+              </div>
 
-                <span
-                  className={`mt-1 block text-6xl font-black sm:text-7xl ${getSifirNumberTheme(
+              <div className="inline-flex self-start items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-black text-indigo-700 sm:self-auto">
+                <ClipboardList size={17} />
+                Total: 12 Tables
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-12">
+              {sifirOptions.map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => chooseSifir(num)}
+                  className={`group relative min-h-[138px] overflow-hidden rounded-[22px] border-2 px-2 pb-12 pt-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.07)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_14px_28px_rgba(15,23,42,0.12)] ${getSifirCardTheme(
                     num
                   )}`}
-                  style={QUESTION_FONT_STYLE}
                 >
-                  {num}
-                </span>
+                  <span
+                    className={`block text-[9px] font-black uppercase tracking-[0.12em] ${getSifirNumberTheme(
+                      num
+                    )}`}
+                  >
+                    {uiLanguage === "en" ? "TABLE" : "SIFIR"}
+                  </span>
 
-                <span className="mt-1 inline-flex rounded-full bg-white px-4 py-2 text-sm font-black text-slate-900 shadow-[0_8px_18px_rgba(15,23,42,0.18)] ring-1 ring-black/5 transition group-hover:-translate-y-0.5 group-hover:shadow-[0_12px_22px_rgba(15,23,42,0.22)]">
-                  Start
-                </span>
-              </button>
-            ))}
+                  <span
+                    className={`mt-1 block text-[46px] font-black leading-[0.95] ${getSifirNumberTheme(
+                      num
+                    )}`}
+                    style={QUESTION_FONT_STYLE}
+                  >
+                    {num}
+                  </span>
+
+                  <span className="absolute inset-x-2 bottom-2 rounded-full bg-white px-2 py-2 text-[10px] font-black text-slate-700 shadow-sm ring-1 ring-black/5">
+                    {difficulty === "easy" ? "12 Q" : "Start"}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
+              <div className="flex items-center gap-3 rounded-2xl bg-indigo-50 px-4 py-3">
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-indigo-600 shadow-sm">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-indigo-700">How it works?</p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
+                    Choose a level and times table above.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3">
+                <CircleCheckBig size={18} className="text-emerald-600" />
+                <p className="text-[11px] font-bold text-slate-600">Answer correctly</p>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-2xl bg-orange-50 px-4 py-3">
+                <Flame size={18} className="text-orange-600" />
+                <p className="text-[11px] font-bold text-slate-600">Build your streak</p>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-2xl bg-violet-50 px-4 py-3">
+                <Trophy size={18} className="text-violet-600" />
+                <p className="text-[11px] font-bold text-slate-600">Beat your best score</p>
+              </div>
+            </div>
           </section>
         </div>
       </main>
@@ -718,6 +985,9 @@ function SifirDeckGame({ userId }: { userId: string }) {
                   setTimeLeft(timerSeconds);
                   setStatus("idle");
                   setInput("");
+                  setAnsweredCurrent(false);
+                  answerLockedRef.current = false;
+                  setSlideState("idle");
                 }}
                 className={`rounded-2xl px-5 py-4 font-black transition ${
                   mode === m
@@ -729,7 +999,7 @@ function SifirDeckGame({ userId }: { userId: string }) {
                   ? t.cardMode
                   : m === "vertical"
                   ? t.verticalMode
-                  : `🎡 ${t.wheelMode}`}
+                  : t.wheelMode}
               </button>
             ))}
           </div>
@@ -750,97 +1020,189 @@ function SifirDeckGame({ userId }: { userId: string }) {
             correctCount={correctCount}
             wrongCount={wrongCount}
             scorePercent={scorePercent}
+            bestStreak={bestStreak}
             onPlayAgain={restartRound}
             onChooseOther={backToChoose}
           />
         ) : (
           <section className="mt-8 rounded-[2.5rem] border border-indigo-100 bg-white p-6 shadow-xl">
-            {mode !== "wheel" ? (
-              <div className="mb-6 flex items-center justify-between">
+            <GameStats
+              timed={mode === "card" || mode === "wheel"}
+              timeLeft={timeLeft}
+              timerSeconds={timerSeconds}
+              currentIndex={index}
+              total={cards.length}
+              correctCount={correctCount}
+              wrongCount={wrongCount}
+              streak={streak}
+            />
+
+            <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
+              <div className="min-w-0">
+                {mode === "card" && (
+                  <div
+                    className={`transition-all duration-200 ease-out ${getSlideClass()}`}
+                    style={{
+                      transform:
+                        touchStartX !== null && slideState === "idle"
+                          ? `translateX(${Math.max(-100, Math.min(100, touchDeltaX * 0.32))}px)`
+                          : undefined,
+                    }}
+                    onTouchStart={(event) => onCardTouchStart(event.touches[0]?.clientX ?? 0)}
+                    onTouchMove={(event) => onCardTouchMove(event.touches[0]?.clientX ?? 0)}
+                    onTouchEnd={onCardTouchEnd}
+                  >
+                    <CardQuestion
+                      current={current}
+                      status={status}
+                      label={t.question}
+                      swipeHint={t.swipeHint}
+                      inputRef={inputRef}
+                      input={input}
+                      placeholder={t.typeAnswer}
+                      hint={t.enterHint}
+                      onChange={handleInputChange}
+                      onSubmit={checkAnswer}
+                      disabled={isSpinning || slideState !== "idle" || status === "correct"}
+                    />
+                  </div>
+                )}
+
+                {mode === "vertical" && (
+                  <div className={`transition-all duration-200 ease-out ${getSlideClass()}`}>
+                    <VerticalQuestion
+                      first={verticalParts.first}
+                      second={verticalParts.second}
+                      input={input}
+                      status={status}
+                      inputRef={inputRef}
+                      placeholder={t.typeAnswer}
+                      hint={t.enterHint}
+                      onChange={handleInputChange}
+                      onSubmit={checkAnswer}
+                      disabled={slideState !== "idle" || status === "correct"}
+                    />
+                  </div>
+                )}
+
+                {mode === "wheel" && (
+                  <>
+                    <WheelQuestion
+                      current={current}
+                      spinning={isSpinning}
+                      rotation={wheelRotation}
+                      spinText={t.spin}
+                      cardLabel={`${index + 1} / ${cards.length}`}
+                      onSpin={spinWheel}
+                    />
+
+                    <AnswerInput
+                      inputRef={inputRef}
+                      input={input}
+                      status={status}
+                      placeholder={t.typeAnswer}
+                      hint={t.enterHint}
+                      onChange={handleInputChange}
+                      onSubmit={checkAnswer}
+                      disabled={isSpinning || status === "correct"}
+                    />
+                  </>
+                )}
+
+                <div className="mt-4">
+                  {status === "correct" && (
+                    <StatusBox type="correct" message={t.correct} />
+                  )}
+
+                  {(status === "wrong" || status === "timeup") && (
+                    <StatusBox
+                      type="wrong"
+                      message={status === "timeup" ? t.timeUp : t.wrong}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="lg:sticky lg:top-5">
+                <NumberPad
+                  status={status}
+                  onPress={pressNumber}
+                  onClear={clearInput}
+                  onSubmit={checkAnswer}
+                  clearText={t.clear}
+                  checkText={t.check}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex min-w-max gap-2">
+                {sifirOptions.map((num) => {
+                  const selected = selectedSifir === num;
+
+                  return (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => chooseSifir(num)}
+                      className={`relative h-[132px] w-[88px] shrink-0 overflow-hidden rounded-[22px] border-2 px-2 pb-11 pt-3 text-center shadow-sm transition hover:-translate-y-0.5 ${
+                        selected
+                          ? "border-orange-500 bg-orange-50 ring-2 ring-orange-100"
+                          : getSifirCardTheme(num)
+                      }`}
+                    >
+                      <span
+                        className={`block text-[9px] font-black uppercase ${getSifirNumberTheme(
+                          num
+                        )}`}
+                      >
+                        {uiLanguage === "en" ? "TABLE" : "SIFIR"}
+                      </span>
+
+                      <span
+                        className={`mt-1 block text-[44px] font-black leading-[0.95] ${getSifirNumberTheme(
+                          num
+                        )}`}
+                        style={QUESTION_FONT_STYLE}
+                      >
+                        {num}
+                      </span>
+
+                      <span className="absolute inset-x-2 bottom-2 rounded-full bg-white px-2 py-1.5 text-[10px] font-black text-slate-700 shadow-sm">
+                        12 Q
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {mode !== "wheel" && (
+              <div className="mx-auto mt-5 flex max-w-xl items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={previousCard}
-                  className="rounded-2xl bg-indigo-50 px-5 py-3 font-bold text-indigo-700 hover:bg-indigo-100"
+                  disabled={index === 0 || slideState !== "idle"}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-30"
                 >
+                  <ChevronLeft size={17} />
                   {t.previous}
                 </button>
 
-                <p className="font-black text-yellow-300">
-                  {index + 1} / {cards.length}
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                  {mode === "card" ? "Swipe" : "Auto Next"}
                 </p>
 
                 <button
                   type="button"
                   onClick={nextCard}
-                  className="rounded-2xl bg-yellow-300 px-5 py-3 font-black text-slate-950"
+                  disabled={index + 1 >= cards.length || slideState !== "idle"}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-30"
                 >
                   {t.next}
+                  <ChevronRight size={17} />
                 </button>
               </div>
-            ) : (
-              <WheelStats
-                timeLeft={timeLeft}
-                timerSeconds={timerSeconds}
-                currentIndex={index}
-                total={cards.length}
-                correctCount={correctCount}
-                wrongCount={wrongCount}
-              />
-            )}
-
-            {mode === "card" && (
-              <CardQuestion current={current} status={status} label={t.question} />
-            )}
-
-            {mode === "vertical" && (
-              <VerticalQuestion
-                first={questionParts.first}
-                second={questionParts.second}
-                input={input}
-                status={status}
-              />
-            )}
-
-            {mode === "wheel" && (
-              <WheelQuestion
-                current={current}
-                spinning={isSpinning}
-                rotation={wheelRotation}
-                spinText={t.spin}
-                cardLabel={`${index + 1} / ${cards.length}`}
-                onSpin={spinWheel}
-              />
-            )}
-
-            <AnswerInput
-              inputRef={inputRef}
-              input={input}
-              status={status}
-              placeholder={t.typeAnswer}
-              hint={t.enterHint}
-              onChange={handleInputChange}
-              onSubmit={checkAnswer}
-              disabled={isSpinning}
-            />
-
-            <NumberPad
-              status={status}
-              onPress={pressNumber}
-              onClear={clearInput}
-              onSubmit={checkAnswer}
-              clearText={t.clear}
-              checkText={t.check}
-            />
-
-            {status === "correct" && (
-              <StatusBox type="correct" message={t.correct} />
-            )}
-
-            {(status === "wrong" || status === "timeup") && (
-              <StatusBox
-                type="wrong"
-                message={status === "timeup" ? t.timeUp : t.wrong}
-              />
             )}
           </section>
         )}
@@ -1062,29 +1424,88 @@ function CardQuestion({
   current,
   status,
   label,
+  swipeHint,
+  inputRef,
+  input,
+  placeholder,
+  hint,
+  onChange,
+  onSubmit,
+  disabled,
 }: {
   current: SifirCard;
   status: Status;
   label: string;
+  swipeHint: string;
+  inputRef: RefObject<HTMLInputElement | null>;
+  input: string;
+  placeholder: string;
+  hint: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  disabled?: boolean;
 }) {
-  return (
-    <div
-      className={`mx-auto max-w-3xl rounded-[2.5rem] p-10 text-center shadow-2xl ${
-        status === "correct"
-          ? "bg-emerald-500"
-          : status === "wrong" || status === "timeup"
-          ? "bg-red-500"
-          : "bg-gradient-to-br from-indigo-600 to-purple-700"
-      }`}
-    >
-      <p className="text-xl font-bold text-white/90">{label}</p>
+  const parts = parseQuestion(current.question);
 
-      <h2
-        className="mt-6 text-6xl font-black text-white sm:text-7xl"
-        style={QUESTION_FONT_STYLE}
+  return (
+    <div className="select-none">
+      <div
+        className={`relative overflow-hidden rounded-[2rem] border p-6 text-center shadow-[0_18px_50px_rgba(15,23,42,0.12)] sm:p-8 ${
+          status === "correct"
+            ? "border-emerald-200 bg-gradient-to-br from-emerald-600 to-teal-700"
+            : status === "wrong" || status === "timeup"
+              ? "border-rose-200 bg-gradient-to-br from-rose-600 to-red-700"
+              : "border-indigo-200 bg-gradient-to-br from-[#090d2a] via-[#17184f] to-[#321c72]"
+        }`}
       >
-        {current.question}
-      </h2>
+        <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/[0.06]" />
+        <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-white/[0.04]" />
+
+        <div className="relative">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/55">
+            {label}
+          </p>
+
+          <div
+            className="mt-6 flex items-center justify-center gap-3 text-5xl font-black sm:gap-5 sm:text-7xl"
+            style={QUESTION_FONT_STYLE}
+          >
+            <span className="text-orange-400">{parts.first}</span>
+            <span className="text-white">×</span>
+            <span className="text-sky-400">{parts.second}</span>
+            <span className="text-white">=</span>
+            <span className="text-violet-400">?</span>
+          </div>
+
+          <input
+            ref={inputRef}
+            value={input}
+            disabled={disabled}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            placeholder={placeholder}
+            onChange={(event) => onChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onSubmit();
+              }
+            }}
+            className={`mx-auto mt-7 block w-full max-w-xl rounded-2xl border-[3px] bg-white px-5 py-4 text-center text-4xl font-black text-slate-950 outline-none transition ${
+              status === "correct"
+                ? "border-emerald-400"
+                : status === "wrong" || status === "timeup"
+                  ? "border-red-400"
+                  : "border-violet-400 focus:border-yellow-300"
+            }`}
+            style={QUESTION_FONT_STYLE}
+          />
+
+          <p className="mt-3 text-xs font-bold text-white/55">{hint}</p>
+          <div className="mx-auto mt-4 h-1.5 w-20 rounded-full bg-white/20" />
+          <p className="mt-3 text-[11px] font-bold text-white/40">{swipeHint}</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1094,37 +1515,73 @@ function VerticalQuestion({
   second,
   input,
   status,
+  inputRef,
+  placeholder,
+  hint,
+  onChange,
+  onSubmit,
+  disabled,
 }: {
   first: string;
   second: string;
   input: string;
   status: Status;
+  inputRef: RefObject<HTMLInputElement | null>;
+  placeholder: string;
+  hint: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="mx-auto max-w-xl rounded-[2.5rem] border border-indigo-100 bg-white p-8 text-center text-slate-900 shadow-2xl">
-      <div
-        className="mx-auto w-72 text-right text-6xl font-black sm:text-7xl"
-        style={QUESTION_FONT_STYLE}
-      >
-        <div>{first}</div>
-        <div className="flex justify-between">
-          <span>×</span>
-          <span>{second}</span>
-        </div>
+    <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.10)]">
+      <div className="bg-[#060b22] px-6 py-4 text-center">
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">
+          Vertical Multiplication
+        </p>
+      </div>
 
-        <div className="my-4 border-t-8 border-slate-900" />
-
+      <div className="p-6 sm:p-8">
         <div
-          className={`min-h-24 rounded-2xl border-4 bg-slate-50 px-4 py-3 text-center ${
-            status === "correct"
-              ? "border-emerald-400 text-emerald-600"
-              : status === "wrong" || status === "timeup"
-              ? "border-red-400 text-red-600"
-              : "border-indigo-300 text-indigo-600"
-          }`}
+          className="mx-auto w-[min(76vw,310px)] text-right text-6xl font-black text-slate-950 sm:text-7xl"
+          style={QUESTION_FONT_STYLE}
         >
-          {input || "?"}
+          <div className="pr-3">{first}</div>
+
+          <div className="mt-1 flex items-end justify-between border-b-[6px] border-slate-950 pb-3">
+            <span className="text-5xl text-indigo-600">×</span>
+            <span className="pr-3 text-orange-500">{second}</span>
+          </div>
         </div>
+
+        <input
+          ref={inputRef}
+          value={input}
+          disabled={disabled}
+          inputMode="numeric"
+          pattern="[0-9]*"
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onSubmit();
+            }
+          }}
+          className={`mx-auto mt-6 block w-full max-w-md rounded-2xl border-[3px] px-5 py-4 text-center text-4xl font-black outline-none transition ${
+            status === "correct"
+              ? "border-emerald-400 bg-emerald-50 text-emerald-600"
+              : status === "wrong" || status === "timeup"
+                ? "border-red-400 bg-red-50 text-red-600"
+                : "border-indigo-200 bg-indigo-50/40 text-indigo-700 focus:border-indigo-500"
+          }`}
+          style={QUESTION_FONT_STYLE}
+        />
+
+        <p className="mt-3 text-center text-xs font-bold text-slate-400">{hint}</p>
+        <p className="mt-4 text-center text-[11px] font-bold text-slate-400">
+          2-digit / larger number is placed on top automatically.
+        </p>
       </div>
     </div>
   );
@@ -1168,7 +1625,7 @@ function WheelQuestion({
             className="text-3xl font-black text-indigo-700"
             style={QUESTION_FONT_STYLE}
           >
-            {spinning ? "🎡" : current.question}
+            {spinning ? "..." : current.question}
           </p>
         </div>
       </div>
@@ -1177,9 +1634,8 @@ function WheelQuestion({
         type="button"
         onClick={onSpin}
         disabled={spinning}
-        className="mt-10 inline-flex items-center justify-center gap-3 rounded-full bg-yellow-300 px-10 py-5 text-xl font-black text-slate-950 shadow-xl disabled:opacity-60"
+        className="mt-10 inline-flex items-center justify-center rounded-full bg-yellow-300 px-10 py-5 text-xl font-black text-slate-950 shadow-xl disabled:opacity-60"
       >
-        <RotateCw className={spinning ? "animate-spin" : ""} size={26} />
         {spinning ? "Spinning..." : spinText}
       </button>
     </div>
@@ -1206,7 +1662,7 @@ function AnswerInput({
   disabled?: boolean;
 }) {
   return (
-    <div className="mx-auto mt-8 max-w-xl rounded-[2rem] bg-white p-5 shadow-xl">
+    <div className="mx-auto mt-6 max-w-xl rounded-[1.7rem] border border-slate-200 bg-white p-4 shadow-sm">
       <input
         ref={inputRef}
         value={input}
@@ -1253,15 +1709,22 @@ function NumberPad({
   clearText: string;
   checkText: string;
 }) {
+  const locked = status === "correct" || status === "timeup";
+
   return (
-    <div className="mx-auto mt-6 max-w-xl rounded-[2rem] border border-indigo-100 bg-indigo-50 p-5 shadow-sm">
-      <div className="grid grid-cols-3 gap-4">
+    <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-3 shadow-sm sm:p-4">
+      <p className="mb-3 hidden text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 lg:block">
+        Number Pad
+      </p>
+
+      <div className="grid grid-cols-3 gap-2.5">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
           <button
             key={num}
             type="button"
             onClick={() => onPress(num)}
-            className="h-20 rounded-2xl bg-white text-3xl font-black text-slate-900 shadow-md"
+            disabled={locked}
+            className="min-h-16 rounded-2xl border border-slate-200 bg-white text-2xl font-black text-slate-950 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 active:scale-95 disabled:opacity-40"
             style={QUESTION_FONT_STYLE}
           >
             {num}
@@ -1270,16 +1733,9 @@ function NumberPad({
 
         <button
           type="button"
-          onClick={onClear}
-          className="flex h-20 items-center justify-center rounded-2xl bg-red-500 text-white shadow-md"
-        >
-          <X />
-        </button>
-
-        <button
-          type="button"
           onClick={() => onPress("0")}
-          className="h-20 rounded-2xl bg-white text-3xl font-black text-slate-900 shadow-md"
+          disabled={locked}
+          className="min-h-16 rounded-2xl border border-slate-200 bg-white text-2xl font-black text-slate-950 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 active:scale-95 disabled:opacity-40"
           style={QUESTION_FONT_STYLE}
         >
           0
@@ -1287,69 +1743,153 @@ function NumberPad({
 
         <button
           type="button"
-          onClick={onSubmit}
-          className={`h-20 rounded-2xl text-xl font-black text-white shadow-md ${
-            status === "correct" ? "bg-emerald-500" : "bg-green-500"
-          }`}
+          onClick={onClear}
+          disabled={locked}
+          className="flex min-h-16 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition active:scale-95 disabled:opacity-40"
+          aria-label={clearText}
+          title={clearText}
         >
-          <Check className="mr-1 inline" />
+          <Delete size={21} />
+        </button>
+
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={locked}
+          className="min-h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 px-3 text-sm font-black text-white shadow-md transition active:scale-95 disabled:opacity-40"
+        >
+          <Check className="mx-auto mb-0.5" size={17} />
           {checkText}
         </button>
       </div>
-
-      <button
-        type="button"
-        onClick={onClear}
-        className="mt-4 w-full rounded-2xl bg-yellow-300 px-5 py-4 font-black text-slate-950 shadow"
-      >
-        <Eraser className="mr-2 inline" />
-        {clearText}
-      </button>
     </div>
   );
 }
 
-function WheelStats({
+function GameStats({
+  timed,
   timeLeft,
   timerSeconds,
   currentIndex,
   total,
   correctCount,
   wrongCount,
+  streak,
 }: {
+  timed: boolean;
   timeLeft: number;
   timerSeconds: number;
   currentIndex: number;
   total: number;
   correctCount: number;
   wrongCount: number;
+  streak: number;
 }) {
-  const percent = Math.max(0, Math.min(100, (timeLeft / timerSeconds) * 100));
+  const timePercent = timed
+    ? Math.max(0, Math.min(100, (timeLeft / timerSeconds) * 100))
+    : 100;
+
+  const progress =
+    total > 0 ? Math.max(0, Math.min(100, ((currentIndex + 1) / total) * 100)) : 0;
 
   return (
-    <div className="mb-6 rounded-[2rem] border border-indigo-100 bg-indigo-50 p-5">
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Stat label="QUESTION" value={`${currentIndex + 1}/${total}`} />
-        <Stat label="TIME" value={`${timeLeft}s`} />
-        <Stat label="CORRECT" value={correctCount} />
-        <Stat label="WRONG" value={wrongCount} />
+    <div className="mb-5 rounded-[1.7rem] border border-slate-200 bg-slate-50 p-3 sm:p-4">
+      <div className={`grid gap-2 ${timed ? "grid-cols-5" : "grid-cols-4"}`}>
+        <div className="flex min-w-0 items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-white px-2 py-3 shadow-sm sm:gap-3 sm:px-3">
+          <span className="hidden h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-violet-600 sm:grid">
+            <ClipboardList size={18} />
+          </span>
+          <div className="min-w-0 text-center sm:text-left">
+            <p className="text-[8px] font-black uppercase tracking-[0.08em] text-slate-400 sm:text-[9px]">
+              QUESTION
+            </p>
+            <p className="mt-0.5 text-lg font-black leading-none text-slate-950 sm:text-xl">
+              {currentIndex + 1}/{total}
+            </p>
+          </div>
+        </div>
+
+        {timed && (
+          <div className="flex min-w-0 items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-white px-2 py-3 shadow-sm sm:gap-3 sm:px-3">
+            <span className="hidden h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-600 sm:grid">
+              <Clock size={18} />
+            </span>
+            <div className="min-w-0 text-center sm:text-left">
+              <p className="text-[8px] font-black uppercase tracking-[0.08em] text-slate-400 sm:text-[9px]">
+                TIME
+              </p>
+              <p className="mt-0.5 text-lg font-black leading-none text-slate-950 sm:text-xl">
+                {timeLeft}s
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex min-w-0 items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-white px-2 py-3 shadow-sm sm:gap-3 sm:px-3">
+          <span className="hidden h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-600 sm:grid">
+            <CircleCheckBig size={18} />
+          </span>
+          <div className="min-w-0 text-center sm:text-left">
+            <p className="text-[8px] font-black uppercase tracking-[0.08em] text-slate-400 sm:text-[9px]">
+              CORRECT
+            </p>
+            <p className="mt-0.5 text-lg font-black leading-none text-emerald-600 sm:text-xl">
+              {correctCount}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex min-w-0 items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-white px-2 py-3 shadow-sm sm:gap-3 sm:px-3">
+          <span className="hidden h-9 w-9 shrink-0 place-items-center rounded-full bg-red-100 text-red-600 sm:grid">
+            <CircleX size={18} />
+          </span>
+          <div className="min-w-0 text-center sm:text-left">
+            <p className="text-[8px] font-black uppercase tracking-[0.08em] text-slate-400 sm:text-[9px]">
+              WRONG
+            </p>
+            <p className="mt-0.5 text-lg font-black leading-none text-red-600 sm:text-xl">
+              {wrongCount}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex min-w-0 items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-white px-2 py-3 shadow-sm sm:gap-3 sm:px-3">
+          <span className="hidden h-9 w-9 shrink-0 place-items-center rounded-full bg-orange-100 text-orange-600 sm:grid">
+            <Flame size={19} />
+          </span>
+          <div className="min-w-0 text-center sm:text-left">
+            <p className="text-[8px] font-black uppercase tracking-[0.08em] text-slate-400 sm:text-[9px]">
+              STREAK
+            </p>
+            <p className="mt-0.5 text-lg font-black leading-none text-slate-950 sm:text-xl">
+              {streak}
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-4 h-4 overflow-hidden rounded-full bg-white">
-        <div
-          className="h-full rounded-full bg-yellow-300 transition-all"
-          style={{ width: `${percent}%` }}
-        />
+      <div className="mt-3 flex items-center gap-3">
+        <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-violet-600 to-indigo-500 transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <span className="min-w-9 text-right text-[10px] font-black text-indigo-600">
+          {Math.round(progress)}%
+        </span>
       </div>
-    </div>
-  );
-}
 
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-2xl bg-white p-4 text-center text-slate-900">
-      <p className="text-xs font-black text-slate-400">{label}</p>
-      <p className="mt-1 text-2xl font-black">{value}</p>
+      {timed && (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white">
+          <div
+            className={`h-full rounded-full transition-all duration-300 ${
+              timeLeft <= 5 ? "bg-red-500" : "bg-yellow-400"
+            }`}
+            style={{ width: `${timePercent}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1359,6 +1899,7 @@ function ResultScreen({
   correctCount,
   wrongCount,
   scorePercent,
+  bestStreak,
   onPlayAgain,
   onChooseOther,
 }: {
@@ -1366,6 +1907,7 @@ function ResultScreen({
   correctCount: number;
   wrongCount: number;
   scorePercent: number;
+  bestStreak: number;
   onPlayAgain: () => void;
   onChooseOther: () => void;
 }) {
@@ -1411,7 +1953,7 @@ function ResultScreen({
           {resultMessage}
         </p>
 
-        <div className="mx-auto mt-8 grid max-w-xl gap-4 sm:grid-cols-2">
+        <div className="mx-auto mt-8 grid max-w-2xl gap-4 sm:grid-cols-3">
           <div className="rounded-[1.6rem] border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600">
               {t.correctCount}
@@ -1433,6 +1975,18 @@ function ResultScreen({
               style={QUESTION_FONT_STYLE}
             >
               {wrongCount}
+            </p>
+          </div>
+
+          <div className="rounded-[1.6rem] border border-amber-100 bg-amber-50 p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-600">
+              BEST STREAK
+            </p>
+            <p
+              className="mt-2 text-4xl font-black text-amber-700"
+              style={QUESTION_FONT_STYLE}
+            >
+              🔥 {bestStreak}
             </p>
           </div>
         </div>

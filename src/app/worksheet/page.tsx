@@ -9,8 +9,11 @@ import {
   useState,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import * as fabric from "fabric";
 import {
+  ArrowLeft,
+  CheckCircle2,
   Circle,
   Copy,
   Download,
@@ -20,11 +23,13 @@ import {
   MousePointer2,
   Pencil,
   RectangleHorizontal,
+  Redo2,
   RotateCcw,
   Save,
   Trash2,
   Type,
   Upload,
+  Undo2,
   Minus,
   Brush,
 } from "lucide-react";
@@ -76,6 +81,10 @@ function WorksheetCanvas() {
   const canvasWrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const loadedFreebieRef = useRef("");
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef(-1);
+  const restoringHistoryRef = useRef(false);
+  const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [tool, setTool] = useState<Tool>("select");
   const [colour, setColour] = useState("#2563eb");
@@ -86,6 +95,9 @@ function WorksheetCanvas() {
   const [message, setMessage] = useState("");
   const [canvasWidth, setCanvasWidth] = useState(794);
   const [canvasHeight, setCanvasHeight] = useState(1123);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving">("saved");
 
   function getCanvasSize() {
     return {
@@ -124,6 +136,85 @@ function WorksheetCanvas() {
     canvas.requestRenderAll();
   }
 
+  function updateHistoryButtons() {
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(
+      historyIndexRef.current >= 0 &&
+        historyIndexRef.current < historyRef.current.length - 1,
+    );
+  }
+
+  function pushHistorySnapshot() {
+    const canvas = canvasRef.current;
+    if (!canvas || restoringHistoryRef.current) return;
+
+    const snapshot = JSON.stringify(canvas.toJSON());
+
+    const currentSnapshot =
+      historyRef.current[historyIndexRef.current] || "";
+
+    if (snapshot === currentSnapshot) return;
+
+    const nextHistory = historyRef.current.slice(
+      0,
+      historyIndexRef.current + 1,
+    );
+
+    nextHistory.push(snapshot);
+
+    if (nextHistory.length > 40) {
+      nextHistory.shift();
+    }
+
+    historyRef.current = nextHistory;
+    historyIndexRef.current = nextHistory.length - 1;
+    updateHistoryButtons();
+
+    setAutoSaveStatus("saving");
+
+    if (historyTimerRef.current) {
+      clearTimeout(historyTimerRef.current);
+    }
+
+    historyTimerRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(LOCAL_SAVE_KEY, snapshot);
+        setAutoSaveStatus("saved");
+      } catch {
+        setAutoSaveStatus("saved");
+      }
+    }, 450);
+  }
+
+  async function restoreHistory(index: number) {
+    const canvas = canvasRef.current;
+    const snapshot = historyRef.current[index];
+
+    if (!canvas || !snapshot) return;
+
+    restoringHistoryRef.current = true;
+
+    try {
+      await canvas.loadFromJSON(snapshot);
+      canvas.requestRenderAll();
+      historyIndexRef.current = index;
+      updateHistoryButtons();
+      setTool("select");
+    } finally {
+      restoringHistoryRef.current = false;
+    }
+  }
+
+  function undoCanvas() {
+    if (historyIndexRef.current <= 0) return;
+    void restoreHistory(historyIndexRef.current - 1);
+  }
+
+  function redoCanvas() {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return;
+    void restoreHistory(historyIndexRef.current + 1);
+  }
+
   useEffect(() => {
     if (!canvasEl.current) return;
 
@@ -139,7 +230,31 @@ function WorksheetCanvas() {
 
     canvasRef.current = canvas;
 
+    historyRef.current = [JSON.stringify(canvas.toJSON())];
+    historyIndexRef.current = 0;
+    updateHistoryButtons();
+
+    const scheduleHistory = () => {
+      if (restoringHistoryRef.current) return;
+      window.setTimeout(() => pushHistorySnapshot(), 0);
+    };
+
+    canvas.on("object:added", scheduleHistory);
+    canvas.on("object:modified", scheduleHistory);
+    canvas.on("object:removed", scheduleHistory);
+    canvas.on("path:created", scheduleHistory);
+    canvas.on("text:changed", scheduleHistory);
+
     return () => {
+      if (historyTimerRef.current) {
+        clearTimeout(historyTimerRef.current);
+      }
+
+      canvas.off("object:added", scheduleHistory);
+      canvas.off("object:modified", scheduleHistory);
+      canvas.off("object:removed", scheduleHistory);
+      canvas.off("path:created", scheduleHistory);
+      canvas.off("text:changed", scheduleHistory);
       canvas.dispose();
     };
   }, []);
@@ -151,6 +266,43 @@ function WorksheetCanvas() {
   useEffect(() => {
     applyTool(tool);
   }, [tool, colour, penSize]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+
+      const meta = event.metaKey || event.ctrlKey;
+
+      if (meta && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+
+        if (event.shiftKey) {
+          redoCanvas();
+        } else {
+          undoCanvas();
+        }
+
+        return;
+      }
+
+      if (typing) return;
+
+      if (event.key === "Delete" || event.key === "Backspace") {
+        const canvas = canvasRef.current;
+        if (!canvas?.getActiveObject()) return;
+
+        event.preventDefault();
+        deleteSelected();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!canvasRef.current || !freebiesFile) return;
@@ -565,7 +717,9 @@ function WorksheetCanvas() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    localStorage.setItem(LOCAL_SAVE_KEY, JSON.stringify(canvas.toJSON()));
+    const snapshot = JSON.stringify(canvas.toJSON());
+    localStorage.setItem(LOCAL_SAVE_KEY, snapshot);
+    setAutoSaveStatus("saved");
     setMessage("Draft saved in this browser.");
   }
 
@@ -580,9 +734,21 @@ function WorksheetCanvas() {
       return;
     }
 
-    await canvas.loadFromJSON(saved);
-    canvas.requestRenderAll();
-    setMessage("Draft loaded.");
+    restoringHistoryRef.current = true;
+
+    try {
+      await canvas.loadFromJSON(saved);
+      canvas.requestRenderAll();
+
+      historyRef.current = [saved];
+      historyIndexRef.current = 0;
+      updateHistoryButtons();
+      setAutoSaveStatus("saved");
+      setTool("select");
+      setMessage("Draft loaded.");
+    } finally {
+      restoringHistoryRef.current = false;
+    }
   }
 
   function downloadCanvas() {
@@ -601,210 +767,182 @@ function WorksheetCanvas() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-indigo-50 px-3 py-5 md:px-4 md:py-8">
-      <section className="mx-auto max-w-7xl">
-        <section className="overflow-hidden rounded-[1.8rem] bg-gradient-to-r from-indigo-600 via-violet-600 to-pink-500 p-5 text-white shadow-2xl md:rounded-[2.5rem] md:p-7">
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-yellow-200 md:text-sm md:tracking-[0.35em]">
-                FD Arcadia
-              </p>
+    <main className="min-h-screen bg-[#f5f7fb] px-3 py-4 text-slate-950 sm:px-5 lg:px-8">
+      <section className="mx-auto max-w-[1600px]">
+        {/* APP HEADER */}
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/custom-worksheet"
+              className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
+              aria-label="Back to Custom Worksheet"
+            >
+              <ArrowLeft size={18} />
+            </Link>
 
-              <h1 className="mt-2 text-3xl font-black md:text-6xl">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-indigo-500">
+                FD Arcadia Learning Hub
+              </p>
+              <h1 className="mt-0.5 text-xl font-black tracking-tight sm:text-2xl">
                 Draw & Learn Studio
               </h1>
+            </div>
+          </div>
 
-              <p className="mt-3 max-w-2xl text-sm text-indigo-50 md:text-base">
-                Upload worksheet, draw, type, add shapes, stickers and download your edited page.
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-[10px] font-black text-emerald-700 sm:flex">
+              <CheckCircle2 size={13} />
+              {autoSaveStatus === "saving" ? "Saving..." : "Auto Saved"}
+            </div>
+
+            <div className="rounded-full bg-slate-950 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-white">
+              Page {currentPage}
+            </div>
+          </div>
+        </header>
+
+        {/* PREMIUM HERO / STATUS */}
+        <section className="relative mt-4 overflow-hidden rounded-[26px] bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-950 px-5 py-5 text-white shadow-[0_20px_55px_rgba(15,23,42,0.16)] sm:px-6">
+          <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-violet-500/20 blur-3xl" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-300">
+                Interactive Worksheet Canvas
+              </p>
+              <h2 className="mt-1 text-2xl font-black sm:text-3xl">
+                Draw, write and practise directly on your worksheet.
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                Upload an image or PDF, annotate it with drawing tools, add text and
+                shapes, then save or export your completed page.
               </p>
             </div>
 
-            <div className="w-fit rounded-3xl bg-white/20 px-5 py-3 text-sm font-bold backdrop-blur">
-              Page {currentPage}
+            <div className="grid grid-cols-3 gap-2 lg:min-w-[330px]">
+              <StudioStat label="Canvas" value={`${canvasWidth}×${canvasHeight}`} />
+              <StudioStat label="Tool" value={toolLabel(tool)} />
+              <StudioStat label="PDF" value={pdfPages.length ? `${pdfPages.length} pages` : "None"} />
             </div>
           </div>
         </section>
 
-        <section className="mt-5 grid gap-4 lg:grid-cols-[76px_1fr]">
-          <aside className="rounded-[1.5rem] border border-white/70 bg-white/90 p-2 shadow-xl backdrop-blur lg:sticky lg:top-24 lg:h-fit lg:rounded-[2rem] lg:p-3">
-            <div className="grid grid-cols-8 gap-2 overflow-x-auto lg:grid-cols-1 lg:overflow-visible">
+        <div className="mt-4 grid gap-4 xl:grid-cols-[68px_minmax(0,1fr)_300px]">
+          {/* PRIMARY TOOLBAR */}
+          <aside className="order-1 rounded-[22px] border border-slate-200 bg-white p-2 shadow-sm xl:sticky xl:top-4 xl:h-fit">
+            <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:flex-col xl:overflow-visible">
               <ToolButton active={tool === "select"} onClick={() => setTool("select")} title="Select">
-                <MousePointer2 size={22} />
+                <MousePointer2 size={20} />
               </ToolButton>
 
               <ToolButton active={tool === "pen"} onClick={() => setTool("pen")} title="Pen">
-                <Pencil size={22} />
+                <Pencil size={20} />
               </ToolButton>
 
               <ToolButton active={tool === "marker"} onClick={() => setTool("marker")} title="Marker">
-                <Brush size={22} />
+                <Brush size={20} />
               </ToolButton>
 
-              <ToolButton active={tool === "highlighter"} onClick={() => setTool("highlighter")} title="Highlighter">
-                <Highlighter size={22} />
+              <ToolButton
+                active={tool === "highlighter"}
+                onClick={() => setTool("highlighter")}
+                title="Highlighter"
+              >
+                <Highlighter size={20} />
               </ToolButton>
 
               <ToolButton active={tool === "eraser"} onClick={() => setTool("eraser")} title="Eraser">
-                <Eraser size={22} />
+                <Eraser size={20} />
               </ToolButton>
 
+              <div className="hidden h-px bg-slate-100 xl:block" />
+
               <ToolButton onClick={addTextBox} title="Text">
-                <Type size={22} />
+                <Type size={20} />
               </ToolButton>
 
               <ToolButton onClick={addAnswerBox} title="Answer Box">
-                <RectangleHorizontal size={22} />
+                <RectangleHorizontal size={20} />
               </ToolButton>
 
               <ToolButton danger onClick={deleteSelected} title="Delete Selected">
-                <Trash2 size={22} />
+                <Trash2 size={20} />
               </ToolButton>
             </div>
           </aside>
 
-          <div className="space-y-5">
-            <section className="rounded-[1.8rem] border border-white/80 bg-white/90 p-4 shadow-xl backdrop-blur md:rounded-[2.5rem] md:p-5">
-              <div className="flex gap-2 overflow-x-auto pb-2 md:flex-wrap">
-                <label className="premium-action shrink-0 bg-indigo-100 text-indigo-700">
-                  <Upload size={18} /> Image
-                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                </label>
-
-                <label className="premium-action shrink-0 bg-pink-100 text-pink-700">
-                  <Upload size={18} /> PDF
-                  <input type="file" accept="application/pdf" onChange={handlePdfUpload} className="hidden" />
-                </label>
-
-                <button onClick={addRectangle} className="premium-action shrink-0 bg-rose-100 text-rose-700">
-                  <RectangleHorizontal size={18} /> Rect
-                </button>
-
-                <button onClick={addCircle} className="premium-action shrink-0 bg-emerald-100 text-emerald-700">
-                  <Circle size={18} /> Circle
-                </button>
-
-                <button onClick={addLine} className="premium-action shrink-0 bg-orange-100 text-orange-700">
-                  <Minus size={18} /> Line
-                </button>
-
-                <button onClick={duplicateSelected} className="premium-action shrink-0 bg-sky-100 text-sky-700">
-                  <Copy size={18} /> Copy
-                </button>
-
-                <button
-                  onClick={() => updatePageSize(794, 1123)}
-                  className="premium-action shrink-0 bg-indigo-100 text-indigo-700"
-                >
-                  Portrait
-                </button>
-
-                <button
-                  onClick={() => updatePageSize(1123, 794)}
-                  className="premium-action shrink-0 bg-indigo-100 text-indigo-700"
-                >
-                  Landscape
-                </button>
-
-                <button
-                  onClick={() => updatePageSize(canvasWidth + 100, canvasHeight + 100)}
-                  className="premium-action shrink-0 bg-yellow-100 text-yellow-800"
-                >
-                  Bigger
-                </button>
-
-                <button
-                  onClick={() =>
-                    updatePageSize(
-                      Math.max(400, canvasWidth - 100),
-                      Math.max(400, canvasHeight - 100)
-                    )
-                  }
-                  className="premium-action shrink-0 bg-yellow-100 text-yellow-800"
-                >
-                  Smaller
-                </button>
-
-                <button onClick={saveDraftInBrowser} className="premium-action shrink-0 bg-yellow-100 text-yellow-800">
-                  <Save size={18} /> Save
-                </button>
-
-                <button onClick={loadDraftFromBrowser} className="premium-action shrink-0 bg-slate-100 text-slate-700">
-                  Load
-                </button>
-
-                <button onClick={clearAll} className="premium-action shrink-0 bg-slate-100 text-slate-700">
-                  <RotateCcw size={18} /> Clear
-                </button>
-
-                <button onClick={downloadCanvas} className="premium-action shrink-0 bg-emerald-600 text-white">
-                  <Download size={18} /> Download
-                </button>
-              </div>
-
-              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr]">
-                <div className="rounded-[1.5rem] bg-indigo-50 p-3 md:rounded-[2rem] md:p-4">
-                  <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                    {colours.map((item) => (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setColour(item)}
-                        className={`h-8 w-8 rounded-full border-4 transition md:h-10 md:w-10 ${
-                          colour === item
-                            ? "scale-110 border-indigo-600 shadow-lg"
-                            : "border-white"
-                        }`}
-                        style={{ backgroundColor: item }}
-                        title={item}
-                      />
-                    ))}
-                  </div>
+          {/* CANVAS WORKSPACE */}
+          <div className="order-3 min-w-0 xl:order-2">
+            <section
+              className="rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
+              onDrop={handleDrop}
+              onDragOver={(event) => event.preventDefault()}
+            >
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    Worksheet Workspace
+                  </p>
+                  <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                    Drag & drop a PDF or image here.
+                  </p>
                 </div>
 
-                <div className="rounded-[1.5rem] bg-yellow-50 p-3 md:rounded-[2rem] md:p-4">
-                  <div className="flex items-center gap-3 md:gap-4">
-                    <span className="min-w-14 text-sm font-bold text-yellow-800 md:min-w-16 md:text-base">
-                      Size {penSize}
-                    </span>
-                    <input
-                      type="range"
-                      min="2"
-                      max="50"
-                      value={penSize}
-                      onChange={(event) => setPenSize(Number(event.target.value))}
-                      className="w-full"
-                    />
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={undoCanvas}
+                    disabled={!canUndo}
+                    className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
+                    title="Undo (Ctrl/Cmd + Z)"
+                  >
+                    <Undo2 size={17} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={redoCanvas}
+                    disabled={!canRedo}
+                    className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
+                    title="Redo (Ctrl/Cmd + Shift + Z)"
+                  >
+                    <Redo2 size={17} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={saveDraftInBrowser}
+                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
+                  >
+                    <Save size={15} />
+                    Save
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={downloadCanvas}
+                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-950 px-3 text-xs font-black text-white transition hover:bg-slate-800"
+                  >
+                    <Download size={15} />
+                    Export
+                  </button>
                 </div>
-              </div>
-
-              <div className="mt-4 flex flex-col gap-3 md:flex-row">
-                <input
-                  value={imageLink}
-                  onChange={(event) => setImageLink(event.target.value)}
-                  placeholder="Paste direct PNG / JPG image link"
-                  className="w-full rounded-[1.3rem] border border-indigo-100 bg-white px-4 py-3 text-sm outline-none ring-indigo-200 transition focus:ring-4 md:rounded-[1.5rem] md:px-5 md:py-4 md:text-base"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => addImageFromUrl(imageLink, false)}
-                  className="rounded-[1.3rem] bg-indigo-600 px-6 py-3 font-bold text-white shadow-lg transition hover:bg-indigo-700 md:rounded-[1.5rem] md:py-4"
-                >
-                  <Link2 className="inline" size={18} /> Add
-                </button>
               </div>
 
               {pdfPages.length > 0 && (
-                <div className="mt-4 flex gap-2 overflow-x-auto pb-2 md:flex-wrap">
+                <div className="mb-3 flex items-center gap-2 overflow-x-auto rounded-xl bg-slate-50 p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <span className="shrink-0 px-2 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                    Pages
+                  </span>
                   {pdfPages.map((page) => (
                     <button
                       key={page.pageNo}
+                      type="button"
                       onClick={() => openPdfPage(page)}
-                      className={`shrink-0 rounded-2xl px-4 py-3 font-bold transition ${
+                      className={`grid h-9 min-w-9 shrink-0 place-items-center rounded-lg px-2 text-xs font-black transition ${
                         currentPage === page.pageNo
-                          ? "bg-indigo-600 text-white shadow-lg"
-                          : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "bg-white text-slate-500 hover:bg-slate-100"
                       }`}
                     >
                       {page.pageNo}
@@ -813,44 +951,193 @@ function WorksheetCanvas() {
                 </div>
               )}
 
-              <div className="mt-4 flex gap-2 overflow-x-auto pb-2 md:flex-wrap md:gap-3">
+              <div
+                ref={canvasWrapRef}
+                className="w-full overflow-auto rounded-[18px] border border-slate-200 bg-slate-100 p-2 shadow-inner sm:p-4"
+              >
+                <div className="mx-auto w-fit overflow-hidden rounded-lg bg-white shadow-[0_12px_35px_rgba(15,23,42,0.12)]">
+                  <canvas ref={canvasEl} className="block touch-none" />
+                </div>
+              </div>
+
+              {message && (
+                <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">
+                  {message}
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* CLEAN SETTINGS PANEL */}
+          <aside className="order-2 space-y-3 xl:order-3 xl:sticky xl:top-4 xl:h-fit">
+            <Panel title="Import">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="studio-action cursor-pointer">
+                  <Upload size={16} />
+                  Image
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                </label>
+
+                <label className="studio-action cursor-pointer">
+                  <Upload size={16} />
+                  PDF
+                  <input type="file" accept="application/pdf" onChange={handlePdfUpload} className="hidden" />
+                </label>
+              </div>
+
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={imageLink}
+                  onChange={(event) => setImageLink(event.target.value)}
+                  placeholder="Direct image URL"
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs outline-none transition focus:border-indigo-300 focus:bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => addImageFromUrl(imageLink, false)}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white"
+                  title="Add image link"
+                >
+                  <Link2 size={16} />
+                </button>
+              </div>
+            </Panel>
+
+            <Panel title="Drawing">
+              <div className="flex flex-wrap gap-2">
+                {colours.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setColour(item)}
+                    className={`h-8 w-8 rounded-full border-[3px] transition ${
+                      colour === item
+                        ? "scale-110 border-indigo-500 shadow-sm"
+                        : "border-white ring-1 ring-slate-200"
+                    }`}
+                    style={{ backgroundColor: item }}
+                    title={item}
+                  />
+                ))}
+              </div>
+
+              <div className="mt-4">
+                <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
+                  <span>Brush Size</span>
+                  <span>{penSize}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="2"
+                  max="50"
+                  value={penSize}
+                  onChange={(event) => setPenSize(Number(event.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </Panel>
+
+            <Panel title="Objects">
+              <div className="grid grid-cols-3 gap-2">
+                <SmallAction onClick={addRectangle} label="Rect">
+                  <RectangleHorizontal size={17} />
+                </SmallAction>
+                <SmallAction onClick={addCircle} label="Circle">
+                  <Circle size={17} />
+                </SmallAction>
+                <SmallAction onClick={addLine} label="Line">
+                  <Minus size={17} />
+                </SmallAction>
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <SmallAction onClick={duplicateSelected} label="Duplicate">
+                  <Copy size={17} />
+                </SmallAction>
+                <SmallAction onClick={deleteSelected} label="Delete" danger>
+                  <Trash2 size={17} />
+                </SmallAction>
+              </div>
+            </Panel>
+
+            <Panel title="Page">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => updatePageSize(794, 1123)}
+                  className="studio-action"
+                >
+                  Portrait
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updatePageSize(1123, 794)}
+                  className="studio-action"
+                >
+                  Landscape
+                </button>
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => updatePageSize(canvasWidth + 100, canvasHeight + 100)}
+                  className="studio-action"
+                >
+                  Bigger
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updatePageSize(
+                      Math.max(400, canvasWidth - 100),
+                      Math.max(400, canvasHeight - 100),
+                    )
+                  }
+                  className="studio-action"
+                >
+                  Smaller
+                </button>
+              </div>
+            </Panel>
+
+            <Panel title="Stickers">
+              <div className="grid grid-cols-4 gap-2">
                 {stickers.map((sticker) => (
                   <button
                     key={sticker}
                     type="button"
                     onClick={() => addSticker(sticker)}
-                    className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-xl shadow-md transition hover:-translate-y-1 hover:shadow-lg md:h-14 md:w-14 md:text-2xl"
+                    className="grid h-10 place-items-center rounded-xl border border-slate-200 bg-white text-lg transition hover:bg-slate-50"
                   >
                     {sticker}
                   </button>
                 ))}
               </div>
+            </Panel>
 
-              {message && (
-                <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 md:text-base">
-                  {message}
-                </div>
-              )}
-            </section>
-
-            <section
-              className="rounded-[1.8rem] border border-white/80 bg-white/90 p-3 shadow-xl backdrop-blur md:rounded-[2.5rem] md:p-4"
-              onDrop={handleDrop}
-              onDragOver={(event) => event.preventDefault()}
-            >
-              <p className="mb-3 text-center text-xs font-medium text-slate-500 md:text-sm">
-                Drag & drop PDF or image here. Select object to move, resize or delete.
-              </p>
-
-              <div
-                ref={canvasWrapRef}
-                className="w-full overflow-auto rounded-[1.5rem] border-2 border-indigo-100 bg-white shadow-inner md:rounded-[2rem]"
-              >
-                <canvas ref={canvasEl} className="block touch-none" />
+            <Panel title="Draft">
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={saveDraftInBrowser} className="studio-action">
+                  <Save size={15} />
+                  Save
+                </button>
+                <button type="button" onClick={loadDraftFromBrowser} className="studio-action">
+                  Load
+                </button>
               </div>
-            </section>
-          </div>
-        </section>
+
+              <button
+                type="button"
+                onClick={clearAll}
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-xs font-black text-red-600 transition hover:bg-red-100"
+              >
+                <RotateCcw size={15} />
+                Clear Canvas
+              </button>
+            </Panel>
+          </aside>
+        </div>
       </section>
     </main>
   );
@@ -874,15 +1161,78 @@ function ToolButton({
       type="button"
       onClick={onClick}
       title={title}
-      className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl transition hover:-translate-y-1 md:h-14 md:w-14 ${
+      className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl transition ${
         danger
-          ? "bg-red-100 text-red-700 shadow-md hover:bg-red-200"
+          ? "bg-red-50 text-red-600 hover:bg-red-100"
           : active
-          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200"
-          : "bg-white text-slate-700 shadow-md hover:bg-indigo-50 hover:text-indigo-700"
+          ? "bg-indigo-600 text-white shadow-sm"
+          : "bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
       }`}
     >
       {children}
+    </button>
+  );
+}
+
+function toolLabel(tool: Tool) {
+  if (tool === "select") return "Select";
+  if (tool === "pen") return "Pen";
+  if (tool === "marker") return "Marker";
+  if (tool === "highlighter") return "Highlight";
+  return "Eraser";
+}
+
+function StudioStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-3 text-center backdrop-blur">
+      <p className="truncate text-sm font-black text-white">{value}</p>
+      <p className="mt-1 text-[8px] font-black uppercase tracking-[0.12em] text-slate-400">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function Panel({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-[20px] border border-slate-200 bg-white p-3.5 shadow-sm">
+      <p className="mb-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+        {title}
+      </p>
+      {children}
+    </section>
+  );
+}
+
+function SmallAction({
+  children,
+  label,
+  onClick,
+  danger = false,
+}: {
+  children: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl border text-[10px] font-black transition ${
+        danger
+          ? "border-red-100 bg-red-50 text-red-600 hover:bg-red-100"
+          : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+      }`}
+    >
+      {children}
+      {label}
     </button>
   );
 }

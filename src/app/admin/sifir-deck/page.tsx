@@ -236,20 +236,20 @@ function Content() {
     <>
       <Navbar />
 
-      <main className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-emerald-50 px-4 py-8">
+      <main className="min-h-screen bg-[#f6f7fb] px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          <section className="rounded-[2rem] bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white shadow-xl sm:p-8">
+          <section className="relative overflow-hidden rounded-[28px] border border-indigo-400/20 bg-gradient-to-br from-[#111735] via-[#28265f] to-[#5b45b7] p-6 text-white shadow-[0_20px_60px_rgba(30,41,59,0.16)] sm:p-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="tracking-[0.25em] text-yellow-200">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-violet-200">
                   ADMIN SIFIR DECK
                 </p>
 
-                <h1 className="font-display mt-3 text-5xl sm:text-6xl">
+                <h1 className="font-display mt-2 text-4xl font-black tracking-tight sm:text-5xl">
                   Create Sifir Cards
                 </h1>
 
-                <p className="mt-3 text-indigo-100">
+                <p className="mt-2 max-w-2xl text-sm font-semibold text-xs font-black uppercase tracking-[0.16em] text-violet-200/80">
                   Add questions, set level, timer and spin wheel limit.
                 </p>
               </div>
@@ -257,14 +257,14 @@ function Content() {
               <div className="flex flex-wrap gap-3">
                 <Link
                   href="/sifir-deck"
-                  className="rounded-full bg-white px-5 py-3 font-bold text-indigo-700 shadow"
+                  className="rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-black text-white backdrop-blur transition hover:bg-white/15"
                 >
                   Preview Parent
                 </Link>
 
                 <Link
                   href="/dashboard"
-                  className="rounded-full bg-yellow-200 px-5 py-3 font-bold text-indigo-700 shadow"
+                  className="rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-900 shadow-sm transition hover:bg-slate-50"
                 >
                   <ArrowLeft className="mr-2 inline" size={18} />
                   Back
@@ -273,26 +273,26 @@ function Content() {
             </div>
           </section>
 
-          <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
+          <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex items-center gap-3">
-              <div className="grid h-14 w-14 place-items-center rounded-2xl bg-pink-100 text-pink-600">
+              <div className="grid h-11 w-11 place-items-center rounded-xl bg-violet-50 text-violet-600">
                 <Settings size={28} />
               </div>
 
               <div>
-                <h2 className="text-3xl font-bold text-indigo-700">
+                <h2 className="text-2xl font-black tracking-tight text-slate-950">
                   Spin Wheel Settings
                 </h2>
-                <p className="text-slate-500">
+                <p className="text-sm font-semibold text-slate-400">
                   Control how many random questions and how many seconds per
                   question.
                 </p>
               </div>
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
               <label className="grid gap-2">
-                <span className="font-bold text-slate-700">
+                <span className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">
                   Random Questions Per Round
                 </span>
                 <input
@@ -301,19 +301,19 @@ function Content() {
                   max={50}
                   value={wheelLimit}
                   onChange={(e) => setWheelLimit(Number(e.target.value))}
-                  className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-pink-500"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
                 />
               </label>
 
               <label className="grid gap-2">
-                <span className="font-bold text-slate-700">Timer Seconds</span>
+                <span className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">Timer Seconds</span>
                 <input
                   type="number"
                   min={5}
                   max={300}
                   value={timerSeconds}
                   onChange={(e) => setTimerSeconds(Number(e.target.value))}
-                  className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-pink-500"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
                 />
               </label>
 
@@ -321,7 +321,7 @@ function Content() {
                 type="button"
                 onClick={saveSettings}
                 disabled={savingSettings}
-                className="self-end rounded-2xl bg-pink-500 px-6 py-4 font-bold text-white shadow-md transition hover:bg-pink-600 disabled:opacity-60"
+                className="self-end rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-3.5 text-sm font-black text-white shadow-sm transition hover:opacity-95 disabled:opacity-60"
               >
                 {savingSettings ? (
                   <>
@@ -338,44 +338,53 @@ function Content() {
             </div>
 
             <div className="mt-5 grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl bg-pink-50 p-4 text-pink-700">
+              <div className="rounded-xl border border-violet-100 bg-violet-50/70 p-4 text-sm font-bold text-violet-700">
                 Parent Spin Wheel will use{" "}
                 <b>{wheelLimit} random question(s)</b> per round.
               </div>
 
-              <div className="rounded-2xl bg-yellow-50 p-4 text-yellow-700">
+              <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-4 text-sm font-bold text-amber-700">
                 Timer will be <b>{timerSeconds} second(s)</b> per question.
               </div>
             </div>
           </section>
 
-          <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_420px]">
+          <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
             <form
               onSubmit={handleSubmit}
-              className="rounded-[2rem] bg-white p-6 shadow-xl"
+              className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
             >
               <div className="flex items-center gap-3">
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-yellow-100 text-yellow-700">
+                <div className="grid h-11 w-11 place-items-center rounded-xl bg-amber-50 text-amber-600">
                   <Plus size={28} />
                 </div>
 
                 <div>
-                  <h2 className="text-3xl font-bold text-indigo-700">
+                  <h2 className="text-2xl font-black tracking-tight text-slate-950">
                     Add New Card
                   </h2>
-                  <p className="text-slate-500">
+                  <p className="text-sm font-semibold text-slate-400">
                     Auto calculate answer and detect sifir number.
                   </p>
                 </div>
               </div>
 
+              <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3">
+                <p className="text-xs font-black text-indigo-700">
+                  Medium & Hard Question Bank
+                </p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                  Admin creates and saves the Medium and Hard questions here. Existing question logic is unchanged.
+                </p>
+              </div>
+
               <div className="mt-6 grid gap-4">
                 <label className="grid gap-2">
-                  <span className="font-bold text-slate-700">Language</span>
+                  <span className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">Language</span>
                   <select
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
                   >
                     <option value="bm">Bahasa Melayu</option>
                     <option value="en">English</option>
@@ -383,13 +392,13 @@ function Content() {
                 </label>
 
                 <label className="grid gap-2">
-                  <span className="font-bold text-slate-700">
+                  <span className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">
                     Question Level
                   </span>
                   <select
                     value={level}
                     onChange={(e) => setLevel(e.target.value as QuestionLevel)}
-                    className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
                   >
                     <option value="easy">Easy</option>
                     <option value="medium">Medium</option>
@@ -399,7 +408,7 @@ function Content() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="grid gap-2">
-                    <span className="font-bold text-slate-700">
+                    <span className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">
                       First Number
                     </span>
                     <input
@@ -407,12 +416,12 @@ function Content() {
                       onChange={(e) => setFirstNumber(e.target.value)}
                       placeholder="Contoh: 42"
                       inputMode="numeric"
-                      className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
                     />
                   </label>
 
                   <label className="grid gap-2">
-                    <span className="font-bold text-slate-700">
+                    <span className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">
                       Sifir Number
                     </span>
                     <input
@@ -420,30 +429,30 @@ function Content() {
                       onChange={(e) => setSecondNumber(e.target.value)}
                       placeholder="Contoh: 2"
                       inputMode="numeric"
-                      className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
                     />
                   </label>
                 </div>
 
                 <label className="grid gap-2">
-                  <span className="font-bold text-slate-700">Question</span>
+                  <span className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">Question</span>
                   <input
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     placeholder="Contoh: 42 × 2 = ?"
-                    className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
                     required
                   />
                 </label>
 
                 <label className="grid gap-2">
-                  <span className="font-bold text-slate-700">Answer</span>
+                  <span className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">Answer</span>
                   <input
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
                     placeholder="Jawapan: 84"
                     inputMode="numeric"
-                    className="rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
                     required
                   />
                 </label>
@@ -451,7 +460,7 @@ function Content() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-2xl bg-indigo-600 px-6 py-4 text-lg font-bold text-white shadow-md transition hover:bg-indigo-700 disabled:opacity-60"
+                  className="rounded-xl bg-slate-950 px-5 py-3.5 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60"
                 >
                   {saving ? (
                     <>
@@ -468,41 +477,41 @@ function Content() {
               </div>
             </form>
 
-            <div className="rounded-[2rem] bg-white p-6 shadow-xl">
-              <h2 className="text-3xl font-bold text-indigo-700">
+            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-2xl font-black tracking-tight text-slate-950">
                 Live Preview
               </h2>
 
-              <p className="mt-1 text-slate-500">
+              <p className="mt-1 text-sm font-semibold text-slate-400">
                 This is how the parent card will read the question.
               </p>
 
-              <div className="mt-6 rounded-[2rem] bg-indigo-600 p-8 text-center text-white shadow-xl">
-                <p className="text-indigo-100">Soalan Sifir</p>
+              <div className="mt-5 rounded-[22px] bg-gradient-to-br from-[#111735] to-[#322c73] p-7 text-center text-white shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-violet-200">Soalan Sifir</p>
 
-                <h3 className="mt-5 text-5xl font-black">
+                <h3 className="mt-4 text-5xl font-black tracking-tight">
                   {question || "42 × 2 = ?"}
                 </h3>
               </div>
 
-              <div className="mt-5 rounded-[2rem] border-4 border-yellow-200 bg-yellow-50 p-6 text-center">
+              <div className="mt-4 rounded-[20px] border border-emerald-100 bg-emerald-50/70 p-5 text-center">
                 <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">
                   Answer
                 </p>
 
-                <p className="mt-3 text-5xl font-black text-emerald-600">
+                <p className="mt-2 text-4xl font-black text-emerald-600">
                   {answer || "84"}
                 </p>
               </div>
 
-              <div className="mt-5 rounded-[2rem] bg-slate-50 p-4 text-center">
-                <p className="text-sm font-bold text-slate-500">LEVEL</p>
+              <div className="mt-4 rounded-[18px] border border-slate-200 bg-slate-50 p-4 text-center">
+                <p className="text-sm font-bold text-sm font-semibold text-slate-400">LEVEL</p>
                 <p className="mt-2 text-2xl font-black uppercase text-indigo-700">
                   {level}
                 </p>
               </div>
 
-              <div className="mt-5 rounded-[2rem] bg-yellow-50 p-4 text-center text-yellow-700">
+              <div className="mt-4 rounded-[18px] border border-amber-100 bg-amber-50 p-4 text-center text-amber-700">
                 <Clock className="mx-auto" size={28} />
                 <p className="mt-2 font-bold">
                   Spin Wheel Timer: {timerSeconds}s
@@ -511,21 +520,21 @@ function Content() {
             </div>
           </section>
 
-          <section className="mt-8 rounded-[2rem] bg-white p-6 shadow-xl">
+          <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-bold tracking-[0.2em] text-yellow-600">
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-violet-500">
                   SAVED QUESTIONS
                 </p>
 
-                <h2 className="mt-1 text-3xl font-bold text-indigo-700">
+                <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
                   {filteredItems.length} / {items.length} Questions
                 </h2>
               </div>
 
               <button
                 onClick={loadData}
-                className="rounded-2xl bg-emerald-100 px-5 py-3 font-bold text-emerald-700"
+                className="rounded-xl bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-700 transition hover:bg-emerald-100"
               >
                 <RefreshCw className="mr-2 inline" size={18} />
                 Refresh
@@ -536,7 +545,7 @@ function Content() {
               <select
                 value={selectedTable}
                 onChange={(e) => setSelectedTable(e.target.value)}
-                className="rounded-2xl border border-slate-300 px-4 py-3 font-semibold outline-none focus:border-indigo-500"
+                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
               >
                 <option value="all">Semua Sifir</option>
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((no) => (
@@ -549,7 +558,7 @@ function Content() {
               <select
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value)}
-                className="rounded-2xl border border-slate-300 px-4 py-3 font-semibold outline-none focus:border-indigo-500"
+                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
               >
                 <option value="all">Semua Level</option>
                 <option value="easy">Easy</option>
@@ -566,13 +575,13 @@ function Content() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search soalan / jawapan..."
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 pl-11 font-semibold outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pl-11 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
                 />
               </div>
             </div>
 
             {loading ? (
-              <div className="mt-6 rounded-2xl bg-slate-50 p-6 text-center text-slate-500">
+              <div className="mt-6 rounded-2xl bg-slate-50 p-6 text-center text-sm font-semibold text-slate-400">
                 Loading questions...
               </div>
             ) : filteredItems.length === 0 ? (
@@ -580,9 +589,9 @@ function Content() {
                 No questions found.
               </div>
             ) : (
-              <div className="mt-6 overflow-x-auto rounded-[1.5rem] border border-slate-200">
+              <div className="mt-5 overflow-x-auto rounded-[18px] border border-slate-200">
                 <table className="w-full min-w-[850px] border-collapse bg-white text-left">
-                  <thead className="bg-indigo-100 text-indigo-800">
+                  <thead className="bg-slate-950 text-white">
                     <tr>
                       <th className="p-4">No</th>
                       <th className="p-4">Sifir</th>
@@ -598,7 +607,7 @@ function Content() {
                     {filteredItems.map((item, index) => (
                       <tr
                         key={item.id}
-                        className="border-t border-slate-100 hover:bg-yellow-50"
+                        className="border-t border-slate-100 transition hover:bg-violet-50/40"
                       >
                         <td className="p-4 font-semibold text-slate-600">
                           {index + 1}
@@ -637,7 +646,7 @@ function Content() {
                         <td className="p-4 text-center">
                           <button
                             onClick={() => deleteQuestion(item.id)}
-                            className="rounded-2xl bg-red-100 p-3 text-red-600 transition hover:bg-red-200"
+                            className="rounded-xl bg-rose-50 p-2.5 text-rose-600 transition hover:bg-rose-100"
                             title="Delete question"
                           >
                             <Trash2 size={18} />

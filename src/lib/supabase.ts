@@ -1,13 +1,8 @@
 "use client";
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/client";
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://placeholder.supabase.co";
-const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "placeholder-anon-key";
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient();
 
 export type UserType =
   | "learning_hub"

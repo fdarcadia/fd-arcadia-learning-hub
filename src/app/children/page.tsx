@@ -386,30 +386,30 @@ function ChildrenContent({ parentId }: { parentId: string }) {
   }
 
   return (
-    <main className="min-h-screen bg-[#fbfaf7] text-slate-900">
-      <div className="grid min-h-screen xl:grid-cols-[280px_1fr]">
+    <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
+      <div className="grid min-h-screen xl:grid-cols-[250px_minmax(0,1fr)]">
         <ChildrenSidebar totalChildren={children.length} />
 
-        <section className="px-4 py-6 lg:px-8">
-          <header className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
+          <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <Link
                 href="/dashboard"
-                className="mb-4 inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                className="mb-3 inline-flex items-center gap-2 text-xs font-black text-indigo-600 transition hover:text-indigo-700"
               >
                 <ArrowLeft size={20} />
-                Back Dashboard
+                Back to Dashboard
               </Link>
 
-              <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-500">
                 CHILD PROFILE CENTER
               </p>
 
-              <h1 className="mt-1 text-4xl font-black text-indigo-700 sm:text-5xl">
+              <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
                 My Children
               </h1>
 
-              <p className="mt-2 max-w-3xl text-slate-600">
+              <p className="mt-1 max-w-3xl text-sm font-semibold text-slate-400">
                 Add child profile, upload avatar, set learning level, goal,
                 notes and selected subjects.
               </p>
@@ -422,7 +422,7 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                   resetForm();
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-black text-white shadow-sm transition hover:bg-indigo-700"
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-slate-800"
               >
                 <Plus size={18} />
                 Add Child
@@ -430,14 +430,14 @@ function ChildrenContent({ parentId }: { parentId: string }) {
 
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 Dashboard
               </Link>
             </div>
           </header>
 
-          <section className="grid gap-4 md:grid-cols-4">
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Children" value={String(stats.children)} />
             <StatCard label="Subjects" value={String(stats.subjects)} />
             <StatCard label="Progress" value={`${stats.averageProgress}%`} />
@@ -445,17 +445,17 @@ function ChildrenContent({ parentId }: { parentId: string }) {
           </section>
 
           {children.length > 0 ? (
-            <section className="mt-6 rounded-[2rem] border border-indigo-100 bg-white p-5 shadow-sm">
+            <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-500">
                     CHILD SWITCHER
                   </p>
-                  <h2 className="mt-1 text-2xl font-black text-indigo-700">
+                  <h2 className="mt-1 text-xl font-black text-slate-950">
                     Choose active child
                   </h2>
                 </div>
-                <Users className="text-indigo-600" size={30} />
+                <Users className="text-indigo-500" size={30} />
               </div>
 
               <div className="flex gap-3 overflow-x-auto pb-2">
@@ -468,15 +468,15 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                       key={child.id}
                       type="button"
                       onClick={() => setActiveChildId(child.id)}
-                      className={`flex min-w-[220px] items-center gap-3 rounded-2xl border p-3 text-left transition ${
+                      className={`flex min-w-[210px] items-center gap-3 rounded-[18px] border p-3 text-left transition ${
                         active
-                          ? "border-indigo-600 bg-indigo-50 ring-4 ring-indigo-100"
-                          : "border-indigo-100 bg-white hover:bg-indigo-50"
+                          ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100"
+                          : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/60"
                       }`}
                     >
                       <AvatarImage src={avatar} name={child.child_name} size="sm" />
                       <div>
-                        <p className="font-black text-indigo-700">{child.child_name}</p>
+                        <p className="font-black text-slate-900">{child.child_name}</p>
                         <p className="text-sm font-bold text-slate-500">
                           Age {child.age || "-"} • {child.level || "Level"}
                         </p>
@@ -488,17 +488,17 @@ function ChildrenContent({ parentId }: { parentId: string }) {
             </section>
           ) : null}
 
-          <section className="mt-6 grid gap-6 2xl:grid-cols-[1.05fr_0.95fr]">
+          <section className="mt-5 grid gap-5 2xl:grid-cols-[1.08fr_0.92fr]">
             <form
               onSubmit={saveChild}
-              className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm"
+              className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
             >
               <div className="mb-6 flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-500">
                     {form.id ? "EDIT CHILD" : "ADD CHILD"}
                   </p>
-                  <h2 className="mt-1 text-3xl font-black text-indigo-700">
+                  <h2 className="mt-1 text-2xl font-black text-slate-950">
                     {form.id ? "Update Profile" : "Create Profile"}
                   </h2>
                 </div>
@@ -507,7 +507,7 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                   <button
                     type="button"
                     onClick={resetForm}
-                    className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-100 text-slate-600"
+                    className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200"
                   >
                     <X size={20} />
                   </button>
@@ -562,10 +562,10 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                 />
               </div>
 
-              <section className="mt-6 rounded-[2rem] border border-indigo-200 bg-white p-5">
+              <section className="mt-6 rounded-[20px] border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
                 <div className="mb-5">
-                  <h3 className="text-xl font-black text-indigo-700">Avatar</h3>
-                  <p className="mt-1 text-sm font-bold text-slate-500">
+                  <h3 className="text-lg font-black text-slate-900">Avatar</h3>
+                  <p className="mt-1 text-xs font-semibold text-slate-400">
                     Choose a default avatar or upload your own image.
                   </p>
                 </div>
@@ -588,20 +588,20 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                           }
                           className={`relative overflow-hidden rounded-2xl border bg-slate-50 p-2 transition ${
                             form.avatar_url === item
-                              ? "border-indigo-600 ring-4 ring-indigo-100"
-                              : "border-indigo-100 hover:border-indigo-300"
+                              ? "border-indigo-500 ring-2 ring-indigo-100"
+                              : "border-slate-200 hover:border-indigo-300"
                           }`}
                         >
-                          <div className="grid h-20 place-items-center rounded-xl bg-white">
+                          <div className="grid h-16 place-items-center rounded-lg bg-slate-50">
                             <img
                               src={item}
                               alt=""
-                              className="h-16 w-16 rounded-xl object-contain"
+                              className="h-14 w-14 rounded-lg object-contain"
                             />
                           </div>
 
                           {form.avatar_url === item ? (
-                            <span className="absolute bottom-2 left-2 grid h-7 w-7 place-items-center rounded-full bg-indigo-600 text-white">
+                            <span className="absolute bottom-2 left-2 grid h-6 w-6 place-items-center rounded-full bg-indigo-600 text-white shadow-sm">
                               <CheckCircle2 size={16} />
                             </span>
                           ) : null}
@@ -622,7 +622,7 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="mt-4 flex min-h-[160px] w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/40 px-4 py-6 text-center transition hover:bg-indigo-50"
+                      className="mt-4 flex min-h-[150px] w-full flex-col items-center justify-center rounded-[18px] border-2 border-dashed border-indigo-200 bg-white px-4 py-5 text-center transition hover:border-indigo-300 hover:bg-indigo-50/50"
                     >
                       {uploadingAvatar ? (
                         <>
@@ -653,10 +653,10 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                     />
 
                     {form.avatar_url ? (
-                      <div className="mt-4 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-white p-3">
+                      <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
                         <AvatarImage src={form.avatar_url} name="Avatar preview" size="sm" />
                         <div className="flex-1">
-                          <p className="font-black text-indigo-700">
+                          <p className="text-sm font-black text-slate-700">
                             {form.avatar_type === "upload"
                               ? "Uploaded avatar selected"
                               : form.avatar_type === "default"
@@ -676,7 +676,7 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                               avatar_type: "url",
                             }))
                           }
-                          className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-500"
+                          className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200"
                         >
                           <X size={18} />
                         </button>
@@ -717,7 +717,7 @@ function ChildrenContent({ parentId }: { parentId: string }) {
 
               <div className="mt-5">
                 <label className="block">
-                  <span className="text-sm font-black text-slate-600">
+                  <span className="text-xs font-black text-slate-600">
                     Parent Notes
                   </span>
                   <textarea
@@ -726,7 +726,7 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                       updateForm("parent_notes", event.target.value)
                     }
                     placeholder="e.g. Loves math, needs spelling practice..."
-                    className="mt-2 min-h-28 w-full rounded-2xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                    className="mt-2 min-h-28 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
                   />
                 </label>
               </div>
@@ -739,10 +739,10 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                       key={subject}
                       type="button"
                       onClick={() => toggleSubject(subject)}
-                      className={`rounded-2xl px-4 py-3 font-black transition ${
+                      className={`rounded-xl border px-3 py-2.5 text-sm font-black transition ${
                         form.subjects.includes(subject)
-                          ? "bg-indigo-600 text-white"
-                          : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                          ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50"
                       }`}
                     >
                       {subject}
@@ -767,7 +767,7 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                 <button
                   type="submit"
                   disabled={saving || uploadingAvatar}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving ? (
                     <Loader2 className="animate-spin" size={20} />
@@ -782,17 +782,15 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-6 py-4 font-black text-slate-700 transition hover:bg-slate-200"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
                 >
                   Clear Form
                 </button>
               </div>
             </form>
 
-            <section className="space-y-6">
-              <LivePreviewCard form={form} activeChild={activeChild} />
-
-              <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+            <section>
+              <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-5 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
@@ -802,7 +800,7 @@ function ChildrenContent({ parentId }: { parentId: string }) {
                       Profiles
                     </h2>
                   </div>
-                  <Users className="text-indigo-600" size={34} />
+                  <Users className="text-indigo-500" size={24} />
                 </div>
 
                 {loadingChildren ? (
@@ -833,23 +831,23 @@ function ChildrenContent({ parentId }: { parentId: string }) {
 
 function ChildrenSidebar({ totalChildren }: { totalChildren: number }) {
   return (
-    <aside className="hidden border-r border-indigo-100 bg-white p-6 xl:block">
-      <Link href="/dashboard" className="flex items-center gap-3">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-600 text-yellow-200 shadow-lg">
+    <aside className="hidden border-r border-indigo-950/10 bg-[#111735] px-4 py-6 text-white xl:flex xl:flex-col">
+      <Link href="/dashboard" className="flex items-center gap-3 px-2">
+        <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-indigo-950/30">
           <Sparkles size={26} />
         </div>
 
         <div>
-          <p className="text-xl font-black tracking-[0.18em] text-slate-900">
+          <p className="text-sm font-black tracking-[0.08em] text-white">
             FD ARCADIA
           </p>
-          <p className="text-sm font-black tracking-[0.25em] text-indigo-600">
+          <p className="text-[9px] font-black tracking-[0.2em] text-violet-300">
             CHILDREN
           </p>
         </div>
       </Link>
 
-      <nav className="mt-10 space-y-2">
+      <nav className="mt-8 space-y-1.5">
         <SidebarLink href="/dashboard" icon={<Home size={22} />}>
           Dashboard
         </SidebarLink>
@@ -864,11 +862,11 @@ function ChildrenSidebar({ totalChildren }: { totalChildren: number }) {
         </SidebarLink>
       </nav>
 
-      <div className="mt-10 rounded-[2rem] bg-gradient-to-br from-indigo-600 to-violet-700 p-6 text-white shadow-xl">
-        <Baby className="text-yellow-200" size={30} />
-        <p className="mt-4 font-black">Child Profiles</p>
-        <h3 className="mt-1 text-xl font-black">{totalChildren} Children</h3>
-        <p className="mt-2 text-sm text-indigo-100">
+      <div className="mt-auto rounded-[20px] border border-violet-400/20 bg-gradient-to-br from-violet-600/35 to-indigo-500/15 p-4 text-white">
+        <Baby className="text-yellow-300" size={18} />
+        <p className="mt-3 text-xs font-black">Child Profiles</p>
+        <h3 className="mt-1 text-lg font-black">{totalChildren} Children</h3>
+        <p className="mt-1 text-[10px] leading-5 text-indigo-200">
           Manage learning profile and progress goals.
         </p>
       </div>
@@ -890,86 +888,15 @@ function SidebarLink({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-4 rounded-2xl px-4 py-3 font-black transition ${
+      className={`flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-black transition ${
         active
-          ? "bg-indigo-50 text-indigo-700"
-          : "text-slate-600 hover:bg-slate-50 hover:text-indigo-700"
+          ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-950/20"
+          : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
       }`}
     >
       {icon}
       {children}
     </Link>
-  );
-}
-
-function LivePreviewCard({
-  form,
-  activeChild,
-}: {
-  form: ChildFormState;
-  activeChild?: Child;
-}) {
-  const previewName = form.child_name || activeChild?.child_name || "Child Name";
-  const previewAge = form.age || activeChild?.age || "-";
-  const previewAvatar = form.avatar_url || activeChild?.avatar_url || activeChild?.avatar || "";
-  const previewReading = form.reading_level || activeChild?.reading_level || "Reading level";
-  const previewMath = form.math_level || activeChild?.math_level || "Math level";
-  const previewGoal = form.learning_goal || activeChild?.learning_goal || "Set learning goal";
-  const previewSubjects = form.subjects.length
-    ? form.subjects
-    : activeChild?.subjects || [];
-
-  return (
-    <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
-            LIVE PREVIEW
-          </p>
-          <h2 className="mt-1 text-3xl font-black text-indigo-700">
-            Profile Preview
-          </h2>
-        </div>
-        <UserRound className="text-indigo-600" size={34} />
-      </div>
-
-      <div className="rounded-[2rem] bg-gradient-to-br from-indigo-50 to-yellow-50 p-5">
-        <div className="flex flex-col items-center text-center">
-          <AvatarImage src={previewAvatar} name={previewName} size="lg" />
-          <h3 className="mt-4 text-3xl font-black text-indigo-700">
-            {previewName}
-          </h3>
-          <p className="mt-1 font-bold text-slate-600">Age: {previewAge}</p>
-        </div>
-
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <MiniInfo label="Reading" value={previewReading} />
-          <MiniInfo label="Math" value={previewMath} />
-        </div>
-
-        <div className="mt-4 rounded-2xl bg-white p-4">
-          <p className="text-sm font-black text-yellow-700">Learning Goal</p>
-          <p className="mt-1 text-sm font-bold text-slate-600">{previewGoal}</p>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {previewSubjects.length ? (
-            previewSubjects.map((subject) => (
-              <span
-                key={subject}
-                className="rounded-2xl bg-yellow-100 px-3 py-2 text-xs font-black text-yellow-800"
-              >
-                {subject}
-              </span>
-            ))
-          ) : (
-            <span className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500">
-              No subject selected
-            </span>
-          )}
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -989,14 +916,14 @@ function ChildProfileCard({
   const avatar = child.avatar_url || child.avatar || "";
 
   return (
-    <article className="rounded-[2rem] border border-indigo-100 bg-[#fbfaf7] p-5">
+    <article className="rounded-[20px] border border-slate-200 bg-slate-50/60 p-4">
       <div className="flex flex-col gap-5 lg:flex-row">
         <AvatarImage src={avatar} name={child.child_name} size="xl" />
 
         <div className="flex-1">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h3 className="text-3xl font-black text-indigo-700">
+              <h3 className="text-2xl font-black text-slate-950">
                 {child.child_name}
               </h3>
               <p className="mt-1 font-bold text-slate-600">
@@ -1007,7 +934,7 @@ function ChildProfileCard({
               </p>
             </div>
 
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700">
               Active
             </span>
           </div>
@@ -1018,7 +945,7 @@ function ChildProfileCard({
             <MiniInfo label="Progress" value={`${progress}%`} />
           </div>
 
-          <div className="mt-5 h-3 overflow-hidden rounded-full bg-white">
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
             <div
               className="h-full rounded-full bg-indigo-600"
               style={{ width: `${progress}%` }}
@@ -1026,14 +953,14 @@ function ChildProfileCard({
           </div>
 
           {child.learning_goal ? (
-            <div className="mt-4 rounded-2xl bg-yellow-50 p-4">
+            <div className="mt-4 rounded-xl bg-amber-50 p-3">
               <p className="text-sm font-black text-yellow-800">Weekly Goal</p>
               <p className="mt-1 text-sm text-slate-600">{child.learning_goal}</p>
             </div>
           ) : null}
 
           {child.parent_notes ? (
-            <div className="mt-3 rounded-2xl bg-indigo-50 p-4">
+            <div className="mt-3 rounded-xl bg-indigo-50 p-3">
               <p className="text-sm font-black text-indigo-700">Parent Notes</p>
               <p className="mt-1 text-sm text-slate-600">{child.parent_notes}</p>
             </div>
@@ -1043,7 +970,7 @@ function ChildProfileCard({
             {(child.subjects || []).map((subject) => (
               <span
                 key={subject}
-                className="rounded-2xl bg-yellow-100 px-3 py-2 text-sm font-black text-yellow-800"
+                className="rounded-full bg-white px-3 py-1.5 text-[10px] font-black text-slate-600 shadow-sm"
               >
                 {subject}
               </span>
@@ -1060,7 +987,10 @@ function ChildProfileCard({
             <QuickButton href="/flashcard-library" icon={<BookOpen size={16} />}>
               Flashcard
             </QuickButton>
-            <QuickButton href="/profile" icon={<BarChart3 size={16} />}>
+            <QuickButton
+              href={`/children/${child.id}/report`}
+              icon={<BarChart3 size={16} />}
+            >
               Report
             </QuickButton>
           </div>
@@ -1069,7 +999,7 @@ function ChildProfileCard({
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 font-black text-white"
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white"
             >
               <Pencil size={17} />
               Edit
@@ -1079,7 +1009,7 @@ function ChildProfileCard({
               type="button"
               onClick={onDelete}
               disabled={deleting}
-              className="inline-flex items-center gap-2 rounded-2xl bg-red-50 px-4 py-3 font-black text-red-600 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-black text-red-600 disabled:opacity-60"
             >
               {deleting ? (
                 <Loader2 className="animate-spin" size={17} />
@@ -1109,7 +1039,7 @@ function AvatarImage({
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden rounded-[2rem] bg-sky-100 ${dimension}`}
+      className={`relative shrink-0 overflow-hidden rounded-full bg-indigo-50 ${dimension}`}
     >
       {src ? (
         <img
@@ -1127,7 +1057,7 @@ function AvatarImage({
       )}
 
       {size !== "sm" ? (
-        <div className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-2xl bg-white text-indigo-600 shadow">
+        <div className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-full bg-white text-indigo-600 shadow">
           <UserRound size={20} />
         </div>
       ) : null}
@@ -1172,15 +1102,15 @@ function InputField({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-black text-slate-600">{label}</span>
-      <div className="mt-2 flex items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-4 py-3 transition focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-100">
+      <span className="text-xs font-black text-slate-600">{label}</span>
+      <div className="mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 transition focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
         {icon ? <span className="text-indigo-600">{icon}</span> : null}
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           required={required}
-          className="w-full bg-transparent font-bold text-slate-800 outline-none placeholder:text-slate-400"
+          className="w-full bg-transparent text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400"
         />
       </div>
     </label>
@@ -1202,11 +1132,11 @@ function SelectField({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-black text-slate-600">{label}</span>
+      <span className="text-xs font-black text-slate-600">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-2xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
       >
         <option value="">{placeholder}</option>
         {options.map((option) => (
@@ -1221,29 +1151,29 @@ function SelectField({
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[1.5rem] border border-indigo-100 bg-white p-5 shadow-sm">
-      <p className="text-sm font-black tracking-[0.18em] text-yellow-600">
+    <div className="rounded-[18px] border border-slate-200 bg-white p-4 shadow-sm">
+      <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
         {label.toUpperCase()}
       </p>
-      <p className="mt-2 text-3xl font-black text-indigo-700">{value}</p>
+      <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
     </div>
   );
 }
 
 function MiniInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white px-4 py-3">
-      <p className="text-xs font-black tracking-[0.16em] text-yellow-600">
+    <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
+      <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
         {label.toUpperCase()}
       </p>
-      <p className="mt-1 text-sm font-black text-indigo-700">{value}</p>
+      <p className="mt-1 text-sm font-black text-slate-800">{value}</p>
     </div>
   );
 }
 
 function LoadingCard() {
   return (
-    <div className="rounded-[1.5rem] bg-indigo-50 p-8 text-center">
+    <div className="rounded-[18px] bg-slate-50 p-8 text-center">
       <Loader2 className="mx-auto animate-spin text-indigo-600" size={36} />
       <p className="mt-3 font-bold text-slate-500">Loading children...</p>
     </div>
@@ -1252,9 +1182,9 @@ function LoadingCard() {
 
 function EmptyState() {
   return (
-    <div className="rounded-[1.5rem] bg-indigo-50 p-10 text-center">
+    <div className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
       <Baby className="mx-auto text-indigo-400" size={44} />
-      <h2 className="mt-3 text-2xl font-black text-indigo-700">
+      <h2 className="mt-3 text-xl font-black text-slate-800">
         No child profile yet
       </h2>
       <p className="mt-2 text-slate-500">

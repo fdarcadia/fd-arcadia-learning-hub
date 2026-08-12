@@ -170,142 +170,150 @@ function CustomWorksheetContent() {
   const recentWorksheets = worksheets.slice(0, 4);
 
   return (
-    <main className="min-h-screen bg-[#fbfaf7] text-slate-900">
-      <div className="grid min-h-screen xl:grid-cols-[280px_1fr]">
+    <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
+      <div className="grid min-h-screen xl:grid-cols-[250px_1fr]">
         <WorksheetSidebar totalWorksheet={totalWorksheet} />
 
-        <section className="px-4 py-6 lg:px-8">
-          <header className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
+          {/* TOP BAR */}
+          <header className="mx-auto flex max-w-[1500px] items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
-                FD ARCADIA CUSTOM WORKSHEET
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-indigo-500">
+                FD Arcadia Learning Hub
               </p>
-
-              <h1 className="mt-1 text-4xl font-black text-indigo-700 sm:text-5xl">
-                My Worksheet Library
+              <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                Custom Worksheet
               </h1>
-
-              <p className="mt-2 max-w-3xl text-slate-600">
-                Download purchased worksheets assigned to your account and open
-                subject folders prepared by FD Arcadia.
+              <p className="mt-1 text-sm font-semibold text-slate-400">
+                Your personalised worksheet library.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex items-center gap-2">
               <Link
                 href="/worksheet"
-                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-black text-white shadow-sm transition hover:bg-indigo-700"
+                className="hidden items-center gap-2 rounded-xl border border-indigo-100 bg-white px-4 py-2.5 text-sm font-black text-slate-950 shadow-sm transition hover:bg-slate-50 sm:inline-flex"
               >
-                <Palette size={18} />
-                Open Draw & Learn
+                <Palette size={16} />
+                Draw & Learn
               </Link>
 
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-slate-800"
               >
                 Dashboard
+                <ChevronRight size={15} />
               </Link>
             </div>
           </header>
 
-          <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <div className="overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-indigo-600 via-violet-600 to-indigo-700 p-7 text-white shadow-xl">
-              <div className="flex items-center gap-3">
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/15 text-yellow-200">
-                  <Sparkles size={30} />
-                </div>
+          <div className="mx-auto mt-5 max-w-[1500px]">
+            {/* PREMIUM HERO */}
+            <section className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-950 px-6 py-7 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] sm:px-8 sm:py-8">
+              <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
+              <div className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-slate-500/15 blur-3xl" />
 
-                <div>
-                  <p className="text-sm font-black tracking-[0.25em] text-yellow-200">
-                    WORKSHEET ACCESS
-                  </p>
-                  <h2 className="mt-1 text-3xl font-black">
-                    Organised by subject.
+              <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-2xl">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/10 text-indigo-200">
+                      <FileText size={22} />
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-300">
+                        Worksheet Library
+                      </p>
+                      <p className="mt-0.5 text-xs font-semibold text-slate-400">
+                        Assigned especially for your account
+                      </p>
+                    </div>
+                  </div>
+
+                  <h2 className="mt-5 text-3xl font-black tracking-tight sm:text-4xl">
+                    Learn by subject, at your own pace.
                   </h2>
-                </div>
-              </div>
 
-              <p className="mt-5 max-w-3xl text-lg leading-8 text-indigo-100">
-                Choose a subject folder to view worksheets assigned to your
-                account. Use Draw & Learn for interactive worksheet practice.
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <HeroStat label="Worksheets" value={loading ? "..." : String(totalWorksheet)} />
-                <HeroStat label="Subjects" value={String(activeSubjects)} />
-                <HeroStat label="Progress" value={`${overallProgress}%`} />
-              </div>
-            </div>
-
-            <div className="rounded-[2.5rem] border border-indigo-100 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
-                    OVERALL PROGRESS
+                  <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+                    Open a subject folder to view worksheets prepared by FD Arcadia.
+                    Keep everything organised in one simple learning space.
                   </p>
-                  <h2 className="mt-2 text-4xl font-black text-indigo-700">
-                    {loading ? "..." : `${overallProgress}%`}
-                  </h2>
                 </div>
 
-                <div className="grid h-16 w-16 place-items-center rounded-2xl bg-indigo-50 text-indigo-600">
-                  <Trophy size={34} />
-                </div>
-              </div>
-
-              <div className="mt-6 h-4 overflow-hidden rounded-full bg-indigo-50">
-                <div
-                  className="h-full rounded-full bg-indigo-600"
-                  style={{ width: `${overallProgress}%` }}
-                />
-              </div>
-
-              <p className="mt-4 text-sm font-bold text-slate-500">
-                {totalWorksheet > 0
-                  ? `${totalWorksheet} worksheet assigned across ${activeSubjects} subject.`
-                  : "No worksheet assigned yet. Please contact admin after payment."}
-              </p>
-            </div>
-          </section>
-
-          <section className="mt-6 grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-            <ChildProfileCard totalWorksheet={totalWorksheet} activeSubjects={activeSubjects} />
-            <ContinueWorksheetCard topSubject={topSubject} loading={loading} />
-          </section>
-
-          <section className="mt-8">
-            <div className="mb-5 flex items-end justify-between gap-3">
-              <div>
-                <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
-                  SUBJECTS
-                </p>
-                <h2 className="mt-1 text-3xl font-black text-indigo-700">
-                  Worksheet Folders
-                </h2>
-              </div>
-            </div>
-
-            {loading ? (
-              <LoadingCard />
-            ) : (
-              <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
-                {subjects.map((subject) => (
-                  <SubjectFolderCard
-                    key={subject.value}
-                    subject={subject}
-                    count={countBySubject(subject.value)}
-                    total={totalWorksheet}
+                <div className="grid grid-cols-3 gap-2 lg:min-w-[340px]">
+                  <PremiumStat
+                    label="Worksheets"
+                    value={loading ? "..." : String(totalWorksheet)}
                   />
-                ))}
+                  <PremiumStat label="Subjects" value={String(activeSubjects)} />
+                  <PremiumStat label="Progress" value={`${overallProgress}%`} />
+                </div>
               </div>
-            )}
-          </section>
+            </section>
 
-          <section className="mt-8 grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-            <RecentWorksheetCard worksheets={recentWorksheets} loading={loading} />
-            <QuickAccessCard />
-          </section>
+            {/* SECTION TITLE */}
+            <section className="mt-7">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-500">
+                    Learning Library
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                    Choose a Subject
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-400">
+                    Open a subject to view your assigned worksheets.
+                  </p>
+                </div>
+
+                {!loading && (
+                  <div className="inline-flex self-start items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm sm:self-auto">
+                    <CheckCircle2 size={14} className="text-emerald-500" />
+                    {activeSubjects} active subject{activeSubjects === 1 ? "" : "s"}
+                  </div>
+                )}
+              </div>
+
+              {loading ? (
+                <LoadingCard />
+              ) : (
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+                  {subjects.map((subject) => (
+                    <SubjectFolderCard
+                      key={subject.value}
+                      subject={subject}
+                      count={countBySubject(subject.value)}
+                      total={totalWorksheet}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* RECENT + TOOLS */}
+            <section className="mt-7 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+              <RecentWorksheetCard
+                worksheets={recentWorksheets}
+                loading={loading}
+              />
+              <QuickAccessCard />
+            </section>
+
+            <div className="mt-7 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs font-semibold text-slate-400">
+                Need another worksheet? Contact FD Arcadia for additional worksheet access.
+              </p>
+
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-1 text-xs font-black text-indigo-600 transition hover:text-slate-950"
+              >
+                View Packages
+                <ChevronRight size={14} />
+              </Link>
+            </div>
+          </div>
         </section>
       </div>
     </main>
@@ -314,23 +322,23 @@ function CustomWorksheetContent() {
 
 function WorksheetSidebar({ totalWorksheet }: { totalWorksheet: number }) {
   return (
-    <aside className="hidden border-r border-indigo-100 bg-white p-6 xl:block">
+    <aside className="hidden border-r border-slate-200 bg-white px-5 py-6 xl:block">
       <Link href="/dashboard" className="flex items-center gap-3">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-600 text-yellow-200 shadow-lg">
-          <Sparkles size={26} />
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-950 text-indigo-200 shadow-sm">
+          <FileText size={21} />
         </div>
 
         <div>
-          <p className="text-xl font-black tracking-[0.18em] text-slate-900">
+          <p className="text-sm font-black tracking-[0.16em] text-slate-950">
             FD ARCADIA
           </p>
-          <p className="text-sm font-black tracking-[0.25em] text-indigo-600">
-            WORKSHEET
+          <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.2em] text-indigo-500">
+            Worksheet
           </p>
         </div>
       </Link>
 
-      <nav className="mt-10 space-y-2">
+      <nav className="mt-8 space-y-1.5">
         {sidebarLinks.map((item) => {
           const Icon = item.icon;
           const active = item.title === "Custom Worksheet";
@@ -339,32 +347,30 @@ function WorksheetSidebar({ totalWorksheet }: { totalWorksheet: number }) {
             <Link
               key={item.title}
               href={item.href}
-              className={`flex items-center gap-4 rounded-2xl px-4 py-3 font-black transition ${
+              className={`flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-black transition ${
                 active
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-indigo-700"
+                  ? "bg-slate-50 text-slate-950"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-              <Icon size={22} />
+              <Icon size={18} />
               {item.title}
             </Link>
           );
         })}
       </nav>
 
-      <div className="mt-10 rounded-[2rem] bg-gradient-to-br from-indigo-600 to-violet-700 p-6 text-white shadow-xl">
-        <Crown className="text-yellow-200" size={30} />
-        <p className="mt-4 font-black">Worksheet Library</p>
-        <h3 className="mt-1 text-xl font-black">{totalWorksheet} Files</h3>
-        <p className="mt-2 text-sm text-indigo-100">
-          Your assigned worksheet collection.
+      <div className="mt-8 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+          Your Library
         </p>
-        <Link
-          href="/pricing"
-          className="mt-5 inline-flex rounded-xl bg-white px-5 py-3 font-black text-indigo-700"
-        >
-          View Package
-        </Link>
+        <div className="mt-3 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-3xl font-black text-slate-950">{totalWorksheet}</p>
+            <p className="text-xs font-semibold text-slate-400">worksheet files</p>
+          </div>
+          <FileText size={24} className="text-indigo-500" />
+        </div>
       </div>
     </aside>
   );
@@ -378,17 +384,17 @@ function ChildProfileCard({
   activeSubjects: number;
 }) {
   return (
-    <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+    <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-4">
         <div className="grid h-24 w-24 place-items-center rounded-[2rem] bg-sky-100 text-5xl">
           👧
         </div>
 
         <div>
-          <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+          <p className="text-sm font-black tracking-[0.2em] text-indigo-500">
             CHILD PROFILE
           </p>
-          <h2 className="mt-1 text-3xl font-black text-indigo-700">
+          <h2 className="mt-1 text-3xl font-black text-slate-950">
             Worksheet Access
           </h2>
           <p className="mt-1 text-slate-500">Parent worksheet library</p>
@@ -421,13 +427,13 @@ function ContinueWorksheetCard({
   const hasWorksheet = Boolean(topSubject && topSubject.count > 0);
 
   return (
-    <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+    <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+          <p className="text-sm font-black tracking-[0.2em] text-indigo-500">
             CONTINUE WORKSHEET
           </p>
-          <h2 className="mt-1 text-3xl font-black text-indigo-700">
+          <h2 className="mt-1 text-3xl font-black text-slate-950">
             {loading
               ? "Loading..."
               : hasWorksheet
@@ -446,7 +452,7 @@ function ContinueWorksheetCard({
         </div>
       </div>
 
-      <div className="mt-5 h-4 overflow-hidden rounded-full bg-indigo-50">
+      <div className="mt-5 h-4 overflow-hidden rounded-full bg-slate-50">
         <div
           className="h-full rounded-full bg-indigo-600"
           style={{ width: hasWorksheet ? "65%" : "0%" }}
@@ -480,49 +486,58 @@ function SubjectFolderCard({
   return (
     <Link
       href={subject.href}
-      className="group rounded-[2rem] border border-indigo-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+      className="group rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(15,23,42,0.10)]"
     >
-      <div className={`rounded-[1.7rem] bg-gradient-to-br ${subject.gradient} p-5`}>
-        <div className="flex items-start justify-between gap-4">
-          <div className={`grid h-16 w-16 place-items-center rounded-2xl bg-white ${subject.color} shadow-sm`}>
-            <Icon size={32} />
-          </div>
-
-          {hasWorksheet ? (
-            <CheckCircle2 className="text-emerald-600" size={26} />
-          ) : (
-            <LockKeyhole className="text-slate-400" size={26} />
-          )}
+      <div className="flex items-start justify-between gap-4">
+        <div
+          className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br ${subject.gradient} ${subject.color}`}
+        >
+          <Icon size={23} />
         </div>
 
-        <div className="mt-6 text-5xl">{subject.emoji}</div>
+        <span
+          className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.08em] ${
+            hasWorksheet
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-400"
+          }`}
+        >
+          {hasWorksheet ? `${count} files` : "Locked"}
+        </span>
+      </div>
 
-        <h3 className="mt-4 text-3xl font-black text-indigo-700">
-          {subject.title}
-        </h3>
+      <h3 className="mt-5 text-xl font-black text-slate-950">
+        {subject.title}
+      </h3>
 
-        <p className="mt-3 min-h-12 text-sm leading-6 text-slate-600">
-          {subject.description}
-        </p>
+      <p className="mt-2 min-h-[44px] text-sm leading-5 text-slate-500">
+        {subject.description}
+      </p>
 
-        <div className="mt-5">
-          <div className="mb-2 flex justify-between text-sm font-bold text-slate-600">
-            <span>{hasWorksheet ? `${count} worksheet` : "No worksheet"}</span>
-            <span>{progress}%</span>
-          </div>
-
-          <div className="h-3 overflow-hidden rounded-full bg-white">
-            <div
-              className="h-full rounded-full bg-indigo-600"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+      <div className="mt-5">
+        <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.08em] text-slate-400">
+          <span>Progress</span>
+          <span>{progress}%</span>
         </div>
 
-        <div className="mt-5 flex items-center justify-between rounded-2xl bg-indigo-600 px-4 py-3 font-black text-white transition group-hover:bg-indigo-700">
-          Open Folder
-          <ChevronRight size={18} />
+        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className={`h-full rounded-full transition-all ${
+              hasWorksheet ? "bg-indigo-600" : "bg-slate-200"
+            }`}
+            style={{ width: `${progress}%` }}
+          />
         </div>
+      </div>
+
+      <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+        <span className="text-sm font-black text-indigo-600">
+          {hasWorksheet ? "Open Folder" : "View Folder"}
+        </span>
+        <ChevronRight
+          size={17}
+          className="text-indigo-500 transition group-hover:translate-x-1"
+        />
       </div>
     </Link>
   );
@@ -536,13 +551,13 @@ function RecentWorksheetCard({
   loading: boolean;
 }) {
   return (
-    <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+    <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+          <p className="text-sm font-black tracking-[0.2em] text-indigo-500">
             RECENT
           </p>
-          <h2 className="mt-1 text-2xl font-black text-indigo-700">
+          <h2 className="mt-1 text-2xl font-black text-slate-950">
             Recent Worksheets
           </h2>
         </div>
@@ -552,9 +567,9 @@ function RecentWorksheetCard({
       {loading ? (
         <p className="font-bold text-slate-500">Loading recent worksheets...</p>
       ) : worksheets.length === 0 ? (
-        <div className="rounded-2xl bg-indigo-50 p-6 text-center">
+        <div className="rounded-2xl bg-slate-50 p-6 text-center">
           <FileText className="mx-auto text-indigo-400" size={38} />
-          <p className="mt-3 font-black text-indigo-700">No worksheet yet</p>
+          <p className="mt-3 font-black text-slate-950">No worksheet yet</p>
           <p className="mt-1 text-sm text-slate-500">Waiting for admin assignment.</p>
         </div>
       ) : (
@@ -568,10 +583,10 @@ function RecentWorksheetCard({
                 href={item.external_link || item.file_url || "#"}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-between rounded-2xl bg-indigo-50 px-4 py-4 transition hover:bg-indigo-100"
+                className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-4 transition hover:bg-slate-100"
               >
                 <div>
-                  <p className="font-black text-indigo-700">
+                  <p className="font-black text-slate-950">
                     {item.title || item.file_name || "Worksheet"}
                   </p>
                   <p className="text-sm font-bold text-slate-500">
@@ -591,12 +606,12 @@ function RecentWorksheetCard({
 
 function QuickAccessCard() {
   return (
-    <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+    <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-5">
-        <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
+        <p className="text-sm font-black tracking-[0.2em] text-indigo-500">
           QUICK ACCESS
         </p>
-        <h2 className="mt-1 text-2xl font-black text-indigo-700">
+        <h2 className="mt-1 text-2xl font-black text-slate-950">
           Worksheet Tools
         </h2>
       </div>
@@ -639,14 +654,14 @@ function QuickLink({
   return (
     <Link
       href={href}
-      className="flex items-center justify-between rounded-2xl bg-indigo-50 px-4 py-4 transition hover:bg-indigo-100"
+      className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-4 transition hover:bg-slate-100"
     >
       <div className="flex items-center gap-4">
         <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-indigo-600">
           {icon}
         </div>
         <div>
-          <p className="font-black text-indigo-700">{title}</p>
+          <p className="font-black text-slate-950">{title}</p>
           <p className="text-sm text-slate-500">{description}</p>
         </div>
       </div>
@@ -666,11 +681,23 @@ function HeroStat({ label, value }: { label: string; value: string }) {
 
 function MiniInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-indigo-50 p-4">
-      <p className="text-xs font-black tracking-[0.16em] text-yellow-600">
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <p className="text-xs font-black tracking-[0.16em] text-indigo-500">
         {label.toUpperCase()}
       </p>
-      <p className="mt-1 font-black text-indigo-700">{value}</p>
+      <p className="mt-1 font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+
+function PremiumStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-4 text-center backdrop-blur">
+      <p className="text-xl font-black text-white sm:text-2xl">{value}</p>
+      <p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+        {label}
+      </p>
     </div>
   );
 }

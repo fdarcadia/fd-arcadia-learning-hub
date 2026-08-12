@@ -1,14 +1,17 @@
 "use client";
 
+import type React from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
+  ArrowLeft,
   BookOpenCheck,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
   Clock3,
-  Crown,
   FileText,
+  Gift,
   Home,
   LockKeyhole,
   Sparkles,
@@ -18,396 +21,300 @@ import {
 } from "lucide-react";
 import { ProtectedPage } from "@/components/ProtectedPage";
 
-const months = [
+const weeks = [
   {
-    month: 1,
-    title: "Month 1",
-    theme: "Foundation",
-    subtitle: "Foundation activities, assessment and weekly learning plan.",
+    week: 1,
+    title: "Week 1",
+    subtitle: "Assessment, warm-up and first activities",
     badge: "Start Here",
+    status: "Completed",
     unlocked: true,
-    progress: 75,
+    progress: 100,
+    image: "🌱",
     color: "from-yellow-100 to-orange-100",
   },
   {
-    month: 2,
-    title: "Month 2",
-    theme: "Practice",
-    subtitle: "Continue with new themes, worksheets and activities.",
-    badge: "Month 2",
+    week: 2,
+    title: "Week 2",
+    subtitle: "Continue weekly worksheet and learning files",
+    badge: "Learning",
+    status: "In Progress",
     unlocked: true,
-    progress: 40,
+    progress: 60,
+    image: "👧",
     color: "from-sky-100 to-indigo-100",
   },
   {
-    month: 3,
-    title: "Month 3",
-    theme: "Explore",
-    subtitle: "Practice, games, reading and learning files.",
-    badge: "Month 3",
+    week: 3,
+    title: "Week 3",
+    subtitle: "Practice, games and revision activities",
+    badge: "Practice",
+    status: "Upcoming",
     unlocked: true,
-    progress: 20,
+    progress: 0,
+    image: "😊",
     color: "from-emerald-100 to-lime-100",
   },
   {
-    month: 4,
-    title: "Month 4",
-    theme: "Build",
-    subtitle: "More learning hub schedules and activities.",
-    badge: "Month 4",
+    week: 4,
+    title: "Week 4",
+    subtitle: "Review, special activity and progress check",
+    badge: "Review",
+    status: "Upcoming",
     unlocked: true,
     progress: 0,
+    image: "🪥",
     color: "from-pink-100 to-rose-100",
-  },
-  {
-    month: 5,
-    title: "Month 5",
-    theme: "Revision",
-    subtitle: "Revision, enrichment and weekly files.",
-    badge: "Month 5",
-    unlocked: true,
-    progress: 0,
-    color: "from-purple-100 to-violet-100",
-  },
-  {
-    month: 6,
-    title: "Month 6",
-    theme: "Premium",
-    subtitle: "Premium learning content and progress activities.",
-    badge: "Premium",
-    unlocked: true,
-    progress: 0,
-    color: "from-indigo-100 to-blue-100",
   },
 ];
 
 const subjectPreview = [
-  { title: "Warm Up", icon: "☀️" },
-  { title: "Math", icon: "🔢" },
-  { title: "Science", icon: "🧪" },
-  { title: "Reading", icon: "📖" },
-  { title: "Membaca", icon: "📚" },
+  { title: "Warm Up", icon: "☀️", time: "9:00 AM" },
+  { title: "Math", icon: "🔢", time: "10:00 AM" },
+  { title: "Science", icon: "🧪", time: "11:00 AM" },
+  { title: "Reading", icon: "📖", time: "9:30 AM" },
+  { title: "Membaca", icon: "📚", time: "12:00 PM" },
 ];
 
 const sidebarLinks = [
   { title: "Dashboard", href: "/dashboard", icon: Home },
   { title: "My Children", href: "/children", icon: Users },
   { title: "Learning Hub", href: "/learning-hub", icon: BookOpenCheck },
+  { title: "Freebies", href: "/freebies", icon: Gift },
 ];
 
-export default function LearningHubPage() {
+export default function MonthPage() {
   return (
     <ProtectedPage>
-      {() => <LearningHubContent />}
+      {() => <MonthContent />}
     </ProtectedPage>
   );
 }
-function LearningHubContent() {
+
+function MonthContent() {
+  const params = useParams();
+  const monthParam = String(params.month || "month-1");
+  const monthNo = monthParam.replace("month-", "") || "1";
+
   const totalProgress = Math.round(
-    months.reduce((sum, item) => sum + item.progress, 0) / months.length
+    weeks.reduce((sum, item) => sum + item.progress, 0) / weeks.length
   );
 
+  const completedWeeks = weeks.filter((item) => item.status === "Completed").length;
+  const activeWeek = weeks.find((item) => item.status === "In Progress") || weeks[0];
+
   return (
-    <main className="min-h-screen bg-[#fbfaf7] text-slate-900">
-      <div className="grid min-h-screen xl:grid-cols-[290px_1fr]">
-        <aside className="hidden border-r border-indigo-100 bg-white p-6 xl:block">
-          <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-600 text-yellow-200 shadow-lg">
-              <Sparkles size={26} />
-            </div>
+    <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
+      <div className="grid min-h-screen xl:grid-cols-[250px_minmax(0,1fr)]">
+        <MonthSidebar monthNo={monthNo} monthParam={monthParam} totalProgress={totalProgress} />
 
+        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
+          <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xl font-black tracking-[0.18em] text-slate-900">
-                FD ARCADIA
-              </p>
-              <p className="text-sm font-black tracking-[0.25em] text-indigo-600">
-                LEARNING HUB
-              </p>
-            </div>
-          </Link>
-
-          <nav className="mt-10 space-y-2">
-            {sidebarLinks.map((item) => {
-              const Icon = item.icon;
-              const active = item.title === "Learning Hub";
-
-              return (
-                <Link
-                  key={item.title}
-                  href={item.href}
-                  className={`flex items-center gap-4 rounded-2xl px-4 py-3 font-black transition ${
-                    active
-                      ? "bg-indigo-50 text-indigo-700"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-indigo-700"
-                  }`}
-                >
-                  <Icon size={22} />
-                  {item.title}
-                </Link>
-              );
-            })}
-
-            <p className="mb-2 mt-6 text-xs font-black tracking-[0.2em] text-slate-400">
-              MONTHS
-            </p>
-
-            {months.map((item) => (
               <Link
-                key={item.month}
-                href={`/learning-hub/month-${item.month}`}
-                className="flex items-center justify-between rounded-2xl px-4 py-3 font-black text-slate-600 transition hover:bg-indigo-50 hover:text-indigo-700"
+                href="/learning-hub"
+                className="inline-flex items-center gap-2 text-xs font-black text-indigo-600 transition hover:text-indigo-700"
               >
-                <span>{item.title}</span>
-                {item.unlocked ? (
-                  <CheckCircle2 size={18} className="text-emerald-600" />
-                ) : (
-                  <LockKeyhole size={18} className="text-slate-400" />
-                )}
+                <ArrowLeft size={14} />
+                Back to Learning Hub
               </Link>
-            ))}
-          </nav>
 
-          <div className="mt-10 rounded-[2rem] bg-gradient-to-br from-indigo-600 to-violet-700 p-6 text-white shadow-xl">
-            <Crown className="text-yellow-200" size={30} />
-            <p className="mt-4 font-black">Learning Hub</p>
-            <h3 className="mt-1 text-xl font-black">Month 1 - Month 6</h3>
-            <p className="mt-2 text-sm text-indigo-100">
-              Open weekly activities, worksheet links, videos and learning files.
-            </p>
-            <Link
-              href="/dashboard"
-              className="mt-5 inline-flex rounded-xl bg-white px-5 py-3 font-black text-indigo-700"
-            >
-              Back Dashboard
-            </Link>
-          </div>
-        </aside>
-
-        <section className="px-4 py-6 lg:px-8">
-          <header className="mb-8 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
-                FD ARCADIA LEARNING HUB
+              <p className="mt-3 text-[9px] font-black uppercase tracking-[0.2em] text-indigo-500">
+                FD Arcadia Learning Hub
               </p>
 
-              <h1 className="mt-1 text-4xl font-black text-indigo-700 sm:text-5xl">
-                Choose Your Month
+              <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">
+                Month {monthNo}
               </h1>
 
-              <p className="mt-2 max-w-3xl text-slate-600">
-                Open monthly learning schedules, weekly activities, worksheets,
-                videos, games and learning files.
+              <p className="mt-1 text-sm font-semibold text-slate-400">
+                Choose a week and continue the monthly learning plan.
               </p>
             </div>
 
             <Link
               href="/dashboard"
-              className="hidden rounded-2xl bg-white px-5 py-3 font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50 sm:inline-flex"
+              className="inline-flex self-start items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600 sm:self-auto"
             >
+              <Home size={15} />
               Dashboard
             </Link>
           </header>
 
-          <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <div className="overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-indigo-600 via-violet-600 to-indigo-700 p-7 text-white shadow-xl">
-              <div className="flex items-center gap-3">
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/15 text-yellow-200">
-                  <Sparkles size={30} />
+          <section className="relative mt-5 overflow-hidden rounded-[26px] bg-gradient-to-br from-[#5b50d6] via-[#5158c6] to-[#36539b] px-5 py-6 text-white shadow-[0_18px_50px_rgba(79,70,229,0.18)] sm:px-6">
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+
+            <div className="relative grid gap-6 xl:grid-cols-[1fr_auto] xl:items-center">
+              <div className="max-w-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/10 text-yellow-200">
+                    <BookOpenCheck size={21} />
+                  </div>
+
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-100">
+                      Monthly Learning Plan
+                    </p>
+                    <h2 className="mt-0.5 text-2xl font-black sm:text-3xl">
+                      Month {monthNo} learning journey
+                    </h2>
+                  </div>
                 </div>
 
-                <div>
-                  <p className="text-sm font-black tracking-[0.25em] text-yellow-200">
-                    MONTHLY JOURNEY
-                  </p>
-                  <h2 className="mt-1 text-3xl font-black">
-                    Learning made structured and simple.
-                  </h2>
-                </div>
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-indigo-100">
+                  Four structured weeks with schedules, worksheets and subject
+                  activities prepared by FD Arcadia.
+                </p>
               </div>
 
-              <p className="mt-5 max-w-3xl text-lg leading-8 text-indigo-100">
-                Each month contains Week 1 to Week 4 with subjects such as Warm
-                Up, Math, Science, Reading and Membaca.
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <HeroStat label="Months" value="6" />
-                <HeroStat label="Weeks" value="24" />
-                <HeroStat label="Subjects" value="5" />
+              <div className="grid min-w-[320px] grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-white/[0.07]">
+                <MonthHeroStat value="4" label="Weeks" />
+                <MonthHeroStat value={`${completedWeeks}/4`} label="Completed" />
+                <MonthHeroStat value={`${totalProgress}%`} label="Progress" />
               </div>
-            </div>
-
-            <div className="rounded-[2.5rem] border border-indigo-100 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
-                    OVERALL PROGRESS
-                  </p>
-                  <h2 className="mt-2 text-4xl font-black text-indigo-700">
-                    {totalProgress}%
-                  </h2>
-                </div>
-
-                <div className="grid h-16 w-16 place-items-center rounded-2xl bg-indigo-50 text-indigo-600">
-                  <Trophy size={34} />
-                </div>
-              </div>
-
-              <div className="mt-6 h-4 overflow-hidden rounded-full bg-indigo-50">
-                <div
-                  className="h-full rounded-full bg-indigo-600"
-                  style={{ width: `${totalProgress}%` }}
-                />
-              </div>
-
-              <p className="mt-4 text-sm font-bold text-slate-500">
-                Progress will increase as child completes weekly activities.
-              </p>
             </div>
           </section>
-                    <section className="mt-8">
-            <div className="mb-5 flex items-end justify-between gap-3">
+
+          <section className="mt-5 grid gap-4 xl:grid-cols-[1fr_0.72fr]">
+            <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-500">
+                    Continue Learning
+                  </p>
+                  <h2 className="mt-1 text-xl font-black">
+                    {activeWeek.title}
+                  </h2>
+                  <p className="mt-1 text-xs font-semibold text-slate-400">
+                    {activeWeek.subtitle}
+                  </p>
+                </div>
+
+                <StatusBadge status={activeWeek.status} />
+              </div>
+
+              <div className="mt-5">
+                <div className="mb-1.5 flex items-center justify-between text-[10px] font-black text-slate-400">
+                  <span>Progress</span>
+                  <span>{activeWeek.progress}%</span>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500"
+                    style={{ width: `${activeWeek.progress}%` }}
+                  />
+                </div>
+              </div>
+
+              <Link
+                href={`/learning-hub/${monthParam}/week-${activeWeek.week}`}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-black text-white transition hover:bg-slate-800"
+              >
+                Continue Week {activeWeek.week}
+                <ChevronRight size={14} />
+              </Link>
+            </div>
+
+            <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    Month Progress
+                  </p>
+                  <h2 className="mt-1 text-xl font-black">{totalProgress}%</h2>
+                </div>
+                <Trophy size={20} className="text-violet-500" />
+              </div>
+
+              <div className="mt-4 grid grid-cols-4 gap-2">
+                {weeks.map((item) => (
+                  <div
+                    key={item.week}
+                    className="rounded-xl bg-slate-50 px-2 py-3 text-center"
+                  >
+                    <p className="text-[9px] font-black uppercase text-slate-400">
+                      W{item.week}
+                    </p>
+                    <p className="mt-1 text-sm font-black text-slate-800">
+                      {item.progress}%
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-6">
+            <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
-                  MONTHS
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-500">
+                  Weekly Path
                 </p>
-                <h2 className="mt-1 text-3xl font-black text-indigo-700">
-                  Monthly Learning Path
-                </h2>
+                <h2 className="mt-1 text-2xl font-black">Choose Your Week</h2>
+              </div>
+
+              <div className="hidden items-center gap-2 text-[10px] font-black text-slate-400 sm:flex">
+                <Clock3 size={14} className="text-indigo-500" />
+                Week 1–4
               </div>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
-              {months.map((item) => (
-                <Link
-                  key={item.month}
-                  href={item.unlocked ? `/learning-hub/month-${item.month}` : "#"}
-                  className={`group rounded-[2rem] border border-indigo-100 bg-white p-5 shadow-sm transition ${
-                    item.unlocked
-                      ? "hover:-translate-y-1 hover:shadow-xl"
-                      : "cursor-not-allowed opacity-60"
-                  }`}
-                >
-                  <div
-                    className={`rounded-[1.7rem] bg-gradient-to-br ${item.color} p-5`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="grid h-16 w-16 place-items-center rounded-2xl bg-white text-indigo-700 shadow-sm">
-                        <CalendarDays size={32} />
-                      </div>
-
-                      {item.unlocked ? (
-                        <CheckCircle2 className="text-emerald-600" size={26} />
-                      ) : (
-                        <LockKeyhole className="text-slate-400" size={26} />
-                      )}
-                    </div>
-
-                    <span className="mt-6 inline-block rounded-full bg-white px-3 py-1 text-sm font-black text-indigo-700">
-                      {item.badge}
-                    </span>
-
-                    <h3 className="mt-4 text-3xl font-black text-indigo-700">
-                      {item.title}
-                    </h3>
-
-                    <p className="mt-1 font-black text-slate-700">
-                      {item.theme}
-                    </p>
-
-                    <p className="mt-3 min-h-12 text-sm leading-6 text-slate-600">
-                      {item.subtitle}
-                    </p>
-
-                    <div className="mt-5">
-                      <div className="mb-2 flex justify-between text-sm font-bold text-slate-600">
-                        <span>Progress</span>
-                        <span>{item.progress}%</span>
-                      </div>
-                      <div className="h-3 overflow-hidden rounded-full bg-white">
-                        <div
-                          className="h-full rounded-full bg-indigo-600"
-                          style={{ width: `${item.progress}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-5 grid grid-cols-4 gap-2">
-                      {[1, 2, 3, 4].map((week) => (
-                        <div
-                          key={week}
-                          className="rounded-xl bg-white px-2 py-2 text-center text-xs font-black text-indigo-700"
-                        >
-                          W{week}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-5 flex items-center justify-between rounded-2xl bg-indigo-600 px-4 py-3 font-black text-white transition group-hover:bg-indigo-700">
-                      Open Month Content
-                      <ChevronRight size={18} />
-                    </div>
-                  </div>
-                </Link>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+              {weeks.map((item) => (
+                <WeekCard key={item.week} item={item} monthParam={monthParam} />
               ))}
             </div>
           </section>
 
-          <section className="mt-8 grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-            <div className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
-              <div className="flex items-start gap-4">
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-purple-100 text-purple-700">
-                  <Sparkles size={28} />
+          <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.8fr]">
+            <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
+                  <FileText size={18} />
                 </div>
-
                 <div>
-                  <h2 className="text-2xl font-black text-indigo-700">
-                    How it works
-                  </h2>
-
-                  <p className="mt-2 leading-7 text-slate-600">
-                    Choose a month, then choose Week 1, Week 2, Week 3 or Week
-                    4. Each week contains schedules, worksheets and activity
-                    links uploaded by FD Arcadia admin.
+                  <h3 className="text-sm font-black text-slate-900">Weekly Flow</h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Select a week to open the daily schedule, worksheet links,
+                    videos and activity resources.
                   </p>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                    <InfoPill icon={<CalendarDays size={18} />} text="Choose Month" />
-                    <InfoPill icon={<FileText size={18} />} text="Open Week" />
-                    <InfoPill icon={<CheckCircle2 size={18} />} text="Complete Activity" />
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <SmallStep number="1" text="Choose week" />
+                    <SmallStep number="2" text="Open resources" />
+                    <SmallStep number="3" text="Complete activity" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
-              <div className="flex items-start gap-4">
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-yellow-100 text-yellow-700">
-                  <Star size={28} />
-                </div>
-
-                <div className="flex-1">
-                  <h2 className="text-2xl font-black text-indigo-700">
-                    Subject Preview
-                  </h2>
-
-                  <p className="mt-2 leading-7 text-slate-600">
-                    Every week can include different subjects and activity
-                    links.
+            <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                    Subjects
                   </p>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    {subjectPreview.map((subject) => (
-                      <div
-                        key={subject.title}
-                        className="rounded-2xl bg-indigo-50 px-4 py-3 font-black text-indigo-700"
-                      >
-                        <span className="mr-2 text-xl">{subject.icon}</span>
-                        {subject.title}
-                      </div>
-                    ))}
-                  </div>
+                  <h3 className="mt-1 text-sm font-black text-slate-900">
+                    Weekly Learning
+                  </h3>
                 </div>
+                <Star size={17} className="text-violet-500" />
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {subjectPreview.map((subject) => (
+                  <span
+                    key={subject.title}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-3 py-2 text-[10px] font-black text-slate-600"
+                  >
+                    <span>{subject.icon}</span>
+                    {subject.title}
+                    <span className="font-semibold text-slate-400">
+                      {subject.time}
+                    </span>
+                  </span>
+                ))}
               </div>
             </div>
           </section>
@@ -417,26 +324,219 @@ function LearningHubContent() {
   );
 }
 
-function HeroStat({ label, value }: { label: string; value: string }) {
+function MonthSidebar({
+  monthNo,
+  monthParam,
+  totalProgress,
+}: {
+  monthNo: string;
+  monthParam: string;
+  totalProgress: number;
+}) {
   return (
-    <div className="rounded-2xl bg-white/15 p-4 text-white backdrop-blur">
-      <p className="text-3xl font-black text-yellow-200">{value}</p>
-      <p className="mt-1 text-sm font-bold text-indigo-100">{label}</p>
+    <aside className="hidden border-r border-indigo-950/10 bg-[#111735] px-4 py-6 text-white xl:flex xl:flex-col">
+      <Link href="/dashboard" className="flex items-center gap-3 px-2">
+        <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-indigo-950/30">
+          <BookOpenCheck size={21} />
+        </div>
+        <div>
+          <p className="text-sm font-black tracking-[0.08em]">FD ARCADIA</p>
+          <p className="text-[9px] font-black tracking-[0.2em] text-violet-300">
+            LEARNING HUB
+          </p>
+        </div>
+      </Link>
+
+      <nav className="mt-8 space-y-1.5">
+        {sidebarLinks.map((item) => {
+          const Icon = item.icon;
+          const active = item.title === "Learning Hub";
+
+          return (
+            <Link
+              key={item.title}
+              href={item.href}
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-black transition ${
+                active
+                  ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-950/20"
+                  : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
+              }`}
+            >
+              <Icon size={18} />
+              {item.title}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="mt-7">
+        <p className="px-3 text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+          Month {monthNo}
+        </p>
+
+        <div className="mt-2 space-y-1">
+          {weeks.map((item) => (
+            <Link
+              key={item.week}
+              href={`/learning-hub/${monthParam}/week-${item.week}`}
+              className="flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"
+            >
+              <span>{item.title}</span>
+              {item.status === "Completed" ? (
+                <CheckCircle2 size={13} className="text-emerald-400" />
+              ) : item.status === "In Progress" ? (
+                <span className="h-2.5 w-2.5 rounded-full bg-violet-400" />
+              ) : (
+                <Clock3 size={13} className="text-slate-500" />
+              )}
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-auto rounded-[18px] border border-white/10 bg-white/[0.05] p-4">
+        <div className="flex items-center gap-2 text-yellow-300">
+          <Trophy size={16} />
+          <p className="text-xs font-black">Month {monthNo}</p>
+        </div>
+
+        <p className="mt-3 text-2xl font-black">{totalProgress}%</p>
+        <p className="mt-1 text-[10px] font-semibold text-slate-400">
+          Overall month progress
+        </p>
+
+        <Link
+          href="/learning-hub"
+          className="mt-3 inline-flex items-center text-[10px] font-black text-violet-300 transition hover:text-white"
+        >
+          Back to months
+          <ChevronRight size={13} className="ml-1" />
+        </Link>
+      </div>
+    </aside>
+  );
+}
+
+function WeekCard({
+  item,
+  monthParam,
+}: {
+  item: (typeof weeks)[number];
+  monthParam: string;
+}) {
+  return (
+    <Link
+      href={item.unlocked ? `/learning-hub/${monthParam}/week-${item.week}` : "#"}
+      className={`group rounded-[22px] border bg-white p-5 shadow-sm transition ${
+        item.unlocked
+          ? "border-slate-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+          : "cursor-not-allowed border-slate-100 opacity-55"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${item.color} text-lg`}
+          >
+            {item.image}
+          </div>
+
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-[0.1em] text-indigo-500">
+              {item.badge}
+            </p>
+            <h3 className="mt-0.5 text-base font-black text-slate-900">
+              {item.title}
+            </h3>
+          </div>
+        </div>
+
+        <StatusBadge status={item.status} />
+      </div>
+
+      <p className="mt-4 min-h-10 text-xs leading-5 text-slate-500">
+        {item.subtitle}
+      </p>
+
+      <div className="mt-4">
+        <div className="mb-1.5 flex items-center justify-between text-[9px] font-black text-slate-400">
+          <span>Progress</span>
+          <span>{item.progress}%</span>
+        </div>
+
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className={`h-full rounded-full ${
+              item.progress === 100
+                ? "bg-emerald-500"
+                : "bg-gradient-to-r from-violet-500 to-indigo-500"
+            }`}
+            style={{ width: `${item.progress}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+        <span className="text-[10px] font-black text-indigo-600">
+          Open Week
+        </span>
+
+        <ChevronRight
+          size={14}
+          className="text-indigo-500 transition group-hover:translate-x-0.5"
+        />
+      </div>
+    </Link>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const classes =
+    status === "Completed"
+      ? "bg-emerald-50 text-emerald-700"
+      : status === "In Progress"
+        ? "bg-indigo-50 text-indigo-700"
+        : "bg-amber-50 text-amber-700";
+
+  return (
+    <span
+      className={`shrink-0 rounded-full px-2.5 py-1 text-[8px] font-black uppercase tracking-wide ${classes}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function MonthHeroStat({
+  value,
+  label,
+}: {
+  value: string;
+  label: string;
+}) {
+  return (
+    <div className="px-3 py-4 text-center">
+      <p className="text-xl font-black sm:text-2xl">{value}</p>
+      <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-indigo-100">
+        {label}
+      </p>
     </div>
   );
 }
 
-function InfoPill({
-  icon,
+function SmallStep({
+  number,
   text,
 }: {
-  icon: React.ReactNode;
+  number: string;
   text: string;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-2xl bg-indigo-50 px-4 py-3 font-black text-indigo-700">
-      {icon}
+    <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 py-1.5 pl-1.5 pr-3 text-[10px] font-black text-slate-600">
+      <span className="grid h-6 w-6 place-items-center rounded-full bg-indigo-600 text-[9px] text-white">
+        {number}
+      </span>
       {text}
-    </div>
+    </span>
   );
 }

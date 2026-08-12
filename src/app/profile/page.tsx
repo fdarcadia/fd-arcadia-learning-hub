@@ -292,8 +292,8 @@ function ProfileContent({ userId, email }: { userId: string; email: string }) {
 
   if (loadingProfile) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#fbfaf7] px-4">
-        <div className="rounded-[2rem] bg-white p-8 text-center shadow-sm">
+      <main className="grid min-h-screen place-items-center bg-[#f7f8fc] px-4">
+        <div className="rounded-[22px] border border-slate-200 bg-white p-8 text-center shadow-sm">
           <Loader2 className="mx-auto animate-spin text-indigo-600" size={42} />
           <p className="mt-4 font-black text-slate-600">Loading profile...</p>
         </div>
@@ -302,87 +302,134 @@ function ProfileContent({ userId, email }: { userId: string; email: string }) {
   }
 
   return (
-    <main className="min-h-screen bg-[#fbfaf7] text-slate-900">
-      <div className="grid min-h-screen xl:grid-cols-[280px_1fr]">
+    <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
+      <div className="grid min-h-screen xl:grid-cols-[250px_minmax(0,1fr)]">
         <ProfileSidebar
           fullName={fullName}
           avatarUrl={avatarUrl}
           packageName={packageName}
         />
 
-        <section className="px-4 py-6 lg:px-8">
-          <header className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
+          <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <Link
                 href="/dashboard"
-                className="mb-4 inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                className="inline-flex items-center gap-2 text-xs font-black text-indigo-600 transition hover:text-indigo-700"
               >
-                <ArrowLeft size={20} />
-                Back Dashboard
+                <ArrowLeft size={15} />
+                Back to Dashboard
               </Link>
 
-              <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
-                PARENT PROFILE
+              <p className="mt-3 text-[9px] font-black uppercase tracking-[0.2em] text-indigo-500">
+                Parent Profile
               </p>
 
-              <h1 className="mt-1 text-4xl font-black text-indigo-700 sm:text-5xl">
+              <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
                 My Profile
               </h1>
 
-              <p className="mt-2 max-w-3xl text-slate-600">
-                Manage your parent account, profile photo, package status and FD
-                Arcadia access.
+              <p className="mt-1 max-w-3xl text-sm font-semibold text-slate-400">
+                Manage your account, profile photo, package status and portal access.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               {email === ADMIN_EMAIL ? (
                 <Link
                   href="/admin"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-black text-white shadow-sm transition hover:bg-indigo-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-slate-800"
                 >
-                  <ShieldCheck size={18} />
+                  <ShieldCheck size={15} />
                   Admin
                 </Link>
               ) : null}
 
               <Link
                 href="/children"
-                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
-                <Users size={18} />
+                <Users size={15} />
                 My Children
               </Link>
             </div>
           </header>
 
-          <section className="grid gap-4 md:grid-cols-4">
-            <StatCard label="Access" value={`${completion}%`} />
-            <StatCard label="Children" value={String(children.length)} />
-            <StatCard label="Package" value={profile?.package_type ? "Active" : "None"} />
-            <StatCard label="Modules" value={String(accessCount)} />
-          </section>
+          {/* PREMIUM PROFILE HERO */}
+          <section className="relative mt-5 overflow-hidden rounded-[26px] bg-gradient-to-br from-[#10162f] via-[#25265f] to-[#3f47a8] px-5 py-6 text-white shadow-[0_20px_55px_rgba(15,23,42,0.18)] sm:px-6">
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
 
-          <section className="mt-6 grid gap-6 2xl:grid-cols-[0.9fr_1.1fr]">
-            <form
-              onSubmit={handleSave}
-              className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm"
-            >
-              <div className="mb-6">
-                <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
-                  PROFILE DETAILS
-                </p>
-                <h2 className="mt-1 text-3xl font-black text-indigo-700">
-                  Parent Information
-                </h2>
+            <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div className="flex items-center gap-4">
+                <ProfileAvatar src={avatarUrl} name={fullName || "Parent"} size="lg" />
+
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-violet-300">
+                    Parent Account
+                  </p>
+
+                  <h2 className="mt-1 truncate text-3xl font-black sm:text-4xl">
+                    {fullName || "Parent"}
+                  </h2>
+
+                  <p className="mt-1 break-all text-sm font-semibold text-slate-300">
+                    {email}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black">
+                      {accountType}
+                    </span>
+
+                    <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black text-yellow-200">
+                      {packageName}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <section className="rounded-[2rem] border border-indigo-200 bg-white p-5">
-                <div className="grid gap-6 xl:grid-cols-[1fr_auto_1fr]">
-                  <div>
-                    <p className="font-black text-slate-700">Choose default avatar</p>
+              <div className="grid grid-cols-2 divide-x divide-y divide-white/10 rounded-2xl border border-white/10 bg-white/[0.06] sm:grid-cols-4 sm:divide-y-0 lg:min-w-[360px]">
+                <ProfileHeroStat label="Access" value={`${completion}%`} />
+                <ProfileHeroStat label="Children" value={String(children.length)} />
+                <ProfileHeroStat
+                  label="Package"
+                  value={profile?.package_type ? "Active" : "None"}
+                />
+                <ProfileHeroStat label="Modules" value={String(accessCount)} />
+              </div>
+            </div>
+          </section>
 
-                    <div className="mt-4 grid grid-cols-4 gap-3">
+          <section className="mt-5 grid gap-5 2xl:grid-cols-[1.08fr_0.92fr]">
+            {/* PROFILE EDIT */}
+            <form
+              onSubmit={handleSave}
+              className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-500">
+                    Profile Details
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black text-slate-950">
+                    Parent Information
+                  </h2>
+                  <p className="mt-1 text-xs font-semibold text-slate-400">
+                    Update your display name and profile photo.
+                  </p>
+                </div>
+
+                <UserRound size={22} className="text-indigo-500" />
+              </div>
+
+              <section className="mt-5 rounded-[20px] border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+                <div className="grid gap-5 xl:grid-cols-[1fr_auto_1fr]">
+                  <div>
+                    <p className="text-sm font-black text-slate-700">
+                      Choose default avatar
+                    </p>
+
+                    <div className="mt-4 grid grid-cols-4 gap-2.5">
                       {defaultParentAvatars.map((item) => (
                         <button
                           key={item}
@@ -391,23 +438,23 @@ function ProfileContent({ userId, email }: { userId: string; email: string }) {
                             setAvatarUrl(item);
                             setAvatarMode("default");
                           }}
-                          className={`relative overflow-hidden rounded-2xl border bg-slate-50 p-2 transition ${
+                          className={`relative overflow-hidden rounded-xl border bg-white p-2 transition ${
                             avatarUrl === item
-                              ? "border-indigo-600 ring-4 ring-indigo-100"
-                              : "border-indigo-100 hover:border-indigo-300"
+                              ? "border-violet-500 ring-2 ring-violet-100"
+                              : "border-slate-200 hover:border-indigo-300"
                           }`}
                         >
-                          <div className="grid h-20 place-items-center rounded-xl bg-white">
+                          <div className="grid h-16 place-items-center rounded-lg bg-slate-50">
                             <img
                               src={item}
                               alt=""
-                              className="h-16 w-16 rounded-xl object-contain"
+                              className="h-14 w-14 rounded-lg object-contain"
                             />
                           </div>
 
                           {avatarUrl === item ? (
-                            <span className="absolute bottom-2 left-2 grid h-7 w-7 place-items-center rounded-full bg-indigo-600 text-white">
-                              <CheckCircle2 size={16} />
+                            <span className="absolute bottom-2 left-2 grid h-6 w-6 place-items-center rounded-full bg-indigo-600 text-white shadow-sm">
+                              <CheckCircle2 size={14} />
                             </span>
                           ) : null}
                         </button>
@@ -416,34 +463,36 @@ function ProfileContent({ userId, email }: { userId: string; email: string }) {
                   </div>
 
                   <div className="hidden items-center xl:flex">
-                    <div className="grid h-12 w-12 place-items-center rounded-full border border-indigo-100 bg-white text-xs font-black text-slate-500">
+                    <div className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-[10px] font-black text-slate-400">
                       OR
                     </div>
                   </div>
 
                   <div>
-                    <p className="font-black text-slate-700">Upload your own photo</p>
+                    <p className="text-sm font-black text-slate-700">
+                      Upload your own photo
+                    </p>
 
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="mt-4 flex min-h-[160px] w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/40 px-4 py-6 text-center transition hover:bg-indigo-50"
+                      className="mt-4 flex min-h-[150px] w-full flex-col items-center justify-center rounded-[18px] border-2 border-dashed border-slate-200 bg-white px-4 py-5 text-center transition hover:border-violet-300 hover:bg-violet-50/40"
                     >
                       {uploading ? (
                         <>
-                          <Loader2 className="animate-spin text-indigo-600" size={38} />
-                          <p className="mt-3 font-black text-indigo-700">
+                          <Loader2 className="animate-spin text-indigo-600" size={32} />
+                          <p className="mt-3 text-sm font-black text-indigo-700">
                             Uploading photo...
                           </p>
                         </>
                       ) : (
                         <>
-                          <ImagePlus className="text-indigo-600" size={44} />
-                          <p className="mt-3 font-black text-indigo-700">
+                          <ImagePlus className="text-indigo-500" size={34} />
+                          <p className="mt-3 text-sm font-black text-slate-800">
                             Click to upload photo
                           </p>
-                          <p className="mt-1 text-sm font-bold text-slate-500">
-                            PNG, JPG, WEBP or SVG. Max 2MB.
+                          <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                            PNG, JPG, WEBP or SVG • Max 2MB
                           </p>
                         </>
                       )}
@@ -458,57 +507,64 @@ function ProfileContent({ userId, email }: { userId: string; email: string }) {
                     />
 
                     {avatarUrl ? (
-                      <div className="mt-4 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-white p-3">
-                        <ProfileAvatar src={avatarUrl} name={fullName || "Parent"} size="sm" />
-                        <div className="flex-1">
-                          <p className="font-black text-indigo-700">
+                      <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                        <ProfileAvatar
+                          src={avatarUrl}
+                          name={fullName || "Parent"}
+                          size="sm"
+                        />
+
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-black text-slate-800">
                             {avatarMode === "upload"
                               ? "Uploaded photo selected"
                               : avatarMode === "default"
                                 ? "Default avatar selected"
                                 : "Image URL selected"}
                           </p>
-                          <p className="break-all text-xs text-slate-500">
+                          <p className="mt-1 truncate text-[9px] text-slate-400">
                             {avatarUrl}
                           </p>
                         </div>
+
                         <button
                           type="button"
                           onClick={() => {
                             setAvatarUrl(fallbackParentAvatar);
                             setAvatarMode("default");
                           }}
-                          className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-500"
+                          className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200"
                         >
-                          <X size={18} />
+                          <X size={16} />
                         </button>
                       </div>
                     ) : null}
                   </div>
                 </div>
 
-                <div className="mt-6">
+                <div className="mt-5">
                   <label className="block">
-                    <span className="text-sm font-black text-slate-600">
+                    <span className="text-xs font-black text-slate-600">
                       Profile Image URL (optional)
                     </span>
-                    <div className="mt-2 flex items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-4 py-3 transition focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-100">
-                      <Camera className="text-indigo-600" size={20} />
+
+                    <div className="mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 transition focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
+                      <Camera className="text-indigo-500" size={18} />
                       <input
                         value={avatarMode === "url" ? avatarUrl : ""}
                         onChange={(event) => {
                           setAvatarUrl(event.target.value);
                           setAvatarMode("url");
                         }}
-                        placeholder="Paste image URL e.g. https://example.com/profile.png"
-                        className="w-full bg-transparent font-bold text-slate-800 outline-none placeholder:text-slate-400"
+                        placeholder="Paste image URL"
+                        className="w-full bg-transparent text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400"
                       />
                     </div>
                   </label>
                 </div>
               </section>
 
-              <div className="mt-6 space-y-5">
+              <div className="mt-5 space-y-4">
                 <TextInput
                   label="Full name"
                   value={fullName}
@@ -516,19 +572,23 @@ function ProfileContent({ userId, email }: { userId: string; email: string }) {
                   onChange={setFullName}
                 />
 
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <InfoBox label="Email" value={email} icon={<Mail size={22} />} />
-                  <InfoBox label="User Type" value={accountType} icon={<UserRound size={22} />} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <InfoBox label="Email" value={email} icon={<Mail size={18} />} />
+                  <InfoBox
+                    label="User Type"
+                    value={accountType}
+                    icon={<UserRound size={18} />}
+                  />
                 </div>
 
                 {error ? (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 font-bold text-red-700">
+                  <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs font-bold text-red-700">
                     {error}
                   </div>
                 ) : null}
 
                 {message ? (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 font-bold text-emerald-700">
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">
                     {message}
                   </div>
                 ) : null}
@@ -536,27 +596,20 @@ function ProfileContent({ userId, email }: { userId: string; email: string }) {
                 <button
                   type="submit"
                   disabled={saving || uploading}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 text-xl font-black text-white transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving ? (
-                    <Loader2 className="animate-spin" size={22} />
+                    <Loader2 className="animate-spin" size={18} />
                   ) : (
-                    <Save size={22} />
+                    <Save size={18} />
                   )}
-                  {saving ? "Saving profile..." : "Save profile"}
+                  {saving ? "Saving profile..." : "Save Profile"}
                 </button>
               </div>
             </form>
 
-            <section className="space-y-6">
-              <ProfilePreviewCard
-                fullName={fullName}
-                email={email}
-                avatarUrl={avatarUrl}
-                packageName={packageName}
-                accountType={accountType}
-              />
-
+            {/* STATUS COLUMN - no redundant live preview */}
+            <section className="space-y-5">
               <PackageStatusCard
                 packageName={packageName}
                 startDate={profile?.subscription_start || "-"}
@@ -575,10 +628,14 @@ function ProfileContent({ userId, email }: { userId: string; email: string }) {
             </section>
           </section>
 
-          <section className="mt-8 grid gap-6 xl:grid-cols-[1fr_0.9fr]">
+          <section className="mt-5 grid gap-5 xl:grid-cols-[1fr_0.9fr]">
             <ChildrenSummaryCard children={children} />
             <AccountSettingsCard />
           </section>
+          <footer className="mt-6 border-t border-slate-200 py-5 text-center text-[10px] font-semibold text-slate-400">
+            FD Arcadia Parent Portal • Profile & Account Settings
+          </footer>
+
         </section>
       </div>
     </main>
@@ -595,47 +652,53 @@ function ProfileSidebar({
   packageName: string;
 }) {
   return (
-    <aside className="hidden border-r border-indigo-100 bg-white p-6 xl:block">
-      <Link href="/dashboard" className="flex items-center gap-3">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-600 text-yellow-200 shadow-lg">
-          <Sparkles size={26} />
+    <aside className="hidden border-r border-indigo-950/10 bg-[#111735] px-4 py-6 text-white xl:flex xl:flex-col">
+      <Link href="/dashboard" className="flex items-center gap-3 px-2">
+        <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-indigo-950/30">
+          <Sparkles size={21} />
         </div>
 
         <div>
-          <p className="text-xl font-black tracking-[0.18em] text-slate-900">
+          <p className="text-sm font-black tracking-[0.08em] text-white">
             FD ARCADIA
           </p>
-          <p className="text-sm font-black tracking-[0.25em] text-indigo-600">
-            PROFILE
+          <p className="text-[9px] font-black tracking-[0.2em] text-violet-300">
+            PARENT PROFILE
           </p>
         </div>
       </Link>
 
-      <div className="mt-10 flex flex-col items-center rounded-[2rem] bg-indigo-50 p-6 text-center">
-        <ProfileAvatar src={avatarUrl} name={fullName || "Parent"} size="lg" />
-        <h2 className="mt-4 text-2xl font-black text-indigo-700">
+      <div className="mt-8 rounded-[20px] border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.03] p-4 text-center shadow-inner">
+        <div className="flex justify-center">
+          <ProfileAvatar src={avatarUrl} name={fullName || "Parent"} size="lg" />
+        </div>
+
+        <h2 className="mt-3 truncate text-lg font-black text-white">
           {fullName || "Parent"}
         </h2>
-        <p className="mt-1 text-sm font-bold text-slate-500">{packageName}</p>
+
+        <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-5 text-slate-400">
+          {packageName}
+        </p>
       </div>
 
-      <nav className="mt-8 space-y-2">
-        <SidebarLink href="/dashboard" icon={<Home size={22} />}>
+      <nav className="mt-6 space-y-1.5">
+        <SidebarLink href="/dashboard" icon={<Home size={18} />}>
           Dashboard
         </SidebarLink>
-        <SidebarLink href="/profile" icon={<UserRound size={22} />} active>
+        <SidebarLink href="/profile" icon={<UserRound size={18} />} active>
           My Profile
         </SidebarLink>
-        <SidebarLink href="/children" icon={<Users size={22} />}>
+        <SidebarLink href="/children" icon={<Users size={18} />}>
           My Children
         </SidebarLink>
-        <SidebarLink href="/learning-hub" icon={<BookOpenCheck size={22} />}>
+        <SidebarLink href="/learning-hub" icon={<BookOpenCheck size={18} />}>
           Learning Hub
         </SidebarLink>
-        <SidebarLink href="/custom-worksheet" icon={<FileText size={22} />}>
+        <SidebarLink href="/custom-worksheet" icon={<FileText size={18} />}>
           Worksheet
         </SidebarLink>
-        <SidebarLink href="/freebies" icon={<Gift size={22} />}>
+        <SidebarLink href="/freebies" icon={<Gift size={18} />}>
           Freebies
         </SidebarLink>
       </nav>
@@ -657,10 +720,10 @@ function SidebarLink({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-4 rounded-2xl px-4 py-3 font-black transition ${
+      className={`flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-black transition ${
         active
-          ? "bg-indigo-50 text-indigo-700"
-          : "text-slate-600 hover:bg-slate-50 hover:text-indigo-700"
+          ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-950/20"
+          : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
       }`}
     >
       {icon}
@@ -669,43 +732,21 @@ function SidebarLink({
   );
 }
 
-function ProfilePreviewCard({
-  fullName,
-  email,
-  avatarUrl,
-  packageName,
-  accountType,
+
+function ProfileHeroStat({
+  label,
+  value,
 }: {
-  fullName: string;
-  email: string;
-  avatarUrl: string;
-  packageName: string;
-  accountType: string;
+  label: string;
+  value: string;
 }) {
   return (
-    <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
-      <div className="mb-5">
-        <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
-          LIVE PREVIEW
-        </p>
-        <h2 className="mt-1 text-3xl font-black text-indigo-700">
-          Parent Card
-        </h2>
-      </div>
-
-      <div className="rounded-[2rem] bg-gradient-to-br from-indigo-50 to-yellow-50 p-6 text-center">
-        <ProfileAvatar src={avatarUrl} name={fullName || "Parent"} size="xl" />
-        <h3 className="mt-4 text-3xl font-black text-indigo-700">
-          {fullName || "Parent"}
-        </h3>
-        <p className="mt-1 break-all text-sm font-bold text-slate-500">{email}</p>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <MiniInfo label="Account" value={accountType} />
-          <MiniInfo label="Package" value={packageName} />
-        </div>
-      </div>
-    </section>
+    <div className="px-3 py-4 text-center">
+      <p className="text-xl font-black text-white sm:text-2xl">{value}</p>
+      <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-slate-400">
+        {label}
+      </p>
+    </div>
   );
 }
 
@@ -719,7 +760,7 @@ function PackageStatusCard({
   endDate: string;
 }) {
   return (
-    <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+    <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
@@ -729,14 +770,14 @@ function PackageStatusCard({
             Package Status
           </h2>
         </div>
-        <Crown className="text-yellow-500" size={34} />
+        <Crown className="text-amber-500" size={20} />
       </div>
 
-      <div className="mt-5 rounded-2xl bg-indigo-50 p-5">
-        <p className="text-sm font-black tracking-[0.18em] text-yellow-600">
+      <div className="mt-5 rounded-[18px] bg-gradient-to-br from-indigo-50 to-violet-50 p-4">
+        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
           CURRENT PACKAGE
         </p>
-        <p className="mt-2 text-2xl font-black text-indigo-700">{packageName}</p>
+        <p className="mt-2 text-lg font-black text-slate-900">{packageName}</p>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -746,7 +787,7 @@ function PackageStatusCard({
 
       <Link
         href="/pricing"
-        className="mt-5 flex items-center justify-between rounded-2xl bg-indigo-600 px-5 py-4 font-black text-white transition hover:bg-indigo-700"
+        className="mt-5 flex items-center justify-between rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-xs font-black text-white shadow-sm transition hover:opacity-95"
       >
         View Package
         <ChevronRight size={18} />
@@ -783,7 +824,7 @@ function AccessSummaryCard({
   ];
 
   return (
-    <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+    <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-5">
         <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
           ACCESS
@@ -800,17 +841,17 @@ function AccessSummaryCard({
           return (
             <div
               key={row.label}
-              className="flex items-center justify-between rounded-2xl bg-indigo-50 px-4 py-3 font-black text-slate-700"
+              className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 text-xs font-black text-slate-700"
             >
               <span className="flex items-center gap-3">
-                <Icon className="text-indigo-600" size={21} />
+                <Icon className="text-indigo-500" size={17} />
                 {row.label}
               </span>
 
               {row.unlocked ? (
-                <CheckCircle2 className="text-emerald-600" size={22} />
+                <CheckCircle2 className="text-emerald-500" size={18} />
               ) : (
-                <LockKeyhole className="text-slate-400" size={22} />
+                <LockKeyhole className="text-slate-300" size={18} />
               )}
             </div>
           );
@@ -822,7 +863,7 @@ function AccessSummaryCard({
 
 function ChildrenSummaryCard({ children }: { children: ChildProfile[] }) {
   return (
-    <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+    <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
@@ -832,16 +873,21 @@ function ChildrenSummaryCard({ children }: { children: ChildProfile[] }) {
             Child Profiles
           </h2>
         </div>
-        <Baby className="text-indigo-600" size={34} />
+        <Baby className="text-indigo-500" size={20} />
       </div>
 
       {children.length === 0 ? (
-        <div className="rounded-2xl bg-indigo-50 p-6 text-center">
-          <Baby className="mx-auto text-indigo-400" size={40} />
-          <p className="mt-3 font-black text-indigo-700">No child profile yet</p>
+        <div className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+          <Baby className="mx-auto text-slate-300" size={34} />
+          <p className="mt-3 text-sm font-black text-slate-800">
+            No child profile yet
+          </p>
+          <p className="mt-1 text-[10px] font-semibold text-slate-400">
+            Add your child to start using learning features.
+          </p>
           <Link
             href="/children"
-            className="mt-4 inline-flex rounded-2xl bg-indigo-600 px-5 py-3 font-black text-white"
+            className="mt-4 inline-flex rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-black text-white"
           >
             Add Child
           </Link>
@@ -856,18 +902,18 @@ function ChildrenSummaryCard({ children }: { children: ChildProfile[] }) {
               <Link
                 key={child.id}
                 href="/children"
-                className="flex items-center justify-between rounded-2xl bg-indigo-50 px-4 py-4 transition hover:bg-indigo-100"
+                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 transition hover:border-indigo-200 hover:bg-indigo-50/60"
               >
                 <div className="flex items-center gap-3">
                   <ProfileAvatar src={avatar} name={name} size="sm" />
                   <div>
-                    <p className="font-black text-indigo-700">{name}</p>
-                    <p className="text-sm font-bold text-slate-500">
+                    <p className="text-sm font-black text-slate-900">{name}</p>
+                    <p className="text-[10px] font-semibold text-slate-400">
                       Age {child.age || "-"} • {child.level || child.grade || "Level"}
                     </p>
                   </div>
                 </div>
-                <ChevronRight className="text-indigo-600" size={20} />
+                <ChevronRight className="text-indigo-400" size={16} />
               </Link>
             );
           })}
@@ -879,7 +925,7 @@ function ChildrenSummaryCard({ children }: { children: ChildProfile[] }) {
 
 function AccountSettingsCard() {
   return (
-    <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+    <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-5">
         <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
           SETTINGS
@@ -927,18 +973,18 @@ function SettingsLink({
   return (
     <Link
       href={href}
-      className="flex items-center justify-between rounded-2xl bg-indigo-50 px-4 py-4 transition hover:bg-indigo-100"
+      className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 transition hover:border-indigo-200 hover:bg-indigo-50/60"
     >
       <div className="flex items-center gap-4">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-indigo-600">
+        <div className="grid h-10 w-10 place-items-center rounded-xl border border-slate-100 bg-white text-indigo-500 shadow-sm">
           {icon}
         </div>
         <div>
-          <p className="font-black text-indigo-700">{title}</p>
-          <p className="text-sm text-slate-500">{description}</p>
+          <p className="text-sm font-black text-slate-900">{title}</p>
+          <p className="text-[10px] text-slate-400">{description}</p>
         </div>
       </div>
-      <ChevronRight className="text-indigo-600" size={20} />
+      <ChevronRight className="text-indigo-400" size={16} />
     </Link>
   );
 }
@@ -957,7 +1003,7 @@ function ProfileAvatar({
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden rounded-[2rem] bg-sky-100 ${dimension}`}
+      className={`relative shrink-0 overflow-hidden rounded-full border border-slate-200 bg-indigo-50 ${dimension}`}
     >
       {src ? (
         <img
@@ -975,7 +1021,7 @@ function ProfileAvatar({
       )}
 
       {size !== "sm" ? (
-        <div className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-2xl bg-white text-indigo-600 shadow">
+        <div className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full border-2 border-white bg-indigo-600 text-white shadow">
           <UserRound size={20} />
         </div>
       ) : null}
@@ -993,12 +1039,12 @@ function InfoBox({
   icon: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl bg-indigo-50 p-4">
+    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
       <div className="flex items-center gap-2 text-indigo-600">{icon}</div>
-      <p className="mt-3 text-sm font-black tracking-[0.18em] text-yellow-600">
+      <p className="mt-3 text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
         {label.toUpperCase()}
       </p>
-      <p className="mt-2 break-words text-lg font-black text-indigo-700">
+      <p className="mt-1 break-words text-sm font-black text-slate-800">
         {value}
       </p>
     </div>
@@ -1018,11 +1064,11 @@ function StatCard({ label, value }: { label: string; value: string }) {
 
 function MiniInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white px-4 py-3">
-      <p className="text-xs font-black tracking-[0.16em] text-yellow-600">
+    <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
+      <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
         {label.toUpperCase()}
       </p>
-      <p className="mt-1 text-sm font-black text-indigo-700">{value}</p>
+      <p className="mt-1 text-xs font-black text-slate-800">{value}</p>
     </div>
   );
 }
