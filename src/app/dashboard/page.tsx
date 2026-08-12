@@ -1,5 +1,6 @@
 "use client";
 
+import { PortalShell } from "@/components/PortalShell";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -326,9 +327,13 @@ export default function DashboardPage() {
     <ProtectedPage>
       {(user) =>
         user.email === ADMIN_EMAIL ? (
-          <AdminDashboard email={user.email ?? ""} />
+          <PortalShell role="admin">
+            <AdminDashboard email={user.email ?? ""} />
+          </PortalShell>
         ) : (
-          <ParentDashboard userId={user.id} />
+          <PortalShell role="parent">
+            <ParentDashboard userId={user.id} />
+          </PortalShell>
         )
       }
     </ProtectedPage>
