@@ -42,6 +42,7 @@ type DashboardProfile = Profile & {
   draw_learn_unlocked?: boolean;
   sifir_deck_unlocked?: boolean;
   freebies_unlocked?: boolean;
+  huruf_membaca_unlocked?: boolean;
 };
 
 type ParentAccessField =
@@ -52,7 +53,8 @@ type ParentAccessField =
   | "sifir_deck_unlocked"
   | "freebies_unlocked"
   | "flashcard_unlocked"
-  | "flashcard_modul_unlocked";
+  | "flashcard_modul_unlocked"
+  | "huruf_membaca_unlocked";
 
 type ChildProfile = {
   id: string;
@@ -100,6 +102,7 @@ const packageLabels: Record<string, string> = {
   learning_hub_monthly: "Learning Hub Monthly RM50",
   learning_hub_6month: "Learning Hub Premium RM210",
   full_package: "Full Package RM250",
+  modul_membaca: "Modul Membaca RM45",
   worksheet_trial: "Worksheet Trial RM5",
   worksheet_basic: "Worksheet Basic RM15",
   worksheet_standard: "Worksheet Standard RM25",
@@ -198,6 +201,14 @@ const moduleCards: {
     packageGroup: "reading",
   },
   {
+    title: "Huruf & Membaca",
+    href: "/huruf-membaca",
+    field: "huruf_membaca_unlocked",
+    icon: BookOpenCheck,
+    description: "Interactive letter, phonics and Bahasa Melayu reading games.",
+    packageGroup: "reading",
+  },
+  {
     title: "Sifir Deck",
     href: "/sifir-deck",
     field: "sifir_deck_unlocked",
@@ -281,6 +292,14 @@ const adminCards = [
     tone: "pink",
   },
   {
+  title: "Huruf & Membaca",
+  href: "/admin/huruf-membaca",
+  icon: BookOpenCheck,
+  description: "Create, edit and organise letter, phonics and reading activities.",
+  badge: "Reading Game",
+  tone: "violet",
+},
+  {
     title: "Math Activity",
     href: "/admin/math-activity",
     icon: Calculator,
@@ -351,10 +370,7 @@ function AdminDashboard({ email }: { email: string }) {
 
   return (
     <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
-      <div className="grid min-h-screen xl:grid-cols-[250px_minmax(0,1fr)]">
-        <AdminPremiumSidebar />
-
-        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
+      <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
           <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.22em] text-indigo-500">
@@ -465,8 +481,7 @@ function AdminDashboard({ email }: { email: string }) {
               </div>
             </div>
           </section>
-        </section>
-      </div>
+      </section>
     </main>
   );
 }
@@ -887,11 +902,13 @@ function ParentDashboard({ userId }: { userId: string }) {
   const hasFreebies = profile?.freebies_unlocked !== false;
   const hasFlashcardLibrary = Boolean(profile?.flashcard_unlocked);
   const hasReadingModules = Boolean(profile?.flashcard_modul_unlocked);
+  const hasHurufMembaca = Boolean(profile?.huruf_membaca_unlocked);
 
   const unlockedCount = moduleCards.filter((card) => {
     if (!card.field) return true;
     if (card.field === "flashcard_unlocked") return hasFlashcardLibrary;
     if (card.field === "flashcard_modul_unlocked") return hasReadingModules;
+    if (card.field === "huruf_membaca_unlocked") return hasHurufMembaca;
     if (card.field === "freebies_unlocked") return hasFreebies;
     return Boolean(profile?.[card.field]);
   }).length;
@@ -1001,23 +1018,14 @@ function ParentDashboard({ userId }: { userId: string }) {
   const dashboardModules = moduleCards.filter((card) => {
     if (card.field === "flashcard_unlocked") return hasFlashcardLibrary;
     if (card.field === "flashcard_modul_unlocked") return hasReadingModules;
+    if (card.field === "huruf_membaca_unlocked") return hasHurufMembaca;
     if (card.field === "freebies_unlocked") return hasFreebies;
     return card.field ? Boolean(profile?.[card.field]) : true;
   });
 
   return (
     <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
-      <div className="grid min-h-screen xl:grid-cols-[250px_minmax(0,1fr)]">
-        <ParentSidebar
-          packageName={packageName}
-          endDate={profile?.subscription_end || "-"}
-          hasLearningHub={hasLearningHub}
-          hasCustomWorksheet={hasCustomWorksheet}
-          hasFlashcardLibrary={hasFlashcardLibrary}
-          hasReadingModules={hasReadingModules}
-        />
-
-        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
+      <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
           <TopHeader displayName={displayName} avatarUrl={profile?.avatar_url || null} />
 
           {error ? (
@@ -1302,8 +1310,7 @@ function ParentDashboard({ userId }: { userId: string }) {
               </a>
             </div>
           </section>
-        </section>
-      </div>
+      </section>
     </main>
   );
 }
@@ -1315,6 +1322,7 @@ function ParentSidebar({
   hasCustomWorksheet,
   hasFlashcardLibrary,
   hasReadingModules,
+  hasHurufMembaca,
 }: {
   packageName: string;
   endDate: string;
@@ -1322,12 +1330,14 @@ function ParentSidebar({
   hasCustomWorksheet: boolean;
   hasFlashcardLibrary: boolean;
   hasReadingModules: boolean;
+  hasHurufMembaca: boolean;
 }) {
   const links = [
     { title: "Dashboard", href: "/dashboard", icon: Home, show: true },
     { title: "Learning Hub", href: "/learning-hub", icon: BookOpenCheck, show: hasLearningHub },
     { title: "Flashcard Library", href: "/flashcard-library", icon: BookOpen, show: hasFlashcardLibrary },
     { title: "Modul Membaca", href: "/flashcard-modules", icon: BookOpenCheck, show: hasReadingModules },
+    { title: "Huruf & Membaca", href: "/huruf-membaca", icon: BookOpenCheck, show: hasHurufMembaca },
     { title: "Math Activity", href: "/math-activity", icon: Calculator, show: true },
     { title: "Custom Worksheet", href: "/custom-worksheet", icon: FileText, show: hasCustomWorksheet },
     { title: "Draw & Learn", href: "/worksheet", icon: Palette, show: true },

@@ -45,6 +45,7 @@ type Profile = {
   draw_learn_unlocked: boolean;
   sifir_deck_unlocked: boolean;
   freebies_unlocked: boolean;
+  huruf_membaca_unlocked: boolean;
   package_type: string | null;
   package_note: string | null;
   subscription_start: string | null;
@@ -59,7 +60,8 @@ type AccessField =
   | "math_activity_unlocked"
   | "draw_learn_unlocked"
   | "sifir_deck_unlocked"
-  | "freebies_unlocked";
+  | "freebies_unlocked"
+  | "huruf_membaca_unlocked";
 
 const ADMIN_EMAIL = "fdarcadia.hello@gmail.com";
 
@@ -92,7 +94,13 @@ const packageOptions = [
     value: "full_package",
     label: "Full Package RM250",
     months: 6,
-    note: "Learning Hub + Math Activity + Draw & Learn + Sifir Deck + Freebies + Flashcard Library + Modul Membaca",
+    note: "Learning Hub + Math Activity + Draw & Learn + Sifir Deck + Freebies + Flashcard Library + Modul Membaca (termasuk Huruf & Membaca)",
+  },
+  {
+    value: "modul_membaca",
+    label: "Modul Membaca RM45",
+    days: 365,
+    note: "Modul Membaca + Huruf & Membaca",
   },
   {
     value: "worksheet_trial",
@@ -154,6 +162,7 @@ function getPackageUnlocks(packageType: string) {
     draw_learn_unlocked: false,
     sifir_deck_unlocked: false,
     freebies_unlocked: false,
+    huruf_membaca_unlocked: false,
   };
 
   switch (packageType) {
@@ -173,6 +182,13 @@ function getPackageUnlocks(packageType: string) {
         learning_hub_unlocked: true,
       };
 
+    case "modul_membaca":
+      return {
+        ...base,
+        flashcard_modul_unlocked: true,
+        huruf_membaca_unlocked: true,
+      };
+
     case "full_package":
       return {
         ...base,
@@ -183,6 +199,7 @@ function getPackageUnlocks(packageType: string) {
         freebies_unlocked: true,
         flashcard_unlocked: true,
         flashcard_modul_unlocked: true,
+        huruf_membaca_unlocked: true,
       };
 
     case "worksheet_trial":
@@ -216,6 +233,7 @@ function getPackageBadgeStyle(packageType: string | null) {
   ) {
     return "bg-emerald-100 text-emerald-700";
   }
+  if (packageType === "modul_membaca") return "bg-fuchsia-100 text-fuchsia-700";
   if (packageType.includes("monthly")) return "bg-blue-100 text-blue-700";
   if (packageType.includes("weekly") || packageType.includes("trial")) {
     return "bg-orange-100 text-orange-700";
@@ -353,7 +371,7 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
         profile.learning_hub_unlocked,
         profile.custom_worksheet_unlocked,
         profile.flashcard_unlocked,
-        profile.flashcard_modul_unlocked,
+        profile.flashcard_modul_unlocked && profile.huruf_membaca_unlocked,
         profile.math_activity_unlocked,
         profile.draw_learn_unlocked,
         profile.sifir_deck_unlocked,
@@ -380,20 +398,41 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
 
     const nextValue = !Boolean(currentValue);
 
-    const { data, error: updateError } = await supabase
-      .from("profiles")
-      .update({ [field]: nextValue })
-      .eq("id", id)
-      .select()
-      .single<Profile>();
+    const isReadingBundle =
+      field === "flashcard_modul_unlocked" ||
+      field === "huruf_membaca_unlocked";
 
-    if (updateError || !data) {
-      setError(updateError?.message ?? "Unable to update access.");
+    const updatePayload: Partial<Profile> = isReadingBundle
+      ? {
+          flashcard_modul_unlocked: nextValue,
+          huruf_membaca_unlocked: nextValue,
+        }
+      : {
+          [field]: nextValue,
+        };
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update(updatePayload)
+      .eq("id", id);
+
+    if (updateError) {
+      setError(
+        updateError.message ||
+          "Unable to update access. Please check the admin UPDATE policy for profiles.",
+      );
       return;
     }
 
     setProfiles((current) =>
-      current.map((profile) => (profile.id === id ? data : profile)),
+      current.map((profile) =>
+        profile.id === id
+          ? {
+              ...profile,
+              ...updatePayload,
+            }
+          : profile,
+      ),
     );
   }
 
@@ -407,6 +446,8 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
       return;
     }
 
+    setError("");
+
     const selectedPackage = packageOptions.find(
       (option) => option.value === packageType,
     );
@@ -414,7 +455,7 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
     const endDate = getEndDate(packageType, startDate);
     const unlocks = getPackageUnlocks(packageType);
 
-    const updatePayload = {
+    const updatePayload: Partial<Profile> = {
       package_type: packageType,
       package_note: selectedPackage?.note ?? "",
       subscription_start: startDate,
@@ -422,53 +463,72 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
       ...unlocks,
     };
 
-    const { data, error: updateError } = await supabase
+    const { error: updateError } = await supabase
       .from("profiles")
       .update(updatePayload)
-      .eq("id", profile.id)
-      .select()
-      .single<Profile>();
+      .eq("id", profile.id);
 
-    if (updateError || !data) {
-      setError(updateError?.message ?? "Unable to save package.");
+    if (updateError) {
+      setError(
+        updateError.message ||
+          "Unable to save package. Please check the admin UPDATE policy for profiles.",
+      );
       return;
     }
 
     setProfiles((current) =>
-      current.map((item) => (item.id === profile.id ? data : item)),
+      current.map((item) =>
+        item.id === profile.id
+          ? {
+              ...item,
+              ...updatePayload,
+            }
+          : item,
+      ),
     );
-
-    setError("");
   }
 
   async function resetAccess(profile: Profile) {
-    const { data, error: updateError } = await supabase
-      .from("profiles")
-      .update({
-        package_type: null,
-        package_note: null,
-        subscription_start: null,
-        subscription_end: null,
-        learning_hub_unlocked: false,
-        custom_worksheet_unlocked: false,
-        flashcard_unlocked: false,
-        flashcard_modul_unlocked: false,
-        math_activity_unlocked: false,
-        draw_learn_unlocked: false,
-        sifir_deck_unlocked: false,
-        freebies_unlocked: false,
-      })
-      .eq("id", profile.id)
-      .select()
-      .single<Profile>();
+    setError("");
 
-    if (updateError || !data) {
-      setError(updateError?.message ?? "Unable to reset access.");
+    const updatePayload: Partial<Profile> = {
+      package_type: null,
+      package_note: null,
+      subscription_start: null,
+      subscription_end: null,
+      learning_hub_unlocked: false,
+      custom_worksheet_unlocked: false,
+      flashcard_unlocked: false,
+      flashcard_modul_unlocked: false,
+      math_activity_unlocked: false,
+      draw_learn_unlocked: false,
+      sifir_deck_unlocked: false,
+      freebies_unlocked: false,
+      huruf_membaca_unlocked: false,
+    };
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update(updatePayload)
+      .eq("id", profile.id);
+
+    if (updateError) {
+      setError(
+        updateError.message ||
+          "Unable to reset access. Please check the admin UPDATE policy for profiles.",
+      );
       return;
     }
 
     setProfiles((current) =>
-      current.map((item) => (item.id === profile.id ? data : item)),
+      current.map((item) =>
+        item.id === profile.id
+          ? {
+              ...item,
+              ...updatePayload,
+            }
+          : item,
+      ),
     );
   }
 
@@ -873,11 +933,14 @@ function UserCard({
   const expired = isExpired(profile.subscription_end);
   const active = Boolean(profile.package_type) && !expired;
 
+  const modulMembacaUnlocked =
+    profile.flashcard_modul_unlocked && profile.huruf_membaca_unlocked;
+
   const accessValues = [
     profile.learning_hub_unlocked,
     profile.custom_worksheet_unlocked,
     profile.flashcard_unlocked,
-    profile.flashcard_modul_unlocked,
+    modulMembacaUnlocked,
     profile.math_activity_unlocked,
     profile.draw_learn_unlocked,
     profile.sifir_deck_unlocked,
@@ -981,7 +1044,17 @@ function UserCard({
               <AccessButton label="Freebies" active={profile.freebies_unlocked} onClick={() => onToggle(profile.id, "freebies_unlocked", profile.freebies_unlocked)} />
               <AccessButton label="Custom Worksheet" active={profile.custom_worksheet_unlocked} onClick={() => onToggle(profile.id, "custom_worksheet_unlocked", profile.custom_worksheet_unlocked)} />
               <AccessButton label="Flashcard Library" active={profile.flashcard_unlocked} onClick={() => onToggle(profile.id, "flashcard_unlocked", profile.flashcard_unlocked)} />
-              <AccessButton label="Modul Membaca" active={profile.flashcard_modul_unlocked} onClick={() => onToggle(profile.id, "flashcard_modul_unlocked", profile.flashcard_modul_unlocked)} />
+              <AccessButton
+                label="Modul Membaca + Huruf & Membaca"
+                active={modulMembacaUnlocked}
+                onClick={() =>
+                  onToggle(
+                    profile.id,
+                    "flashcard_modul_unlocked",
+                    modulMembacaUnlocked,
+                  )
+                }
+              />
             </div>
 
             <div className="mt-4 grid gap-3 rounded-[18px] border border-slate-200 bg-white p-4 lg:grid-cols-[minmax(240px,1fr)_170px_150px]">

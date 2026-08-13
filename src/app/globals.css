@@ -185,3 +185,15 @@ textarea {
 .fd-float {
   animation: fdFloat 3.5s ease-in-out infinite;
 }
+
+@font-face {
+  font-family: "Kabel";
+  src: url("/fonts/Kabel.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-kabel {
+  font-family: "Kabel", "Arial Rounded MT Bold", Arial, sans-serif;
+}
