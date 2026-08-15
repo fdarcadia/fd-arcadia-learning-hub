@@ -214,14 +214,14 @@ const FALLBACK_QUESTION: ReadingQuestion = {
 ========================================================= */
 
 const letterColours = [
-  "#0F9FA8", // teal
-  "#F59E0B", // amber
-  "#2563EB", // blue
-  "#10B981", // emerald
-  "#F97316", // orange
-  "#06B6D4", // cyan
-  "#84CC16", // lime
-  "#EAB308", // yellow
+  "#13A8A8", // aqua teal
+  "#2D9CDB", // ocean blue
+  "#5B7CFA", // periwinkle
+  "#7357D9", // soft violet
+  "#20B7C9", // cyan
+  "#3A8DDE", // clear blue
+  "#66C6B9", // seafoam
+  "#7896E8", // lavender blue
 ];
 
 /* =========================================================
@@ -1215,7 +1215,7 @@ function ReadingGame() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#eef0ff] px-4 py-8">
+      <main className="min-h-screen bg-[#eaf8ff] px-4 py-8">
         <div className="flex min-h-[70vh] items-center justify-center">
           <div className="text-center">
             <Loader2
@@ -1237,15 +1237,23 @@ function ReadingGame() {
   ========================================================= */
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#eef0ff] px-3 py-4 sm:px-5 lg:px-7">
-      {/* BACKGROUND */}
+    <main
+      className="relative min-h-screen overflow-hidden bg-[#eaf8ff] px-3 py-4 sm:px-5 lg:px-7"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(236,249,255,0.30), rgba(236,249,255,0.30)), url('/images/reading-ocean-background.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center bottom",
+        backgroundAttachment: "fixed",
+      }}
+    >
+      {/* OCEAN THEME OVERLAY */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 via-sky-50/10 to-white/5" />
 
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-32 top-10 h-80 w-80 rounded-full bg-violet-300/20 blur-3xl" />
-
-        <div className="absolute right-[-120px] top-[-60px] h-96 w-96 rounded-full bg-blue-300/20 blur-3xl" />
-
-        <div className="absolute bottom-[-160px] left-[30%] h-96 w-96 rounded-full bg-pink-300/20 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <span className="ocean-bubble absolute left-[8%] top-[18%] h-6 w-6 rounded-full border-2 border-white/70 bg-white/20" />
+        <span className="ocean-bubble ocean-bubble-delay absolute right-[12%] top-[28%] h-10 w-10 rounded-full border-2 border-white/60 bg-white/15" />
+        <span className="ocean-bubble ocean-bubble-delay-2 absolute left-[18%] top-[62%] h-4 w-4 rounded-full border-2 border-white/70 bg-white/20" />
       </div>
 
       {celebrate ? (
@@ -1260,7 +1268,7 @@ function ReadingGame() {
       ) : null}
 
       <div className="relative mx-auto max-w-[1180px]">
-        <section className="overflow-hidden rounded-[34px] border-[5px] border-[#6756e9] bg-white shadow-[0_28px_80px_rgba(77,64,190,0.23)]">
+        <section className="overflow-hidden rounded-[34px] border-[4px] border-white/80 bg-white/90 shadow-[0_28px_80px_rgba(70,150,190,0.20)] backdrop-blur-[8px]">
           {/* =====================================================
               TOP BAR
           ===================================================== */}
@@ -1358,7 +1366,7 @@ function ReadingGame() {
               READING LEVEL SELECTOR
           ===================================================== */}
 
-          <div className="mt-5 border-y border-violet-100 bg-[#faf9ff] px-5 py-4 sm:px-8">
+          <div className="mt-5 border-y border-sky-100 bg-gradient-to-r from-sky-50/90 via-white/90 to-cyan-50/90 px-5 py-4 sm:px-8">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[0.18em] text-violet-500">
@@ -1425,7 +1433,7 @@ function ReadingGame() {
           ===================================================== */}
 
           <div className="mx-auto mt-5 max-w-[680px] px-5">
-            <div className="flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center shadow-sm">
+            <div className="flex items-center justify-center gap-3 rounded-2xl border border-sky-100 bg-white/92 px-4 py-3 text-center shadow-[0_8px_20px_rgba(74,163,197,0.10)] backdrop-blur">
               {mode ===
               "finger" ? (
                 <Hand
@@ -1454,7 +1462,7 @@ function ReadingGame() {
           ===================================================== */}
 
           {question ? (
-            <div className="relative mx-3 mt-6 overflow-visible rounded-[28px] border border-slate-200 bg-gradient-to-b from-white to-[#fbfcff] px-3 py-7 sm:mx-6 sm:px-5 lg:mx-7 lg:px-7">
+            <div className="relative mx-3 mt-6 overflow-visible rounded-[30px] border-2 border-sky-100 bg-white/82 px-3 py-7 shadow-[0_18px_45px_rgba(51,151,190,0.10)] backdrop-blur-sm sm:mx-6 sm:px-5 lg:mx-7 lg:px-7">
               {/* =====================================================
                   LETTER CARDS
                   Auto responsive ikut lebar phone / iPad / desktop.
@@ -1583,7 +1591,7 @@ function ReadingGame() {
                     >
                       {/* BULATAN HURUF */}
                       <div
-                        className={`relative flex aspect-square w-full shrink-0 items-center justify-center rounded-full border-[3px] bg-white transition-all duration-300 ${
+                        className={`ocean-letter-float relative flex aspect-square w-full shrink-0 items-center justify-center rounded-full border-[3px] bg-white/95 transition-all duration-300 ${
                           isCurrent
                             ? "-translate-y-1 scale-[1.025]"
                             : "translate-y-0 scale-100"
@@ -1593,7 +1601,7 @@ function ReadingGame() {
                           maxHeight: `${maxCircleSize}px`,
                           borderColor: active
                             ? colour
-                            : "#D8DEE8",
+                            : "#C7E1EE",
                           background: active
                             ? `linear-gradient(145deg, #FFFFFF 0%, ${colour}12 100%)`
                             : "linear-gradient(145deg, #FFFFFF 0%, #F8FAFC 100%)",
@@ -1695,9 +1703,9 @@ function ReadingGame() {
                     onPointerCancel={handlePointerUp}
                     className="relative h-[92px] touch-none select-none cursor-grab active:cursor-grabbing"
                   >
-                    <div className="absolute left-0 right-0 top-[18px] h-[34px] overflow-hidden rounded-full bg-[#eef0f7] shadow-inner">
+                    <div className="absolute left-0 right-0 top-[18px] h-[34px] overflow-hidden rounded-full border border-sky-100 bg-white/90 shadow-inner">
                       <div
-                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#7346ee] via-[#6b4ee8] to-[#586de9] transition-[width] duration-75"
+                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#32C7C7] via-[#2D9CDB] to-[#6D62E9] transition-[width] duration-75"
                         style={{
                           width: `${progress}%`,
                         }}
@@ -1733,7 +1741,7 @@ function ReadingGame() {
                           <span className="h-5 w-[3px] rounded-full bg-slate-300" />
                         </div>
 
-                        <span className="absolute -right-[6px] top-[8px] h-4 w-4 rounded-full bg-rose-500 ring-4 ring-white" />
+                        <span className="absolute -right-[6px] top-[8px] h-4 w-4 rounded-full bg-cyan-400 ring-4 ring-white shadow-[0_0_14px_rgba(34,211,238,0.55)]" />
                       </div>
 
                       <div className="absolute left-[34px] top-[40px] text-[46px] drop-shadow-md">
@@ -1815,7 +1823,7 @@ function ReadingGame() {
             <button
               type="button"
               onClick={toggleMode}
-              className="flex min-h-[56px] items-center justify-between rounded-2xl border border-violet-100 bg-violet-50 px-4"
+              className="flex min-h-[56px] items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/90 px-4"
             >
               <div className="flex items-center gap-3">
                 <Hand
@@ -1861,7 +1869,7 @@ function ReadingGame() {
             <button
               type="button"
               onClick={playWord}
-              className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg"
+              className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-cyan-400 via-sky-500 to-indigo-500 text-white shadow-[0_10px_24px_rgba(45,156,219,0.28)]"
             >
               <Volume2
                 size={24}
@@ -2029,7 +2037,7 @@ function ReadingGame() {
               type="button"
               onClick={nextQuestion}
               disabled={!question}
-              className="inline-flex min-h-[48px] disabled:cursor-not-allowed disabled:opacity-40 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 text-sm font-black text-white"
+              className="inline-flex min-h-[48px] disabled:cursor-not-allowed disabled:opacity-40 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-500 px-5 text-sm font-black text-white shadow-[0_8px_20px_rgba(14,165,233,0.22)]"
             >
               Seterusnya
 
@@ -2046,6 +2054,38 @@ function ReadingGame() {
           </div>
         ) : null}
       </div>
+
+      <style jsx global>{`
+        @keyframes oceanLetterFloat {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-5px); }
+        }
+
+        @keyframes oceanBubbleFloat {
+          0% { transform: translateY(20px) scale(0.9); opacity: 0; }
+          20% { opacity: 0.75; }
+          100% { transform: translateY(-90px) scale(1.08); opacity: 0; }
+        }
+
+        .ocean-letter-float {
+          animation: oceanLetterFloat 3.8s ease-in-out infinite;
+        }
+
+        .ocean-letter-float:nth-child(2) { animation-delay: .28s; }
+        .ocean-letter-float:nth-child(3) { animation-delay: .56s; }
+        .ocean-letter-float:nth-child(4) { animation-delay: .84s; }
+        .ocean-letter-float:nth-child(5) { animation-delay: 1.12s; }
+
+        .ocean-bubble {
+          animation: oceanBubbleFloat 6s ease-in-out infinite;
+        }
+        .ocean-bubble-delay { animation-delay: 1.7s; }
+        .ocean-bubble-delay-2 { animation-delay: 3.2s; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .ocean-letter-float, .ocean-bubble { animation: none !important; }
+        }
+      `}</style>
     </main>
   );
 }

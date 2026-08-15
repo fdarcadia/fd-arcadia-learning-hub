@@ -66,6 +66,8 @@ type ChildProfile = {
   grade?: string | null;
   school?: string | null;
   avatar_url?: string | null;
+  avatar_character?: string | null;
+  avatar_skin?: string | null;
 };
 
 type ReadingModuleRow = {
@@ -95,6 +97,8 @@ type ReadingModuleSummary = {
   lastOpenedAt: string | null;
   completed: boolean;
 };
+
+type AvatarAction = "idle" | "sit" | "dance" | "wave" | "clap" | "jump";
 
 const packageLabels: Record<string, string> = {
   math_package: "Math Package RM25",
@@ -300,6 +304,14 @@ const adminCards = [
   tone: "violet",
 },
   {
+    title: "Bina Perkataan",
+    href: "/admin/huruf-membaca/bina-perkataan",
+    icon: BookOpenCheck,
+    description: "Manage 30 KVKV word-building questions and upload picture clues.",
+    badge: "KVKV",
+    tone: "cyan",
+  },
+  {
     title: "Math Activity",
     href: "/admin/math-activity",
     icon: Calculator,
@@ -350,9 +362,7 @@ export default function DashboardPage() {
             <AdminDashboard email={user.email ?? ""} />
           </PortalShell>
         ) : (
-          <PortalShell role="parent">
-            <ParentDashboard userId={user.id} />
-          </PortalShell>
+          <ParentDashboard userId={user.id} />
         )
       }
     </ProtectedPage>
@@ -815,6 +825,8 @@ function ParentDashboard({ userId }: { userId: string }) {
   const [readingLoading, setReadingLoading] = useState(true);
   const [selectedSubject, setSelectedSubject] = useState("Warm Up");
   const [error, setError] = useState("");
+  const [avatarAction, setAvatarAction] = useState<AvatarAction>("idle");
+  const [selectedChildId, setSelectedChildId] = useState<string>("");
 
   useEffect(() => {
     async function loadDashboardData() {
@@ -838,7 +850,28 @@ function ParentDashboard({ userId }: { userId: string }) {
         .eq("parent_id", userId)
         .limit(8);
 
-      setChildren((childrenData || []) as ChildProfile[]);
+      const loadedChildren = (childrenData || []) as ChildProfile[];
+
+      setChildren(loadedChildren);
+
+      if (loadedChildren.length > 0) {
+        const savedChildId =
+          typeof window !== "undefined"
+            ? window.localStorage.getItem("fd-arcadia-selected-child")
+            : null;
+
+        const savedChildExists = loadedChildren.some(
+          (child) => child.id === savedChildId
+        );
+
+        setSelectedChildId(
+          savedChildId && savedChildExists
+            ? savedChildId
+            : loadedChildren[0].id
+        );
+      } else {
+        setSelectedChildId("");
+      }
 
       try {
         setReadingLoading(true);
@@ -885,6 +918,17 @@ function ParentDashboard({ userId }: { userId: string }) {
 
     loadDashboardData();
   }, [userId]);
+
+  useEffect(() => {
+    if (avatarAction === "idle" || avatarAction === "sit") return;
+
+    const duration = avatarAction === "dance" ? 1800 : 1050;
+    const timer = window.setTimeout(() => {
+      setAvatarAction("idle");
+    }, duration);
+
+    return () => window.clearTimeout(timer);
+  }, [avatarAction]);
 
   const displayName = useMemo(() => {
     return profile?.full_name?.trim() || "Parent";
@@ -999,7 +1043,10 @@ function ParentDashboard({ userId }: { userId: string }) {
 
   const whatsappLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${whatsappText}`;
 
-  const primaryChild = children[0] || null;
+  const primaryChild =
+  children.find((child) => child.id === selectedChildId) ||
+  children[0] ||
+  null;
   const primaryChildName =
     primaryChild?.name ||
     primaryChild?.child_name ||
@@ -1023,295 +1070,631 @@ function ParentDashboard({ userId }: { userId: string }) {
     return card.field ? Boolean(profile?.[card.field]) : true;
   });
 
+  const visibleDashboardModules = dashboardModules.slice(0, 6);
+  const levelNumber = (() => {
+    const raw = String(primaryChildLevel || "");
+    const match = raw.match(/\d+/);
+    return match ? Number(match[0]) : 1;
+  })();
+
+  const xpCurrent = Math.min(1000, Math.max(0, overallProgress * 10));
+  const xpPercent = Math.min(100, Math.round((xpCurrent / 1000) * 100));
+  const coinCount = unlockedCount * 70;
+  const starCount = Math.max(readingCompletedCount * 20, Math.round(overallProgress * 1.2));
+  const gemCount = Math.max(0, Math.floor(readingCompletedCount * 3));
+
+  const gameAvatar = primaryChild?.avatar_character?.trim() || "boy_01";
+  const gameAvatarIdleImage = `/avatars/${gameAvatar}/idle.png`;
+
+  function changeSelectedChild(childId: string) {
+    setSelectedChildId(childId);
+    setAvatarAction("idle");
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("fd-arcadia-selected-child", childId);
+    }
+  }
+
+  function playAvatarAction(action: AvatarAction) {
+    if (action === "sit") {
+      setAvatarAction((current) => (current === "sit" ? "idle" : "sit"));
+      return;
+    }
+
+    // Reset first so repeated taps can replay the same animation cleanly.
+    setAvatarAction("idle");
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setAvatarAction(action));
+    });
+  }
+
   return (
-    <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
-      <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
-          <TopHeader displayName={displayName} avatarUrl={profile?.avatar_url || null} />
+    <main className="min-h-screen bg-[#090d2c] text-slate-950 xl:h-screen xl:overflow-hidden">
+      <style>{`
+        @keyframes fdAvatarIdle {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-6px) scale(1.01); }
+        }
 
-          {error ? (
-            <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-              {error}
+        @keyframes fdAvatarJump {
+          0% { transform: translateY(0) scale(1); }
+          18% { transform: translateY(5px) scaleX(1.05) scaleY(0.95); }
+          50% { transform: translateY(-78px) scaleX(0.98) scaleY(1.04); }
+          76% { transform: translateY(-14px) scale(1); }
+          90% { transform: translateY(4px) scaleX(1.05) scaleY(0.95); }
+          100% { transform: translateY(0) scale(1); }
+        }
+
+        @keyframes fdAvatarDance {
+          0% { transform: translateX(0) translateY(0) rotate(0deg); }
+          12% { transform: translateX(-18px) translateY(-8px) rotate(-7deg); }
+          25% { transform: translateX(18px) translateY(0) rotate(7deg); }
+          38% { transform: translateX(-14px) translateY(-10px) rotate(-6deg); }
+          50% { transform: translateX(14px) translateY(0) rotate(6deg); }
+          63% { transform: translateX(-12px) translateY(-8px) rotate(-5deg); }
+          76% { transform: translateX(12px) translateY(0) rotate(5deg); }
+          88% { transform: translateX(-6px) translateY(-5px) rotate(-2deg); }
+          100% { transform: translateX(0) translateY(0) rotate(0deg); }
+        }
+
+        @keyframes fdAvatarWave {
+          0%, 100% { transform: rotate(0deg) translateX(0); }
+          20% { transform: rotate(-5deg) translateX(-4px); }
+          40% { transform: rotate(5deg) translateX(4px); }
+          60% { transform: rotate(-5deg) translateX(-4px); }
+          80% { transform: rotate(4deg) translateX(3px); }
+        }
+
+        @keyframes fdAvatarClap {
+          0%, 100% { transform: scale(1) translateY(0); }
+          20% { transform: scale(1.06) translateY(-5px); }
+          40% { transform: scale(0.98) translateY(0); }
+          60% { transform: scale(1.06) translateY(-5px); }
+          80% { transform: scale(0.98) translateY(0); }
+        }
+
+        .fd-avatar-idle { animation: fdAvatarIdle 2.8s ease-in-out infinite; }
+        .fd-avatar-jump { animation: fdAvatarJump .95s ease-in-out both; }
+        .fd-avatar-dance { animation: fdAvatarDance 1.7s ease-in-out both; }
+        .fd-avatar-wave { animation: fdAvatarWave .95s ease-in-out both; }
+        .fd-avatar-clap { animation: fdAvatarClap .85s ease-in-out both; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .fd-avatar-idle,
+          .fd-avatar-jump,
+          .fd-avatar-dance,
+          .fd-avatar-wave,
+          .fd-avatar-clap {
+            animation: none !important;
+          }
+        }
+      `}</style>
+      <div className="mx-auto min-h-screen w-full max-w-[1920px] xl:grid xl:h-screen xl:grid-cols-[230px_minmax(0,1fr)]">
+        {/* DESKTOP PLAYER SIDEBAR */}
+        <aside className="hidden min-h-0 border-r border-white/10 bg-gradient-to-b from-[#0c1238] via-[#111744] to-[#0b1032] px-4 py-5 text-white xl:flex xl:flex-col">
+          <Link href="/dashboard" className="flex items-center gap-3 px-2">
+            <div className="grid h-11 w-11 place-items-center rounded-[16px] bg-gradient-to-br from-violet-400 to-indigo-600 text-2xl shadow-lg shadow-violet-950/30">
+              🏠
             </div>
-          ) : null}
+            <div className="min-w-0">
+              <p className="truncate text-[15px] font-black tracking-tight">FD Arcadia</p>
+              <p className="text-[9px] font-black tracking-[0.15em] text-violet-200">LEARNINGHUB</p>
+            </div>
+          </Link>
 
-          <section className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#6253d9] via-[#5159c7] to-[#31549b] px-5 py-6 text-white shadow-[0_20px_55px_rgba(79,70,229,0.20)] sm:px-6">
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+          <div className="mt-5 rounded-[28px] border border-violet-300/20 bg-white/[0.07] p-4 text-center shadow-[0_18px_45px_rgba(0,0,0,0.18)] backdrop-blur">
+            <Link href="/children/avatar" className="relative mx-auto block h-24 w-24" title="Change avatar">
+              <div className="grid h-24 w-24 place-items-center overflow-hidden rounded-full border-4 border-white/80 bg-gradient-to-br from-violet-300 to-indigo-500 shadow-lg">
+                {primaryChild ? (
+                  <img
+                    src={gameAvatarIdleImage}
+                    alt={primaryChildName}
+                    className="h-full w-full object-contain"
+                    draggable={false}
+                  />
+                ) : profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt={displayName} className="h-full w-full object-cover" />
+                ) : (
+                  <UserRound size={42} className="text-white" />
+                )}
+              </div>
+              <span className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-[#111744] bg-white text-indigo-600">✎</span>
+            </Link>
 
-            <div className="relative grid gap-6 xl:grid-cols-[1fr_1.35fr] xl:items-center">
-              <div className="flex items-center gap-4">
-                <Link
-                  href="/children"
-                  className="relative grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white/70 bg-white/15 text-5xl shadow-lg sm:h-28 sm:w-28"
-                >
-                  {primaryChild?.avatar_url ? (
-                    <img src={primaryChild.avatar_url} alt={primaryChildName} className="h-full w-full object-cover" />
-                  ) : profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt={displayName} className="h-full w-full object-cover" />
-                  ) : (
-                    <UserRound size={42} className="text-white/80" />
-                  )}
-                </Link>
+            <h2 className="mt-3 truncate text-2xl font-black">{primaryChildName}</h2>
+            <span className="mt-1 inline-flex rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 px-3 py-1 text-[10px] font-black">
+              Level {levelNumber}
+            </span>
 
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-fuchsia-400" style={{ width: `${xpPercent}%` }} />
+            </div>
+            <p className="mt-1 text-[9px] font-bold text-indigo-100">{xpCurrent} / 1000 XP</p>
+
+            <div className="mt-4 grid grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-white/[0.06] p-2">
+              <MiniCurrency emoji="🪙" value={coinCount} label="Coins" />
+              <MiniCurrency emoji="⭐" value={starCount} label="Stars" />
+              <MiniCurrency emoji="💎" value={gemCount} label="Gems" />
+            </div>
+          </div>
+
+          <nav className="mt-4 space-y-1.5">
+            <GameSideLink href="/dashboard" icon={Home} label="Home" active />
+            <GameSideLink href="/learning-hub" icon={BookOpenCheck} label="Learning" show={hasLearningHub} />
+            <GameSideLink href="/virtual-world" icon={Sparkles} label="Virtual World" />
+            <GameSideLink href="/flashcard-modules" icon={BarChart3} label="Progress" show={hasReadingModules} />
+            <GameSideLink href="/profile" icon={UserRound} label="Profile" />
+          </nav>
+
+          <div className="mt-auto rounded-[22px] border border-violet-300/25 bg-gradient-to-br from-violet-600/35 to-fuchsia-500/15 p-4">
+            <div className="flex items-center gap-3">
+              <div className="text-4xl">🎁</div>
+              <div>
+                <p className="text-xs font-black">Daily Reward</p>
+                <p className="mt-1 text-[9px] font-semibold text-violet-100">Come back every day!</p>
+              </div>
+            </div>
+            <Link href="/freebies" className="mt-3 flex w-full items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black text-white transition hover:bg-white/15">
+              Open Rewards
+            </Link>
+          </div>
+        </aside>
+
+        {/* MAIN GAME DASHBOARD */}
+        <div className="min-w-0 bg-gradient-to-b from-[#f7f3ff] via-[#f9f7ff] to-[#eeeaff] xl:overflow-y-auto">
+          {/* TOP BAR */}
+          <header className="sticky top-0 z-40 border-b border-indigo-100/80 bg-[#f9f7ff]/90 px-3 py-3 backdrop-blur-xl sm:px-5 lg:px-6">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-xl text-white shadow-md xl:hidden">🏠</div>
                 <div className="min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-100">
-                    {children.length > 0 ? "Learning Profile" : "Parent Account"}
-                  </p>
-                  <h2 className="mt-1 truncate text-3xl font-black sm:text-4xl">
-                    {primaryChildName}
-                  </h2>
-                  <p className="mt-1 text-sm font-semibold text-indigo-100">
-                    {primaryChildLevel} • {primaryChildAge}
-                  </p>
-                  <div className="mt-3 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-black">
-                    {packageName}
-                  </div>
+                  <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-violet-500">FD Arcadia LearningHub</p>
+                  <h1 className="truncate text-lg font-black text-[#28245d] sm:text-xl">Home</h1>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <ParentHeroMetric icon={BookOpenCheck} value={String(unlockedCount)} label="Modules Unlocked" />
-                <ParentHeroMetric icon={CheckCircle2} value={`${readingCompletedCount}/${readingSummaries.length || 0}`} label="Reading Complete" />
-                <ParentHeroMetric icon={BarChart3} value={`${readingAverageProgress}%`} label="Reading Progress" />
-                <ParentHeroMetric icon={Users} value={String(children.length)} label="Children" />
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <TopCurrency emoji="🪙" value={coinCount} />
+                <TopCurrency emoji="⭐" value={starCount} className="hidden sm:flex" />
+                <TopCurrency emoji="💎" value={gemCount} className="hidden md:flex" />
+                <Link href="/profile" className="grid h-10 w-10 place-items-center rounded-2xl bg-[#292958] text-white shadow-sm transition hover:-translate-y-0.5">
+                  <UserRound size={18} />
+                </Link>
+                <LogoutGameButton />
               </div>
             </div>
-          </section>
+          </header>
 
-          <section className="mt-5 grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
-            <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-500">
-                    Learning Access
-                  </p>
-                  <h2 className="mt-1 text-xl font-black">My Learning Modules</h2>
-                </div>
-                <Link
-                  href="/pricing"
-                  className="rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 text-[10px] font-black text-violet-700 transition hover:bg-violet-100"
-                >
-                  View Plans
-                </Link>
-              </div>
+          <div className="p-3 pb-24 sm:p-5 sm:pb-24 lg:p-6 lg:pb-24 xl:pb-8">
+            {error ? (
+              <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div>
+            ) : null}
 
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {dashboardModules.slice(0, 6).map((card) => {
-                  const Icon = card.icon;
-                  const isReading = card.title === "Modul Membaca";
-                  const progressValue = isReading ? readingAverageProgress : 100;
+            <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="min-w-0 space-y-4">
+                {/* HOME HERO - SELECTED CHILD */}
+                <section className="relative isolate overflow-hidden rounded-[30px] border border-white/70 bg-gradient-to-br from-[#f6ded3] via-[#ded5fb] to-[#bab6f1] p-5 shadow-[0_22px_70px_rgba(66,53,140,0.18)] sm:p-7">
+                  <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/30 blur-3xl" />
+                  <div className="absolute -bottom-24 left-[20%] h-48 w-48 rounded-full bg-violet-300/25 blur-3xl" />
 
-                  return (
-                    <Link
-                      key={card.title}
-                      href={card.href}
-                      className="group rounded-[18px] border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-600">
-                          <Icon size={20} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <h3 className="truncate text-sm font-black text-slate-900">{card.title}</h3>
-                            <ChevronRight size={15} className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-600" />
-                          </div>
-                          <p className="mt-1 truncate text-[10px] font-semibold text-slate-400">
-                            {isReading
-                              ? readingAverageProgress > 0
-                                ? "Continue reading"
-                                : "Start reading"
-                              : "Ready to use"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center gap-2">
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className={`h-full rounded-full ${isReading ? "bg-violet-500" : "bg-emerald-500"}`}
-                            style={{ width: `${progressValue}%` }}
-                          />
-                        </div>
-                        <span className="text-[9px] font-black text-slate-400">
-                          {isReading ? `${progressValue}%` : "Ready"}
-                        </span>
-                      </div>
-                    </Link>
-                  );
-                })}
-
-                {dashboardModules.length === 0 ? (
-                  <div className="rounded-2xl bg-slate-50 p-5 text-sm font-semibold text-slate-500 md:col-span-2">
-                    No premium module unlocked yet. View plans to choose your learning package.
-                  </div>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-violet-500">
-                    This Week
-                  </p>
-                  <h2 className="mt-1 text-xl font-black">Weekly Progress</h2>
-                </div>
-                <BarChart3 size={20} className="text-violet-500" />
-              </div>
-
-              <div className="mt-5 space-y-4">
-                {subjectTabs.map((subject) => (
-                  <div key={subject.title}>
-                    <div className="mb-1.5 flex items-center justify-between gap-3">
-                      <span className="flex items-center gap-2 text-xs font-black text-slate-700">
-                        <span>{subject.icon}</span>
-                        {subject.title}
-                      </span>
-                      <span className="text-[10px] font-black text-slate-400">{subject.progress}%</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500"
-                        style={{ width: `${subject.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {hasLearningHub ? (
-                <Link
-                  href="/learning-hub"
-                  className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-violet-50 px-4 py-3 text-xs font-black text-violet-700 transition hover:bg-violet-100"
-                >
-                  View Learning Hub
-                  <ChevronRight size={14} />
-                </Link>
-              ) : null}
-            </section>
-          </section>
-
-          {hasReadingModules ? (
-            <ReadingProgressDashboard
-              loading={readingLoading}
-              modules={readingSummaries}
-              latestModule={latestReadingModule}
-              averageProgress={readingAverageProgress}
-              completedCount={readingCompletedCount}
-            />
-          ) : null}
-
-          {hasLearningHub ? (
-            <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-500">
-                    Daily Learning
-                  </p>
-                  <h2 className="mt-1 text-xl font-black">Today&apos;s Schedule</h2>
-                </div>
-                <Link href="/learning-hub" className="text-[10px] font-black text-indigo-600">
-                  View Full Schedule
-                </Link>
-              </div>
-
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                {dailySchedule.map((item, index) => (
-                  <div
-                    key={item.title}
-                    className="flex items-center gap-3 rounded-[16px] border border-slate-100 bg-slate-50 px-3 py-3"
-                  >
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-xl shadow-sm">
-                      {item.icon}
-                    </div>
+                  <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-center">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-black text-slate-400">{item.time}</p>
-                      <p className="truncate text-xs font-black text-slate-800">{item.title}</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-600">
+                        Today&apos;s Home
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black text-[#2b285c] sm:text-3xl">
+                        Hi {primaryChildName}! 👋
+                      </h2>
+                      <p className="mt-1 text-sm font-semibold text-slate-600">
+                        Here&apos;s your learning overview for today.
+                      </p>
+
+                      {children.length > 1 ? (
+                        <div className="mt-5">
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">
+                              Choose Child
+                            </p>
+                            <p className="text-[9px] font-bold text-slate-400">
+                              Home follows the selected child
+                            </p>
+                          </div>
+
+                          <div className="flex max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            {children.map((child) => {
+                              const childName =
+                                child.name ||
+                                child.child_name ||
+                                child.full_name ||
+                                "Child";
+
+                              const childAvatar =
+                                child.avatar_character?.trim() || "boy_01";
+
+                              const active = child.id === primaryChild?.id;
+
+                              return (
+                                <button
+                                  key={child.id}
+                                  type="button"
+                                  onClick={() => changeSelectedChild(child.id)}
+                                  className={`flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2.5 text-xs font-black transition-all ${
+                                    active
+                                      ? "border-violet-500 bg-violet-600 text-white shadow-lg shadow-violet-500/20"
+                                      : "border-white/80 bg-white/80 text-[#373267] hover:-translate-y-0.5 hover:border-violet-300 hover:bg-white"
+                                  }`}
+                                >
+                                  <span
+                                    className={`grid h-10 w-10 place-items-center overflow-hidden rounded-full ${
+                                      active ? "bg-white/20" : "bg-violet-50"
+                                    }`}
+                                  >
+                                    <img
+                                      src={`/avatars/${childAvatar}/idle.png`}
+                                      alt={childName}
+                                      className="h-full w-full object-contain"
+                                      draggable={false}
+                                    />
+                                  </span>
+
+                                  <span>{childName}</span>
+                                  {active ? <span>✓</span> : null}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        {hasLearningHub ? (
+                          <Link
+                            href="/learning-hub"
+                            className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-xs font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-700"
+                          >
+                            <BookOpenCheck size={16} />
+                            Continue Learning
+                          </Link>
+                        ) : null}
+
+                        <Link
+                          href="/virtual-world"
+                          className="inline-flex items-center gap-2 rounded-2xl border border-white/80 bg-white/85 px-4 py-3 text-xs font-black text-violet-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white"
+                        >
+                          <Sparkles size={16} />
+                          Enter Virtual World
+                        </Link>
+
+                        <Link
+                          href="/children/avatar"
+                          className="inline-flex items-center gap-2 rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-xs font-black text-[#484172] transition hover:bg-white"
+                        >
+                          <UserRound size={16} />
+                          Change Avatar
+                        </Link>
+                      </div>
                     </div>
-                    {index < 2 ? (
-                      <CheckCircle2 size={14} className="ml-auto shrink-0 text-emerald-500" />
+
+                    <div className="relative mx-auto flex h-[250px] w-[210px] items-end justify-center sm:h-[300px] sm:w-[250px]">
+                      <div className="absolute bottom-2 h-7 w-36 rounded-full bg-indigo-950/15 blur-md" />
+
+                      {primaryChild ? (
+                        <img
+                          src={gameAvatarIdleImage}
+                          alt={primaryChildName}
+                          className="relative z-10 max-h-full max-w-full select-none object-contain drop-shadow-[0_20px_22px_rgba(43,40,92,0.22)]"
+                          draggable={false}
+                        />
+                      ) : (
+                        <UserRound size={90} className="mb-16 text-violet-400" />
+                      )}
+                    </div>
+                  </div>
+                </section>
+
+                {/* CONTENT CARDS: ORIGINAL MODULE CONTENT, NEW GAME LOOK */}
+                <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+                  <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">Continue Learning</p>
+                        <h2 className="mt-1 text-xl font-black text-[#302c67]">Modul Membaca</h2>
+                      </div>
+                      <div className="text-4xl">📘</div>
+                    </div>
+
+                    {hasReadingModules ? (
+                      readingLoading ? (
+                        <div className="mt-5 rounded-2xl bg-violet-50 p-4 text-xs font-black text-violet-600">Loading reading progress...</div>
+                      ) : latestReadingModule ? (
+                        <>
+                          <div className="mt-5 rounded-[20px] border border-violet-100 bg-gradient-to-br from-violet-50 to-indigo-50 p-4">
+                            <p className="text-sm font-black text-slate-900">{latestReadingModule.title}</p>
+                            <p className="mt-1 text-[11px] font-semibold text-slate-500">Page {latestReadingModule.lastPage} / {latestReadingModule.totalPages}</p>
+                            <div className="mt-3 flex items-center gap-2">
+                              <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
+                                <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${latestReadingModule.progressPercent}%` }} />
+                              </div>
+                              <span className="text-[10px] font-black text-violet-600">{latestReadingModule.progressPercent}%</span>
+                            </div>
+                          </div>
+                          <Link href="/flashcard-modules" className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-xs font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5">
+                            Continue Adventure <ChevronRight size={15} />
+                          </Link>
+                        </>
+                      ) : (
+                        <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-xs font-semibold text-slate-500">No reading module available yet.</div>
+                      )
                     ) : (
-                      <Clock3 size={14} className="ml-auto shrink-0 text-indigo-400" />
+                      <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs font-semibold text-slate-500">Modul Membaca is not included in your current access.</div>
+                    )}
+                  </section>
+
+                  <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-indigo-500">Learning Access</p>
+                        <h2 className="mt-1 text-xl font-black text-[#302c67]">My Learning Modules</h2>
+                      </div>
+                      <Link href="/pricing" className="rounded-xl bg-violet-50 px-3 py-2 text-[10px] font-black text-violet-700">View Plans</Link>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {visibleDashboardModules.map((card) => {
+                        const Icon = card.icon;
+                        const isReading = card.title === "Modul Membaca";
+                        const progressValue = isReading ? readingAverageProgress : 100;
+                        return (
+                          <Link key={card.title} href={card.href} className="group rounded-[20px] border border-indigo-100 bg-gradient-to-b from-white to-[#faf8ff] p-3 text-center transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-lg">
+                            <div className="mx-auto grid h-14 w-14 place-items-center rounded-[18px] bg-gradient-to-br from-violet-100 to-indigo-100 text-indigo-600 shadow-inner">
+                              <Icon size={25} />
+                            </div>
+                            <p className="mt-3 line-clamp-2 min-h-[34px] text-[11px] font-black text-[#312e68]">{card.title}</p>
+                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                              <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${progressValue}%` }} />
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+
+                    {dashboardModules.length === 0 ? (
+                      <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-xs font-semibold text-slate-500">No premium module unlocked yet. View plans to choose your learning package.</div>
+                    ) : null}
+                  </section>
+                </div>
+
+                {/* ORIGINAL READING PROGRESS */}
+                {hasReadingModules ? (
+                  <ReadingProgressDashboard
+                    loading={readingLoading}
+                    modules={readingSummaries}
+                    latestModule={latestReadingModule}
+                    averageProgress={readingAverageProgress}
+                    completedCount={readingCompletedCount}
+                  />
+                ) : null}
+
+                {/* ORIGINAL TODAY'S SCHEDULE */}
+                {hasLearningHub ? (
+                  <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-indigo-500">Daily Learning</p>
+                        <h2 className="mt-1 text-xl font-black text-[#302c67]">Today&apos;s Schedule</h2>
+                      </div>
+                      <Link href="/learning-hub" className="text-[10px] font-black text-indigo-600">View Full Schedule</Link>
+                    </div>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                      {dailySchedule.map((item, index) => (
+                        <div key={item.title} className="flex items-center gap-3 rounded-[18px] border border-violet-100 bg-violet-50/60 px-3 py-3">
+                          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-xl shadow-sm">{item.icon}</div>
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-black text-slate-400">{item.time}</p>
+                            <p className="truncate text-xs font-black text-slate-800">{item.title}</p>
+                          </div>
+                          {index < 2 ? <CheckCircle2 size={14} className="ml-auto text-emerald-500" /> : <Clock3 size={14} className="ml-auto text-indigo-400" />}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {/* ORIGINAL CHILDREN CONTENT */}
+                <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Family</p>
+                      <h2 className="mt-1 text-xl font-black text-[#302c67]">My Children</h2>
+                    </div>
+                    <Link href="/children" className="rounded-xl bg-[#28265d] px-3 py-2 text-[10px] font-black text-white">Manage</Link>
+                  </div>
+                  <div className="mt-4 flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {children.length > 0 ? children.map((child) => {
+                      const childName = child.name || child.child_name || child.full_name || "Child Profile";
+                      return (
+                        <Link key={child.id} href="/children" className="flex min-w-[230px] items-center gap-3 rounded-[18px] border border-indigo-100 bg-violet-50/60 p-3">
+                          <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-100 text-indigo-500">
+                            {child.avatar_url ? <img src={child.avatar_url} alt={childName} className="h-full w-full object-cover" /> : <UserRound size={20} />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black">{childName}</p>
+                            <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">{child.level || child.grade || "Level not set"}{child.age ? ` • Age ${child.age}` : ""}</p>
+                          </div>
+                        </Link>
+                      );
+                    }) : (
+                      <Link href="/children" className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-5 py-4 text-xs font-black text-slate-500">+ Add your first child profile</Link>
                     )}
                   </div>
-                ))}
+                </section>
+
+                {/* ORIGINAL CURRENT PLAN CONTENT */}
+                <section className="flex flex-col gap-3 rounded-[22px] border border-indigo-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Current Plan</p>
+                    <p className="mt-1 text-sm font-black text-slate-800">{packageName}</p>
+                    <p className="mt-0.5 text-[10px] font-semibold text-slate-400">Valid until {profile?.subscription_end || "-"}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link href="/pricing" className="inline-flex items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-xs font-black text-indigo-700">View Plans</Link>
+                    <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-black text-white">WhatsApp Admin</a>
+                  </div>
+                </section>
               </div>
-            </section>
-          ) : null}
 
-          <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Family</p>
-                <h2 className="mt-1 text-xl font-black">My Children</h2>
+              {/* RIGHT MISSION PANEL */}
+              <div className="space-y-4 2xl:sticky 2xl:top-[84px] 2xl:self-start">
+                <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.10)]">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-black text-[#312e68]">Today&apos;s Tasks</h2>
+                    <span className="text-2xl">⭐</span>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {dailySchedule.slice(0, 3).map((item, index) => {
+                      const completed = index === 0;
+                      const current = index === 0 ? 1 : index === 1 ? 4 : 0;
+                      const total = index === 1 ? 5 : 1;
+                      const pct = Math.round((current / total) * 100);
+                      return (
+                        <div key={item.title} className="rounded-[18px] border border-slate-100 bg-[#fbfaff] p-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 ${completed ? "border-emerald-500 bg-emerald-500 text-white" : "border-violet-400 bg-white text-violet-500"}`}>
+                              {completed ? <CheckCircle2 size={18} /> : <span className="text-[10px] font-black">{current}</span>}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-black text-slate-800">{item.title}</p>
+                              <p className="mt-0.5 text-[10px] font-bold text-slate-400">{current} / {total}</p>
+                            </div>
+                            <span className="text-[10px] font-black text-amber-500">+{10 + index * 5} 🪙</span>
+                          </div>
+                          {!completed ? (
+                            <div className="mt-2 ml-12 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                              <div className="h-full rounded-full bg-violet-500" style={{ width: `${pct}%` }} />
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {hasLearningHub ? (
+                    <Link href="/learning-hub" className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-xs font-black text-white">Go to Learning <ChevronRight size={15} /></Link>
+                  ) : null}
+                </section>
+
+                <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.10)]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">This Week</p>
+                      <h2 className="mt-1 text-lg font-black text-[#312e68]">Weekly Progress</h2>
+                    </div>
+                    <span className="text-4xl">🏆</span>
+                  </div>
+                  <p className="mt-4 text-2xl font-black text-[#312e68]">{Math.round(subjectTabs.reduce((sum, item) => sum + item.progress, 0) / subjectTabs.length)}%</p>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-violet-100">
+                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-violet-500" style={{ width: `${Math.round(subjectTabs.reduce((sum, item) => sum + item.progress, 0) / subjectTabs.length)}%` }} />
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    {subjectTabs.map((subject) => (
+                      <div key={subject.title}>
+                        <div className="mb-1 flex items-center justify-between text-[10px] font-black">
+                          <span className="text-slate-700">{subject.icon} {subject.title}</span>
+                          <span className="text-slate-400">{subject.progress}%</span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${subject.progress}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.10)]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-orange-500">Reward</p>
+                      <h2 className="mt-1 text-lg font-black text-[#312e68]">Daily Reward</h2>
+                    </div>
+                    <span className="text-5xl">🎁</span>
+                  </div>
+                  <div className="mt-4 rounded-[22px] bg-gradient-to-br from-[#2d245b] via-violet-700 to-fuchsia-600 p-5 text-center text-white shadow-inner">
+                    <div className="text-6xl">🎁</div>
+                    <p className="mt-2 text-xs font-black">Come back every day!</p>
+                    <p className="mt-1 text-[10px] font-semibold text-violet-100">Claim your reward and continue learning.</p>
+                  </div>
+                  <Link href="/freebies" className="mt-4 flex w-full items-center justify-center rounded-2xl bg-violet-100 px-4 py-3 text-xs font-black text-violet-700">Open Rewards</Link>
+                </section>
               </div>
-              <Link href="/children" className="rounded-xl bg-slate-950 px-3 py-2 text-[10px] font-black text-white">
-                Manage
-              </Link>
             </div>
+          </div>
 
-            <div className="mt-4 flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {children.length > 0 ? (
-                children.map((child) => {
-                  const childName = child.name || child.child_name || child.full_name || "Child Profile";
-                  return (
-                    <Link
-                      key={child.id}
-                      href="/children"
-                      className="flex min-w-[230px] items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3"
-                    >
-                      <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-50 text-indigo-500">
-                        {child.avatar_url ? (
-                          <img src={child.avatar_url} alt={childName} className="h-full w-full object-cover" />
-                        ) : (
-                          <UserRound size={20} />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-black">{childName}</p>
-                        <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">
-                          {child.level || child.grade || "Level not set"}{child.age ? ` • Age ${child.age}` : ""}
-                        </p>
-                      </div>
-                    </Link>
-                  );
-                })
-              ) : (
-                <Link
-                  href="/children"
-                  className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-5 py-4 text-xs font-black text-slate-500"
-                >
-                  + Add your first child profile
-                </Link>
-              )}
-            </div>
-          </section>
-
-          <section className="mt-5 flex flex-col gap-3 rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Current Plan</p>
-              <p className="mt-1 text-sm font-black text-slate-800">{packageName}</p>
-              <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                Valid until {profile?.subscription_end || "-"}
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <Link href="/pricing" className="inline-flex items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-xs font-black text-indigo-700">
-                View Plans
-              </Link>
-              <a
-                href={whatsappLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-black text-white"
-              >
-                WhatsApp Admin
-              </a>
-            </div>
-          </section>
-      </section>
+          {/* MOBILE/TABLET BOTTOM NAV */}
+          <nav className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-[760px] items-center justify-around rounded-[24px] border border-white/15 bg-[#15183d]/95 p-2 text-white shadow-[0_20px_60px_rgba(13,10,48,0.35)] backdrop-blur-xl xl:hidden">
+            <BottomGameLink href="/dashboard" icon={Home} label="Home" active />
+            <BottomGameLink href="/learning-hub" icon={BookOpenCheck} label="Learning" show={hasLearningHub} />
+            <BottomGameLink href="/virtual-world" icon={Sparkles} label="Virtual World" />
+            <BottomGameLink href="/flashcard-modules" icon={BarChart3} label="Progress" show={hasReadingModules} />
+            <BottomGameLink href="/profile" icon={UserRound} label="Profile" />
+          </nav>
+        </div>
+      </div>
     </main>
+  );
+}
+
+function MiniCurrency({ emoji, value, label }: { emoji: string; value: number; label: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-lg">{emoji}</div>
+      <p className="truncate text-[11px] font-black">{value}</p>
+      <p className="truncate text-[8px] font-semibold text-indigo-200">{label}</p>
+    </div>
+  );
+}
+
+function TopCurrency({ emoji, value, className = "flex" }: { emoji: string; value: number; className?: string }) {
+  return (
+    <div className={`${className} h-10 items-center gap-2 rounded-2xl bg-[#292958] px-3 text-white shadow-sm`}>
+      <span className="text-lg">{emoji}</span>
+      <span className="text-xs font-black sm:text-sm">{value}</span>
+      <span className="grid h-5 w-5 place-items-center rounded-full bg-white/15 text-sm font-black">+</span>
+    </div>
+  );
+}
+
+function GameSideLink({ href, icon: Icon, label, active = false, show = true }: { href: string; icon: React.ElementType; label: string; active?: boolean; show?: boolean }) {
+  if (!show) return null;
+  return (
+    <Link href={href} className={`flex items-center gap-3 rounded-[14px] px-3 py-2.5 text-xs font-black transition ${active ? "bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-lg shadow-indigo-950/25" : "text-indigo-100 hover:bg-white/[0.07] hover:text-white"}`}>
+      <Icon size={17} />
+      <span>{label}</span>
+    </Link>
+  );
+}
+
+function BottomGameLink({ href, icon: Icon, label, active = false, show = true }: { href: string; icon: React.ElementType; label: string; active?: boolean; show?: boolean }) {
+  if (!show) return null;
+  return (
+    <Link href={href} className={`flex min-w-[54px] flex-col items-center justify-center rounded-[16px] px-2 py-2 text-[9px] font-black transition sm:min-w-[88px] sm:flex-row sm:gap-2 sm:px-3 sm:text-[10px] ${active ? "bg-gradient-to-r from-violet-500 to-indigo-500 text-white" : "text-indigo-100 hover:bg-white/10"}`}>
+      <Icon size={18} />
+      <span className="mt-1 sm:mt-0">{label}</span>
+    </Link>
+  );
+}
+
+function LogoutGameButton() {
+  const router = useRouter();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
+
+  return (
+    <button type="button" onClick={handleLogout} title="Logout" aria-label="Logout" className="grid h-10 w-10 place-items-center rounded-2xl bg-[#292958] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-red-500">
+      <LogOut size={17} />
+    </button>
   );
 }
 

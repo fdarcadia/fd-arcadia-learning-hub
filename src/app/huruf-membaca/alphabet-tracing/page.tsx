@@ -1,1307 +1,2069 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from "react";
-
+import Link from "next/link";
 import {
   ArrowLeft,
-  ArrowRight,
   Check,
-  ChevronDown,
-  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  Coins,
   Eraser,
-  Home,
+  Gem,
   PenLine,
-  Redo2,
-  Sparkles,
   Star,
   Trash2,
   Undo2,
-  Volume2,
 } from "lucide-react";
+import {
+  PointerEvent as ReactPointerEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 
-type DrawingMode = "pen" | "eraser";
+import { PortalShell } from "@/components/PortalShell";
+import { ProtectedPage } from "@/components/ProtectedPage";
 
-type Point = {
-  x: number;
-  y: number;
-};
+type Point = { x: number; y: number };
 
-type Stroke = {
-  points: Point[];
-  mode: DrawingMode;
+type StrokeLine = {
+  id: string;
+  color: string;
   size: number;
+  points: Point[];
 };
 
-type StrokeHint = {
+type TraceSide = "upper" | "lower";
+type ToolMode = "pen" | "eraser";
+
+type GuideDef = {
+  d: string;
+  startX: number;
+  startY: number;
   number: number;
-  x: number;
-  y: number;
+  badgeX?: number;
+  badgeY?: number;
 };
 
-type LetterData = {
-  uppercaseHints: StrokeHint[];
-  lowercaseHints: StrokeHint[];
+type LetterGuideSet = {
+  upper: GuideDef[];
+  lower: GuideDef[];
 };
 
-const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-const LETTER_DATA: Record<string, LetterData> = {
+const PEN_COLORS = [
+  "#6D3AF2",
+  "#F43F8C",
+  "#2499F3",
+  "#23B66F",
+  "#F97316",
+  "#A9653F",
+];
+
+const PEN_SIZES = [10, 14, 18, 22, 28, 34];
+
+/* =========================================================
+   A-Z HANDWRITING STROKE DATA
+   - Every Next/Previous letter uses its own guides.
+   - Lowercase a is intentionally TWO strokes:
+     1) open c-shape
+     2) straight line down
+========================================================= */
+
+const LETTER_GUIDES: Record<string, LetterGuideSet> = {
   A: {
-    uppercaseHints: [
-      { number: 1, x: 27, y: 16 },
-      { number: 2, x: 69, y: 16 },
-      { number: 3, x: 50, y: 58 },
+    upper: [
+      { d: "M150 72 L70 330", startX: 150, startY: 72, number: 1, badgeX: 116, badgeY: 52 },
+      { d: "M150 72 L230 330", startX: 150, startY: 72, number: 2, badgeX: 214, badgeY: 52 },
+      { d: "M108 230 L192 230", startX: 108, startY: 230, number: 3, badgeX: 88, badgeY: 230 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 31, y: 42 },
-      { number: 2, x: 69, y: 38 },
+    lower: [
+      { d: "M190 145 C170 112 108 112 82 154 C54 202 82 270 142 274 C174 276 194 260 198 240", startX: 190, startY: 145, number: 1, badgeX: 60, badgeY: 142 },
+      { d: "M208 130 L208 286", startX: 208, startY: 130, number: 2, badgeX: 242, badgeY: 122 },
     ],
   },
   B: {
-    uppercaseHints: [
-      { number: 1, x: 28, y: 15 },
-      { number: 2, x: 49, y: 16 },
-      { number: 3, x: 50, y: 49 },
+    upper: [
+      { d: "M86 72 L86 328", startX: 86, startY: 72, number: 1, badgeX: 58, badgeY: 72 },
+      { d: "M86 78 C214 62 226 176 88 194 C230 180 236 318 86 326", startX: 86, startY: 78, number: 2, badgeX: 116, badgeY: 52 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 30, y: 16 },
-      { number: 2, x: 53, y: 48 },
+    lower: [
+      { d: "M92 70 L92 286", startX: 92, startY: 70, number: 1, badgeX: 62, badgeY: 70 },
+      { d: "M94 186 C118 138 198 142 210 204 C222 270 142 300 96 256", startX: 94, startY: 186, number: 2, badgeX: 120, badgeY: 156 },
     ],
   },
   C: {
-    uppercaseHints: [{ number: 1, x: 68, y: 23 }],
-    lowercaseHints: [{ number: 1, x: 67, y: 41 }],
+    upper: [
+      { d: "M228 104 C184 62 98 70 70 164 C42 258 100 330 218 304", startX: 228, startY: 104, number: 1, badgeX: 248, badgeY: 92 },
+    ],
+    lower: [
+      { d: "M210 162 C180 130 112 132 82 188 C58 238 92 288 198 270", startX: 210, startY: 162, number: 1, badgeX: 234, badgeY: 148 },
+    ],
   },
   D: {
-    uppercaseHints: [
-      { number: 1, x: 28, y: 15 },
-      { number: 2, x: 50, y: 16 },
+    upper: [
+      { d: "M82 72 L82 328", startX: 82, startY: 72, number: 1, badgeX: 54, badgeY: 72 },
+      { d: "M82 76 C232 66 250 320 82 328", startX: 82, startY: 76, number: 2, badgeX: 112, badgeY: 52 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 31, y: 43 },
-      { number: 2, x: 69, y: 16 },
+    lower: [
+      { d: "M208 70 L208 286", startX: 208, startY: 70, number: 1, badgeX: 238, badgeY: 70 },
+      { d: "M206 184 C178 140 102 142 82 204 C62 266 126 300 204 256", startX: 206, startY: 184, number: 2, badgeX: 178, badgeY: 156 },
     ],
   },
   E: {
-    uppercaseHints: [
-      { number: 1, x: 28, y: 15 },
-      { number: 2, x: 48, y: 15 },
-      { number: 3, x: 48, y: 49 },
-      { number: 4, x: 48, y: 78 },
+    upper: [
+      { d: "M82 72 L82 328", startX: 82, startY: 72, number: 1, badgeX: 54, badgeY: 72 },
+      { d: "M82 78 L224 78", startX: 82, startY: 78, number: 2, badgeX: 112, badgeY: 52 },
+      { d: "M82 198 L192 198", startX: 82, startY: 198, number: 3, badgeX: 56, badgeY: 198 },
+      { d: "M82 326 L226 326", startX: 82, startY: 326, number: 4, badgeX: 54, badgeY: 326 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 32, y: 47 },
-      { number: 2, x: 68, y: 34 },
+    lower: [
+      { d: "M208 206 C150 206 92 204 84 220 C70 248 100 286 156 282 C182 280 198 270 208 258 M86 220 C100 166 190 152 214 198", startX: 208, startY: 206, number: 1, badgeX: 232, badgeY: 194 },
     ],
   },
   F: {
-    uppercaseHints: [
-      { number: 1, x: 28, y: 15 },
-      { number: 2, x: 48, y: 15 },
-      { number: 3, x: 48, y: 49 },
+    upper: [
+      { d: "M82 72 L82 328", startX: 82, startY: 72, number: 1, badgeX: 54, badgeY: 72 },
+      { d: "M82 78 L224 78", startX: 82, startY: 78, number: 2, badgeX: 112, badgeY: 52 },
+      { d: "M82 198 L192 198", startX: 82, startY: 198, number: 3, badgeX: 56, badgeY: 198 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 58, y: 16 },
-      { number: 2, x: 32, y: 47 },
+    lower: [
+      { d: "M176 78 C134 62 112 90 112 132 L112 286", startX: 176, startY: 78, number: 1, badgeX: 202, badgeY: 66 },
+      { d: "M78 166 L172 166", startX: 78, startY: 166, number: 2, badgeX: 56, badgeY: 166 },
     ],
   },
   G: {
-    uppercaseHints: [
-      { number: 1, x: 68, y: 23 },
-      { number: 2, x: 61, y: 58 },
+    upper: [
+      { d: "M228 104 C184 62 98 70 70 164 C42 258 100 330 218 304 C236 300 244 276 244 238 L172 238", startX: 228, startY: 104, number: 1, badgeX: 248, badgeY: 92 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 31, y: 43 },
-      { number: 2, x: 67, y: 58 },
+    lower: [
+      { d: "M198 152 C168 122 106 128 82 180 C58 232 88 278 146 278 C184 278 202 252 202 212", startX: 198, startY: 152, number: 1, badgeX: 224, badgeY: 140 },
+      { d: "M202 150 L202 304 C202 338 176 350 134 336", startX: 202, startY: 150, number: 2, badgeX: 232, badgeY: 150 },
     ],
   },
   H: {
-    uppercaseHints: [
-      { number: 1, x: 26, y: 15 },
-      { number: 2, x: 74, y: 15 },
-      { number: 3, x: 50, y: 49 },
+    upper: [
+      { d: "M78 72 L78 328", startX: 78, startY: 72, number: 1, badgeX: 50, badgeY: 72 },
+      { d: "M222 72 L222 328", startX: 222, startY: 72, number: 2, badgeX: 250, badgeY: 72 },
+      { d: "M78 198 L222 198", startX: 78, startY: 198, number: 3, badgeX: 52, badgeY: 198 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 31, y: 15 },
-      { number: 2, x: 55, y: 49 },
+    lower: [
+      { d: "M88 72 L88 286", startX: 88, startY: 72, number: 1, badgeX: 58, badgeY: 72 },
+      { d: "M90 190 C108 144 194 136 204 202 L204 286", startX: 90, startY: 190, number: 2, badgeX: 118, badgeY: 160 },
     ],
   },
   I: {
-    uppercaseHints: [{ number: 1, x: 50, y: 15 }],
-    lowercaseHints: [
-      { number: 1, x: 50, y: 39 },
-      { number: 2, x: 50, y: 17 },
+    upper: [
+      { d: "M150 78 L150 326", startX: 150, startY: 78, number: 1, badgeX: 120, badgeY: 78 },
+      { d: "M94 78 L206 78", startX: 94, startY: 78, number: 2, badgeX: 70, badgeY: 78 },
+      { d: "M94 326 L206 326", startX: 94, startY: 326, number: 3, badgeX: 70, badgeY: 326 },
+    ],
+    lower: [
+      { d: "M150 154 L150 286", startX: 150, startY: 154, number: 1, badgeX: 120, badgeY: 154 },
     ],
   },
   J: {
-    uppercaseHints: [{ number: 1, x: 62, y: 15 }],
-    lowercaseHints: [
-      { number: 1, x: 55, y: 39 },
-      { number: 2, x: 55, y: 17 },
+    upper: [
+      { d: "M214 78 L214 258 C214 326 98 348 72 278", startX: 214, startY: 78, number: 1, badgeX: 244, badgeY: 78 },
+      { d: "M112 78 L224 78", startX: 112, startY: 78, number: 2, badgeX: 88, badgeY: 78 },
+    ],
+    lower: [
+      { d: "M170 154 L170 304 C170 340 146 350 116 332", startX: 170, startY: 154, number: 1, badgeX: 200, badgeY: 154 },
     ],
   },
   K: {
-    uppercaseHints: [
-      { number: 1, x: 27, y: 15 },
-      { number: 2, x: 68, y: 16 },
-      { number: 3, x: 68, y: 56 },
+    upper: [
+      { d: "M82 72 L82 328", startX: 82, startY: 72, number: 1, badgeX: 54, badgeY: 72 },
+      { d: "M224 78 L84 208", startX: 224, startY: 78, number: 2, badgeX: 248, badgeY: 70 },
+      { d: "M84 208 L228 328", startX: 84, startY: 208, number: 3, badgeX: 58, badgeY: 208 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 31, y: 15 },
-      { number: 2, x: 67, y: 41 },
-      { number: 3, x: 65, y: 58 },
+    lower: [
+      { d: "M88 72 L88 286", startX: 88, startY: 72, number: 1, badgeX: 58, badgeY: 72 },
+      { d: "M204 160 L90 222", startX: 204, startY: 160, number: 2, badgeX: 232, badgeY: 150 },
+      { d: "M92 220 L212 286", startX: 92, startY: 220, number: 3, badgeX: 66, badgeY: 220 },
     ],
   },
   L: {
-    uppercaseHints: [{ number: 1, x: 30, y: 15 }],
-    lowercaseHints: [{ number: 1, x: 50, y: 15 }],
+    upper: [
+      { d: "M82 72 L82 326", startX: 82, startY: 72, number: 1, badgeX: 54, badgeY: 72 },
+      { d: "M82 326 L224 326", startX: 82, startY: 326, number: 2, badgeX: 54, badgeY: 326 },
+    ],
+    lower: [
+      { d: "M150 72 L150 286", startX: 150, startY: 72, number: 1, badgeX: 120, badgeY: 72 },
+    ],
   },
   M: {
-    uppercaseHints: [
-      { number: 1, x: 16, y: 14 },
-      { number: 2, x: 37, y: 14 },
-      { number: 3, x: 50, y: 58 },
-      { number: 4, x: 82, y: 14 },
+    upper: [
+      { d: "M62 328 L62 78", startX: 62, startY: 328, number: 1, badgeX: 38, badgeY: 328 },
+      { d: "M62 78 L150 224", startX: 62, startY: 78, number: 2, badgeX: 38, badgeY: 78 },
+      { d: "M150 224 L238 78", startX: 150, startY: 224, number: 3, badgeX: 150, badgeY: 250 },
+      { d: "M238 78 L238 328", startX: 238, startY: 78, number: 4, badgeX: 262, badgeY: 78 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 20, y: 40 },
-      { number: 2, x: 50, y: 35 },
-      { number: 3, x: 79, y: 35 },
+    lower: [
+      { d: "M64 166 L64 286", startX: 64, startY: 166, number: 1, badgeX: 40, badgeY: 166 },
+      { d: "M66 190 C82 144 136 148 144 202 L144 286", startX: 66, startY: 190, number: 2, badgeX: 88, badgeY: 164 },
+      { d: "M144 194 C166 144 222 154 226 208 L226 286", startX: 144, startY: 194, number: 3, badgeX: 166, badgeY: 164 },
     ],
   },
   N: {
-    uppercaseHints: [
-      { number: 1, x: 25, y: 15 },
-      { number: 2, x: 40, y: 15 },
-      { number: 3, x: 75, y: 15 },
+    upper: [
+      { d: "M70 328 L70 78", startX: 70, startY: 328, number: 1, badgeX: 44, badgeY: 328 },
+      { d: "M70 78 L230 328", startX: 70, startY: 78, number: 2, badgeX: 44, badgeY: 78 },
+      { d: "M230 328 L230 78", startX: 230, startY: 328, number: 3, badgeX: 256, badgeY: 328 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 29, y: 41 },
-      { number: 2, x: 65, y: 38 },
+    lower: [
+      { d: "M82 166 L82 286", startX: 82, startY: 166, number: 1, badgeX: 56, badgeY: 166 },
+      { d: "M84 190 C104 142 198 142 208 208 L208 286", startX: 84, startY: 190, number: 2, badgeX: 112, badgeY: 160 },
     ],
   },
   O: {
-    uppercaseHints: [{ number: 1, x: 67, y: 23 }],
-    lowercaseHints: [{ number: 1, x: 67, y: 41 }],
+    upper: [
+      { d: "M150 72 C88 72 54 126 54 202 C54 278 90 330 150 330 C212 330 246 278 246 202 C246 126 212 72 150 72", startX: 150, startY: 72, number: 1, badgeX: 120, badgeY: 50 },
+    ],
+    lower: [
+      { d: "M150 142 C96 142 72 178 72 216 C72 260 100 286 150 286 C200 286 228 258 228 216 C228 174 202 142 150 142", startX: 150, startY: 142, number: 1, badgeX: 120, badgeY: 122 },
+    ],
   },
   P: {
-    uppercaseHints: [
-      { number: 1, x: 29, y: 15 },
-      { number: 2, x: 50, y: 16 },
+    upper: [
+      { d: "M82 72 L82 328", startX: 82, startY: 72, number: 1, badgeX: 54, badgeY: 72 },
+      { d: "M82 78 C220 62 230 194 82 200", startX: 82, startY: 78, number: 2, badgeX: 112, badgeY: 52 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 31, y: 40 },
-      { number: 2, x: 54, y: 42 },
+    lower: [
+      { d: "M88 166 L88 338", startX: 88, startY: 166, number: 1, badgeX: 58, badgeY: 166 },
+      { d: "M90 190 C120 142 200 144 212 208 C220 264 150 294 92 254", startX: 90, startY: 190, number: 2, badgeX: 118, badgeY: 160 },
     ],
   },
   Q: {
-    uppercaseHints: [
-      { number: 1, x: 67, y: 23 },
-      { number: 2, x: 65, y: 71 },
+    upper: [
+      { d: "M150 72 C88 72 54 126 54 202 C54 278 90 330 150 330 C212 330 246 278 246 202 C246 126 212 72 150 72", startX: 150, startY: 72, number: 1, badgeX: 120, badgeY: 50 },
+      { d: "M176 272 L244 338", startX: 176, startY: 272, number: 2, badgeX: 154, badgeY: 272 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 31, y: 43 },
-      { number: 2, x: 68, y: 40 },
+    lower: [
+      { d: "M150 142 C96 142 72 178 72 216 C72 260 100 286 150 286 C200 286 228 258 228 216 C228 174 202 142 150 142", startX: 150, startY: 142, number: 1, badgeX: 120, badgeY: 122 },
+      { d: "M206 256 L206 338", startX: 206, startY: 256, number: 2, badgeX: 234, badgeY: 256 },
     ],
   },
   R: {
-    uppercaseHints: [
-      { number: 1, x: 29, y: 15 },
-      { number: 2, x: 49, y: 16 },
-      { number: 3, x: 58, y: 53 },
+    upper: [
+      { d: "M82 72 L82 328", startX: 82, startY: 72, number: 1, badgeX: 54, badgeY: 72 },
+      { d: "M82 78 C220 62 230 194 82 200", startX: 82, startY: 78, number: 2, badgeX: 112, badgeY: 52 },
+      { d: "M132 200 L232 328", startX: 132, startY: 200, number: 3, badgeX: 112, badgeY: 200 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 31, y: 41 },
-      { number: 2, x: 61, y: 39 },
+    lower: [
+      { d: "M92 166 L92 286", startX: 92, startY: 166, number: 1, badgeX: 64, badgeY: 166 },
+      { d: "M94 198 C116 158 156 150 188 166", startX: 94, startY: 198, number: 2, badgeX: 118, badgeY: 172 },
     ],
   },
   S: {
-    uppercaseHints: [{ number: 1, x: 66, y: 23 }],
-    lowercaseHints: [{ number: 1, x: 65, y: 41 }],
+    upper: [
+      { d: "M224 102 C198 70 106 64 76 118 C48 168 112 196 164 202 C226 208 252 256 218 302 C184 346 92 328 66 294", startX: 224, startY: 102, number: 1, badgeX: 248, badgeY: 90 },
+    ],
+    lower: [
+      { d: "M204 164 C180 136 104 134 88 180 C74 222 138 224 166 232 C218 246 214 286 170 294 C126 302 92 282 78 266", startX: 204, startY: 164, number: 1, badgeX: 230, badgeY: 150 },
+    ],
   },
   T: {
-    uppercaseHints: [
-      { number: 1, x: 28, y: 15 },
-      { number: 2, x: 50, y: 16 },
+    upper: [
+      { d: "M56 78 L244 78", startX: 56, startY: 78, number: 1, badgeX: 34, badgeY: 78 },
+      { d: "M150 78 L150 328", startX: 150, startY: 78, number: 2, badgeX: 180, badgeY: 78 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 50, y: 24 },
-      { number: 2, x: 32, y: 47 },
+    lower: [
+      { d: "M150 106 L150 268 C150 294 176 302 204 286", startX: 150, startY: 106, number: 1, badgeX: 120, badgeY: 106 },
+      { d: "M108 166 L194 166", startX: 108, startY: 166, number: 2, badgeX: 84, badgeY: 166 },
     ],
   },
   U: {
-    uppercaseHints: [{ number: 1, x: 24, y: 15 }],
-    lowercaseHints: [
-      { number: 1, x: 29, y: 40 },
-      { number: 2, x: 71, y: 40 },
+    upper: [
+      { d: "M72 78 L72 236 C72 304 108 330 150 330 C196 330 228 302 228 236 L228 78", startX: 72, startY: 78, number: 1, badgeX: 44, badgeY: 78 },
+    ],
+    lower: [
+      { d: "M82 166 L82 246 C82 296 150 300 196 252", startX: 82, startY: 166, number: 1, badgeX: 54, badgeY: 166 },
+      { d: "M204 166 L204 286", startX: 204, startY: 166, number: 2, badgeX: 232, badgeY: 166 },
     ],
   },
   V: {
-    uppercaseHints: [
-      { number: 1, x: 27, y: 15 },
-      { number: 2, x: 73, y: 15 },
+    upper: [
+      { d: "M60 78 L150 328", startX: 60, startY: 78, number: 1, badgeX: 34, badgeY: 78 },
+      { d: "M150 328 L240 78", startX: 150, startY: 328, number: 2, badgeX: 150, badgeY: 350 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 29, y: 40 },
-      { number: 2, x: 71, y: 40 },
+    lower: [
+      { d: "M82 166 L146 286", startX: 82, startY: 166, number: 1, badgeX: 56, badgeY: 166 },
+      { d: "M146 286 L212 166", startX: 146, startY: 286, number: 2, badgeX: 146, badgeY: 314 },
     ],
   },
   W: {
-    uppercaseHints: [
-      { number: 1, x: 15, y: 15 },
-      { number: 2, x: 34, y: 74 },
-      { number: 3, x: 53, y: 51 },
-      { number: 4, x: 84, y: 15 },
+    upper: [
+      { d: "M42 78 L94 328", startX: 42, startY: 78, number: 1, badgeX: 22, badgeY: 78 },
+      { d: "M94 328 L150 174", startX: 94, startY: 328, number: 2, badgeX: 94, badgeY: 350 },
+      { d: "M150 174 L206 328", startX: 150, startY: 174, number: 3, badgeX: 150, badgeY: 148 },
+      { d: "M206 328 L258 78", startX: 206, startY: 328, number: 4, badgeX: 206, badgeY: 350 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 15, y: 40 },
-      { number: 2, x: 35, y: 66 },
-      { number: 3, x: 55, y: 45 },
-      { number: 4, x: 84, y: 40 },
+    lower: [
+      { d: "M52 166 L100 286", startX: 52, startY: 166, number: 1, badgeX: 30, badgeY: 166 },
+      { d: "M100 286 L150 204", startX: 100, startY: 286, number: 2, badgeX: 100, badgeY: 314 },
+      { d: "M150 204 L200 286", startX: 150, startY: 204, number: 3, badgeX: 150, badgeY: 178 },
+      { d: "M200 286 L248 166", startX: 200, startY: 286, number: 4, badgeX: 200, badgeY: 314 },
     ],
   },
   X: {
-    uppercaseHints: [
-      { number: 1, x: 27, y: 15 },
-      { number: 2, x: 73, y: 15 },
+    upper: [
+      { d: "M66 78 L234 328", startX: 66, startY: 78, number: 1, badgeX: 40, badgeY: 78 },
+      { d: "M234 78 L66 328", startX: 234, startY: 78, number: 2, badgeX: 260, badgeY: 78 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 29, y: 40 },
-      { number: 2, x: 71, y: 40 },
+    lower: [
+      { d: "M82 166 L216 286", startX: 82, startY: 166, number: 1, badgeX: 56, badgeY: 166 },
+      { d: "M216 166 L82 286", startX: 216, startY: 166, number: 2, badgeX: 242, badgeY: 166 },
     ],
   },
   Y: {
-    uppercaseHints: [
-      { number: 1, x: 26, y: 15 },
-      { number: 2, x: 74, y: 15 },
-      { number: 3, x: 50, y: 51 },
+    upper: [
+      { d: "M60 78 L150 202", startX: 60, startY: 78, number: 1, badgeX: 34, badgeY: 78 },
+      { d: "M240 78 L150 202", startX: 240, startY: 78, number: 2, badgeX: 266, badgeY: 78 },
+      { d: "M150 202 L150 328", startX: 150, startY: 202, number: 3, badgeX: 120, badgeY: 202 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 29, y: 40 },
-      { number: 2, x: 71, y: 40 },
+    lower: [
+      { d: "M82 166 L148 274", startX: 82, startY: 166, number: 1, badgeX: 56, badgeY: 166 },
+      { d: "M216 166 L148 274 L122 338", startX: 216, startY: 166, number: 2, badgeX: 242, badgeY: 166 },
     ],
   },
   Z: {
-    uppercaseHints: [
-      { number: 1, x: 27, y: 15 },
-      { number: 2, x: 73, y: 20 },
-      { number: 3, x: 27, y: 78 },
+    upper: [
+      { d: "M58 78 L240 78", startX: 58, startY: 78, number: 1, badgeX: 34, badgeY: 78 },
+      { d: "M240 78 L62 328", startX: 240, startY: 78, number: 2, badgeX: 266, badgeY: 78 },
+      { d: "M62 328 L242 328", startX: 62, startY: 328, number: 3, badgeX: 38, badgeY: 328 },
     ],
-    lowercaseHints: [
-      { number: 1, x: 29, y: 40 },
-      { number: 2, x: 71, y: 43 },
-      { number: 3, x: 29, y: 67 },
+    lower: [
+      { d: "M82 166 L218 166", startX: 82, startY: 166, number: 1, badgeX: 56, badgeY: 166 },
+      { d: "M218 166 L84 286", startX: 218, startY: 166, number: 2, badgeX: 244, badgeY: 166 },
+      { d: "M84 286 L220 286", startX: 84, startY: 286, number: 3, badgeX: 58, badgeY: 286 },
     ],
   },
 };
 
-function getCanvasPoint(
-  event: ReactPointerEvent<HTMLCanvasElement>,
-  canvas: HTMLCanvasElement
-): Point {
-  const rect = canvas.getBoundingClientRect();
-
-  return {
-    x: ((event.clientX - rect.left) / rect.width) * canvas.width,
-    y: ((event.clientY - rect.top) / rect.height) * canvas.height,
-  };
-}
-
-function DrawingCanvas({
-  letter,
-  variant,
-}: {
-  letter: string;
-  variant: "trace" | "free";
-}) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  const [mode, setMode] = useState<DrawingMode>("pen");
-  const [penSize, setPenSize] = useState(7);
-  const [strokes, setStrokes] = useState<Stroke[]>([]);
-  const [redoStack, setRedoStack] = useState<Stroke[]>([]);
-  const [isDrawing, setIsDrawing] = useState(false);
-
-  const redraw = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const context = canvas.getContext("2d");
-    if (!context) return;
-
-    context.clearRect(0, 0, canvas.width, canvas.height);
-
-    strokes.forEach((stroke) => {
-      if (stroke.points.length === 0) return;
-
-      context.save();
-      context.lineCap = "round";
-      context.lineJoin = "round";
-      context.lineWidth = stroke.size;
-
-      if (stroke.mode === "eraser") {
-        context.globalCompositeOperation = "destination-out";
-        context.strokeStyle = "#000000";
-      } else {
-        context.globalCompositeOperation = "source-over";
-        context.strokeStyle = "#5B2DFF";
-      }
-
-      context.beginPath();
-
-      const first = stroke.points[0];
-      context.moveTo(first.x, first.y);
-
-      if (stroke.points.length === 1) {
-        context.lineTo(first.x + 0.1, first.y + 0.1);
-      } else {
-        for (let i = 1; i < stroke.points.length; i += 1) {
-          const point = stroke.points[i];
-          context.lineTo(point.x, point.y);
-        }
-      }
-
-      context.stroke();
-      context.restore();
-    });
-  }, [strokes]);
-
-  useEffect(() => {
-    redraw();
-  }, [redraw]);
-
-  useEffect(() => {
-    setStrokes([]);
-    setRedoStack([]);
-  }, [letter, variant]);
-
-  function handlePointerDown(
-    event: ReactPointerEvent<HTMLCanvasElement>
-  ) {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    event.preventDefault();
-
-    try {
-      canvas.setPointerCapture(event.pointerId);
-    } catch {
-      // ignore
-    }
-
-    const point = getCanvasPoint(event, canvas);
-
-    const newStroke: Stroke = {
-      points: [point],
-      mode,
-      size: mode === "eraser" ? 30 : penSize,
-    };
-
-    setStrokes((previous) => [...previous, newStroke]);
-    setRedoStack([]);
-    setIsDrawing(true);
-  }
-
-  function handlePointerMove(
-    event: ReactPointerEvent<HTMLCanvasElement>
-  ) {
-    if (!isDrawing) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    event.preventDefault();
-
-    const point = getCanvasPoint(event, canvas);
-
-    setStrokes((previous) => {
-      if (previous.length === 0) return previous;
-
-      const updated = [...previous];
-      const lastIndex = updated.length - 1;
-      const lastStroke = updated[lastIndex];
-
-      updated[lastIndex] = {
-        ...lastStroke,
-        points: [...lastStroke.points, point],
-      };
-
-      return updated;
-    });
-  }
-
-  function handlePointerUp(
-    event?: ReactPointerEvent<HTMLCanvasElement>
-  ) {
-    if (event && canvasRef.current) {
-      try {
-        canvasRef.current.releasePointerCapture(event.pointerId);
-      } catch {
-        // ignore
-      }
-    }
-
-    setIsDrawing(false);
-  }
-
-  function undo() {
-    if (strokes.length === 0) return;
-
-    const removed = strokes[strokes.length - 1];
-
-    setStrokes((previous) => previous.slice(0, -1));
-    setRedoStack((previous) => [...previous, removed]);
-  }
-
-  function redo() {
-    if (redoStack.length === 0) return;
-
-    const restored = redoStack[redoStack.length - 1];
-
-    setRedoStack((previous) => previous.slice(0, -1));
-    setStrokes((previous) => [...previous, restored]);
-  }
-
-  function clearCanvas() {
-    setStrokes([]);
-    setRedoStack([]);
-  }
-
-  const canvasHeight =
-    variant === "trace"
-      ? "h-[330px] sm:h-[400px] md:h-[430px] lg:h-[480px]"
-      : "h-[280px] sm:h-[320px] md:h-[340px] lg:h-[360px]";
-
+export default function AlphabetActivitiesPage() {
   return (
-    <div className="overflow-hidden rounded-[28px] border border-[#DFE4EF] bg-white shadow-[0_10px_28px_rgba(25,39,74,0.05)]">
-      <div className={`relative overflow-hidden ${canvasHeight}`}>
-        {variant === "trace" ? (
-          <TraceCanvasBackground letter={letter} />
-        ) : (
-          <FreeCanvasBackground />
-        )}
-
-        <canvas
-          ref={canvasRef}
-          width={1600}
-          height={900}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          onPointerLeave={(event) => {
-            if (isDrawing) {
-              handlePointerUp(event);
-            }
-          }}
-          className="absolute inset-0 z-20 h-full w-full cursor-crosshair touch-none select-none"
-          style={{
-            touchAction: "none",
-            WebkitUserSelect: "none",
-            userSelect: "none",
-          }}
-        />
-      </div>
-
-      <div className="relative z-30 flex flex-col gap-3 border-t border-[#E9EDF5] bg-[#FAFBFF] p-3 sm:p-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap gap-2">
-          <CanvasToolButton
-            active={mode === "pen"}
-            onClick={() => setMode("pen")}
-          >
-            <PenLine size={15} />
-            Pen
-          </CanvasToolButton>
-
-          <CanvasToolButton
-            active={mode === "eraser"}
-            onClick={() => setMode("eraser")}
-          >
-            <Eraser size={15} />
-            Eraser
-          </CanvasToolButton>
-
-          <SmallButton
-            onClick={undo}
-            disabled={strokes.length === 0}
-          >
-            <Undo2 size={15} />
-            Undo
-          </SmallButton>
-
-          <SmallButton
-            onClick={redo}
-            disabled={redoStack.length === 0}
-          >
-            <Redo2 size={15} />
-            Redo
-          </SmallButton>
-
-          <SmallButton
-            onClick={clearCanvas}
-            disabled={strokes.length === 0}
-            danger
-          >
-            <Trash2 size={15} />
-            Clear
-          </SmallButton>
-        </div>
-
-        <div className="flex items-center gap-3 rounded-xl border border-[#E2E7F1] bg-white px-3 py-2">
-          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#94A0B6]">
-            Pen Size
-          </span>
-
-          <input
-            type="range"
-            min={4}
-            max={15}
-            value={penSize}
-            onChange={(event) => {
-              setPenSize(Number(event.target.value));
-            }}
-            className="w-24 accent-[#7C3CFF]"
-          />
-        </div>
-      </div>
-    </div>
+    <ProtectedPage>
+      {() => (
+        <PortalShell role="parent">
+          <AlphabetActivities />
+        </PortalShell>
+      )}
+    </ProtectedPage>
   );
 }
 
-function TraceCanvasBackground({ letter }: { letter: string }) {
-  return (
-    <div className="absolute inset-0 overflow-hidden bg-white">
-      <WritingLines />
+function AlphabetActivities() {
+  const [letterIndex, setLetterIndex] = useState(0);
 
-      <div className="absolute inset-0 grid grid-cols-2">
-        <div className="relative flex items-center justify-center border-r border-dashed border-[#E8D8F5] p-2 sm:p-4 md:p-6">
-          <DottedTraceLetter
-            character={letter}
-            type="uppercase"
-          />
-        </div>
-
-        <div className="relative flex items-center justify-center p-2 sm:p-4 md:p-6">
-          <DottedTraceLetter
-            character={letter.toLowerCase()}
-            type="lowercase"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DottedTraceLetter({
-  character,
-  type,
-}: {
-  character: string;
-  type: "uppercase" | "lowercase";
-}) {
-  return (
-    <svg
-      viewBox="0 0 500 500"
-      preserveAspectRatio="xMidYMid meet"
-      className="h-[90%] w-[90%] max-h-full max-w-full overflow-visible"
-      aria-hidden="true"
-    >
-      <text
-        x="250"
-        y={type === "uppercase" ? "400" : "390"}
-        textAnchor="middle"
-        fontFamily='"KG Blank Space Bold", "KG Blank Space Solid", "Comic Sans MS", sans-serif'
-        fontSize={type === "uppercase" ? "410" : "400"}
-        fontWeight="700"
-        fill="none"
-        stroke="#9EB0CB"
-        strokeWidth="5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeDasharray="11 12"
-      >
-        {character}
-      </text>
-    </svg>
-  );
-}
-
-function FreeCanvasBackground() {
-  return (
-    <div className="absolute inset-0 bg-white">
-      <WritingLines />
-
-      <div className="absolute bottom-5 left-1/2 top-5 border-l border-dashed border-[#E5D8EF]" />
-
-      <div className="absolute left-3 top-3 rounded-full bg-[#F1ECFF] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#7C3CFF] sm:left-5 sm:top-5 sm:px-3 sm:text-[10px]">
-        Uppercase
-      </div>
-
-      <div className="absolute left-[52%] top-3 rounded-full bg-[#FFF0F7] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#F52C8C] sm:left-[53%] sm:top-5 sm:px-3 sm:text-[10px]">
-        Lowercase
-      </div>
-    </div>
-  );
-}
-
-function WritingLines() {
-  return (
-    <div className="pointer-events-none absolute inset-0">
-      <div className="absolute left-4 right-4 top-[21%] border-t border-[#D8E0EE]" />
-      <div className="absolute left-4 right-4 top-1/2 border-t border-dashed border-[#B8C8E0]" />
-      <div className="absolute left-4 right-4 top-[79%] border-t border-[#9FB0CA]" />
-    </div>
-  );
-}
-
-function StrokeGuide({ letter }: { letter: string }) {
-  const data = LETTER_DATA[letter];
-
-  return (
-    <div className="grid overflow-hidden md:grid-cols-2">
-      <LetterFormation
-        character={letter}
-        type="uppercase"
-        hints={data.uppercaseHints}
-      />
-
-      <LetterFormation
-        character={letter.toLowerCase()}
-        type="lowercase"
-        hints={data.lowercaseHints}
-      />
-    </div>
-  );
-}
-
-function LetterFormation({
-  character,
-  type,
-  hints,
-}: {
-  character: string;
-  type: "uppercase" | "lowercase";
-  hints: StrokeHint[];
-}) {
-  return (
-    <div className="relative min-h-[300px] overflow-hidden px-3 pb-4 pt-11 first:border-b first:border-[#E8ECF4] sm:min-h-[330px] sm:px-4 sm:pt-12 md:first:border-b-0 md:first:border-r">
-      <div className="absolute left-4 top-4 rounded-full bg-[#F4F0FF] px-3 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#7C3CFF] sm:left-5 sm:top-5 sm:text-[10px]">
-        {type === "uppercase" ? "Uppercase" : "Lowercase"}
-      </div>
-
-      <div className="absolute left-4 right-4 top-[31%] border-t border-dashed border-[#C9D5E7]" />
-      <div className="absolute bottom-[13%] left-4 right-4 border-t border-[#9EB2CF]" />
-
-      <div className="relative flex h-[245px] items-center justify-center sm:h-[280px]">
-        <span className="formation-letter">
-          {character}
-        </span>
-
-        {hints.map((hint) => (
-          <div
-            key={`${character}-${hint.number}`}
-            className="absolute -translate-x-1/2 -translate-y-1/2"
-            style={{
-              left: `${hint.x}%`,
-              top: `${hint.y}%`,
-            }}
-          >
-            <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#F52C8C] text-[12px] font-black text-white shadow-[0_5px_15px_rgba(245,44,140,0.22)] sm:h-9 sm:w-9 sm:text-sm">
-              {hint.number}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function StepHeader({
-  step,
-  title,
-  description,
-  tone,
-}: {
-  step: string;
-  title: string;
-  description: string;
-  tone: "purple" | "pink" | "teal";
-}) {
-  const badgeClass =
-    tone === "purple"
-      ? "bg-[#EEE8FF] text-[#7C3CFF]"
-      : tone === "pink"
-      ? "bg-[#FFF0F7] text-[#F52C8C]"
-      : "bg-[#E7FBF6] text-[#08A989]";
-
-  return (
-    <div className="flex gap-3 border-b border-[#E8ECF4] px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
-      <div
-        className={`flex h-10 min-w-[48px] items-center justify-center rounded-[14px] text-xs font-black sm:h-11 sm:min-w-[52px] sm:text-sm ${badgeClass}`}
-      >
-        {step}
-      </div>
-
-      <div>
-        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#B2BDCF] sm:text-[10px]">
-          Step {step}
-        </p>
-
-        <h2 className="mt-1 text-lg font-black tracking-[-0.02em] text-[#101A3B] sm:text-2xl">
-          {title}
-        </h2>
-
-        <p className="mt-1 text-xs font-medium text-[#8190AA] sm:text-sm">
-          {description}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-export default function AlphabetTracingPage() {
-  const [selectedLetter, setSelectedLetter] = useState("A");
-  const [completedLetters, setCompletedLetters] = useState<string[]>([]);
-  const [mobileLettersOpen, setMobileLettersOpen] = useState(false);
-
-  const currentIndex = ALPHABET.indexOf(selectedLetter);
-
-  const progress = Math.round(
-    (completedLetters.length / ALPHABET.length) * 100
-  );
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(
-        "fd-learninghub-alphabet-progress"
-      );
-
-      if (!saved) return;
-
-      const parsed = JSON.parse(saved) as string[];
-
-      setCompletedLetters(
-        parsed.filter((letter) => ALPHABET.includes(letter))
-      );
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        "fd-learninghub-alphabet-progress",
-        JSON.stringify(completedLetters)
-      );
-    } catch {
-      // ignore
-    }
-  }, [completedLetters]);
-
-  function selectLetter(letter: string) {
-    setSelectedLetter(letter);
-    setMobileLettersOpen(false);
-  }
+  const currentLetter = LETTERS[letterIndex];
+  const lowerLetter = currentLetter.toLowerCase();
 
   function previousLetter() {
-    if (currentIndex <= 0) return;
-
-    setSelectedLetter(ALPHABET[currentIndex - 1]);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    setLetterIndex((current) =>
+      current === 0 ? LETTERS.length - 1 : current - 1
+    );
   }
 
   function nextLetter() {
-    if (currentIndex >= ALPHABET.length - 1) return;
-
-    setSelectedLetter(ALPHABET[currentIndex + 1]);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  }
-
-  function markComplete() {
-    setCompletedLetters((previous) => {
-      if (previous.includes(selectedLetter)) {
-        return previous;
-      }
-
-      return [...previous, selectedLetter];
-    });
-  }
-
-  function resetProgress() {
-    setCompletedLetters([]);
-  }
-
-  function listenToLetter() {
-    if (!("speechSynthesis" in window)) return;
-
-    window.speechSynthesis.cancel();
-
-    const speech = new SpeechSynthesisUtterance(
-      `Letter ${selectedLetter}`
+    setLetterIndex((current) =>
+      current === LETTERS.length - 1 ? 0 : current + 1
     );
-
-    speech.rate = 0.75;
-    speech.pitch = 1;
-
-    window.speechSynthesis.speak(speech);
   }
-
-  const isCompleted = completedLetters.includes(selectedLetter);
 
   return (
-    <main className="min-h-screen bg-[#F4F6FF] text-[#101A3B]">
-      <style jsx global>{`
-        * {
-          box-sizing: border-box;
-        }
+    <main className="min-h-screen bg-[#F4F5FD] px-3 py-4 sm:px-5 lg:px-7">
+      <div className="mx-auto max-w-[1380px]">
+        <section className="rounded-[28px] border border-[#E4E6F2] bg-white px-4 py-4 shadow-[0_12px_35px_rgba(35,45,90,0.06)] sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Link
+                href="/huruf-membaca"
+                className="grid h-12 w-12 place-items-center rounded-[18px] border border-[#E2E4EE] bg-white text-[#6D3AF2] shadow-sm"
+              >
+                <ArrowLeft size={22} />
+              </Link>
 
-        html {
-          -webkit-text-size-adjust: 100%;
-        }
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9EA8C3]">
+                  FD Arcadia LearningHub
+                </p>
 
-        body {
-          margin: 0;
-          background: #f4f6ff;
-          overscroll-behavior-y: contain;
-        }
-
-        button,
-        input {
-          font-family: inherit;
-        }
-
-        canvas {
-          -webkit-tap-highlight-color: transparent;
-        }
-
-        .formation-letter {
-          font-family:
-            "KG Blank Space Bold",
-            "KG Blank Space Solid",
-            "Comic Sans MS",
-            sans-serif;
-          font-size: clamp(155px, 21vw, 255px);
-          font-weight: 700;
-          line-height: 0.8;
-          color: #13254a;
-        }
-
-        @media (max-width: 767px) {
-          .formation-letter {
-            font-size: clamp(165px, 45vw, 230px);
-          }
-        }
-      `}</style>
-
-      <header className="border-b border-[#E5E9F3] bg-[#F4F6FF]">
-        <div className="mx-auto flex max-w-[1550px] items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-[#7C3CFF] shadow-[0_8px_22px_rgba(124,60,255,0.2)]">
-              <span className="text-lg font-black text-white">
-                FD
-              </span>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[15px] font-black tracking-[0.06em] text-[#101A3B] sm:text-[16px]">
-                  FD ARCADIA
-                </span>
-
-                <Sparkles
-                  size={14}
-                  className="text-[#7C3CFF]"
-                />
-              </div>
-
-              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#A4B0C5]">
-                LearningHub
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="hidden rounded-full border border-[#DFE4EF] bg-white px-4 py-2 text-[11px] font-black uppercase tracking-[0.1em] text-[#7A88A1] md:block">
-              A-Z Letter Tracing
-            </div>
-
-            <a
-              href="/huruf-membaca"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#DDDFF0] bg-white px-3 text-xs font-black text-[#6F36F4] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#F8F5FF] hover:shadow-md sm:px-4"
-            >
-              <Home size={16} />
-
-              <span className="hidden sm:inline">
-                Back to Home
-              </span>
-            </a>
-          </div>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-[1550px] px-3 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-        <section className="mb-5 overflow-hidden rounded-[28px] border border-[#DFE4EF] bg-white shadow-[0_10px_30px_rgba(25,39,74,0.06)] sm:mb-6 sm:rounded-[30px]">
-          <div className="grid gap-5 px-5 py-6 sm:px-6 sm:py-7 lg:grid-cols-[1fr_250px] lg:items-center lg:px-9 lg:py-9">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#EEE8FF] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[#7C3CFF]">
-                <Star size={13} fill="currentColor" />
-                Alphabet Journey
-              </div>
-
-              <h1 className="text-[31px] font-black leading-none tracking-[-0.035em] text-[#101A3B] sm:text-[44px] lg:text-[50px]">
-                Learn. Trace. Write.
-              </h1>
-
-              <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-[#7F8DA7]">
-                Learn the letter formation, trace directly on the guide
-                and practise writing independently.
-              </p>
-            </div>
-
-            <div className="rounded-[24px] border border-[#E3E7F0] bg-[#FBFCFF] p-4 sm:p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.13em] text-[#A4AFC1]">
-                    My Progress
-                  </p>
-
-                  <p className="mt-1 text-2xl font-black text-[#101A3B]">
-                    {completedLetters.length}
-                    <span className="text-sm text-[#B4BECD]">
-                      {" "}
-                      / 26
-                    </span>
-                  </p>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-[15px] bg-[#EEE8FF] text-[#7C3CFF]">
-                  <Star size={21} fill="currentColor" />
-                </div>
-              </div>
-
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#E9ECF4]">
-                <div
-                  className="h-full rounded-full bg-[#7C3CFF] transition-all duration-500"
+                <h1
+                  className="mt-1 text-2xl text-[#101C46] sm:text-3xl"
                   style={{
-                    width: `${progress}%`,
+                    fontFamily:
+                      '"KG Black Space", "KG Miss Kindergarten", sans-serif',
                   }}
-                />
-              </div>
-
-              <div className="mt-2 flex items-center justify-between text-[10px] font-bold text-[#9CA7B9]">
-                <span>{progress}% Complete</span>
-
-                {completedLetters.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={resetProgress}
-                    className="font-black text-[#F52C8C] hover:underline"
-                  >
-                    Reset
-                  </button>
-                )}
+                >
+                  Alphabet Activities
+                </h1>
               </div>
             </div>
+
+            <div className="flex items-center gap-2">
+              <TopStat
+                icon={<Coins size={18} className="text-amber-500" />}
+                value="560"
+              />
+              <TopStat
+                icon={
+                  <Star
+                    size={18}
+                    className="fill-amber-400 text-amber-400"
+                  />
+                }
+                value="124"
+              />
+              <TopStat
+                icon={<Gem size={18} className="text-violet-500" />}
+                value="18"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-5">
+            {[
+              ["01", "Learn Stroke"],
+              ["02", "Trace Letter"],
+              ["03", "Write It Yourself"],
+              ["04", "Find & Match"],
+              ["05", "Letter Sound"],
+            ].map(([no, label], index) => (
+              <div
+                key={label}
+                className={`rounded-[16px] border px-3 py-3 text-center text-sm font-bold ${
+                  index === 0
+                    ? "border-[#7445F3] bg-gradient-to-r from-[#7D4EF6] to-[#6837EB] text-white shadow-[0_8px_20px_rgba(108,58,232,0.20)]"
+                    : "border-[#E5E6EF] bg-white text-[#1E2C55]"
+                }`}
+              >
+                <span className="mr-2 text-xs opacity-80">{no}</span>
+                {label}
+              </div>
+            ))}
           </div>
         </section>
 
-        <button
-          type="button"
-          onClick={() =>
-            setMobileLettersOpen((previous) => !previous)
-          }
-          className="mb-4 flex w-full items-center justify-between rounded-[18px] border border-[#DFE4EF] bg-white px-4 py-3.5 text-left font-black shadow-sm lg:hidden"
-        >
-          <span>
-            Letter{" "}
-            <span className="text-[#7C3CFF]">
-              {selectedLetter}
-              {selectedLetter.toLowerCase()}
-            </span>
-          </span>
+        <section className="mt-5 rounded-[30px] border border-[#E2E5F0] bg-white shadow-[0_12px_35px_rgba(35,45,90,0.06)]">
+          <SectionHeader
+            step="STEP 01"
+            title="Learn the Stroke"
+            subtitle="Start at number 1 and follow the number sequence."
+            number="01"
+            color="purple"
+          />
 
-          {mobileLettersOpen ? (
-            <ChevronUp size={18} />
-          ) : (
-            <ChevronDown size={18} />
-          )}
-        </button>
-
-        <div className="grid gap-5 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-6">
-          <aside
-            className={`self-start rounded-[28px] border border-[#DFE4EF] bg-white p-4 shadow-[0_10px_28px_rgba(25,39,74,0.05)] lg:sticky lg:top-5 lg:block ${
-              mobileLettersOpen ? "block" : "hidden"
-            }`}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#A4AEC0]">
-                  Choose Letter
-                </p>
-
-                <h3 className="mt-1 text-xl font-black text-[#101A3B]">
-                  A-Z
-                </h3>
-              </div>
-
-              <div className="rounded-[10px] bg-[#EEE8FF] px-2.5 py-1.5 text-xs font-black text-[#7C3CFF]">
-                26
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-3">
-              {ALPHABET.map((letter) => {
-                const selected = letter === selectedLetter;
-                const completed = completedLetters.includes(letter);
-
-                return (
-                  <button
-                    type="button"
-                    key={letter}
-                    onClick={() => selectLetter(letter)}
-                    className={`relative aspect-square rounded-[15px] border text-[16px] font-black transition-all duration-200 ${
-                      selected
-                        ? "border-[#7C3CFF] bg-[#7C3CFF] text-white shadow-[0_8px_22px_rgba(124,60,255,0.2)]"
-                        : completed
-                        ? "border-[#CFEFE7] bg-[#F0FCF8] text-[#08A989]"
-                        : "border-[#E3E7EF] bg-white text-[#25395F] hover:-translate-y-0.5 hover:border-[#C9D1E3]"
-                    }`}
-                  >
-                    {letter}
-                    <span className="text-[11px] opacity-70">
-                      {letter.toLowerCase()}
-                    </span>
-
-                    {completed && !selected && (
-                      <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#08A989] text-white">
-                        <Check size={9} strokeWidth={4} />
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </aside>
-
-          <div className="space-y-5 sm:space-y-6">
-            <section className="flex flex-col gap-4 rounded-[28px] border border-[#DFE4EF] bg-white p-4 shadow-[0_10px_28px_rgba(25,39,74,0.05)] sm:flex-row sm:items-center sm:justify-between sm:p-5">
-              <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-[18px] bg-[#EEE8FF] text-[#7C3CFF]">
-                  <span className="text-[29px] font-black">
-                    {selectedLetter}
-                  </span>
-
-                  <span
-                    className="text-[22px]"
-                    style={{
-                      fontFamily:
-                        '"KG Blank Space Bold", "KG Blank Space Solid", "Comic Sans MS", sans-serif',
-                    }}
-                  >
-                    {selectedLetter.toLowerCase()}
-                  </span>
-                </div>
-
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.13em] text-[#A6B0C2]">
-                    Now Learning
-                  </p>
-
-                  <h2 className="mt-1 text-xl font-black text-[#101A3B]">
-                    Letter {selectedLetter}
-                  </h2>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={listenToLetter}
-                className="inline-flex items-center justify-center gap-2 rounded-[15px] bg-[#FFF0F7] px-4 py-3 text-xs font-black text-[#F52C8C] transition hover:-translate-y-0.5"
-              >
-                <Volume2 size={17} />
-                Listen
-              </button>
-            </section>
-
-            <section className="overflow-hidden rounded-[30px] border border-[#DFE4EF] bg-white shadow-[0_10px_28px_rgba(25,39,74,0.05)]">
-              <StepHeader
-                step="01"
-                title="Learn the Stroke"
-                description="Start at number 1 and follow the number sequence."
-                tone="purple"
-              />
-
-              <StrokeGuide letter={selectedLetter} />
-            </section>
-
-            <section className="overflow-hidden rounded-[30px] border border-[#DFE4EF] bg-white shadow-[0_10px_28px_rgba(25,39,74,0.05)]">
-              <StepHeader
-                step="02"
-                title="Trace the Letter"
-                description="Use your finger, stylus or mouse to trace the letter."
-                tone="pink"
-              />
-
-              <div className="p-3 sm:p-5">
-                <DrawingCanvas
-                  key={`trace-${selectedLetter}`}
-                  letter={selectedLetter}
-                  variant="trace"
-                />
-              </div>
-            </section>
-
-            <section className="overflow-hidden rounded-[30px] border border-[#DFE4EF] bg-white shadow-[0_10px_28px_rgba(25,39,74,0.05)]">
-              <StepHeader
-                step="03"
-                title="Write It Yourself"
-                description={`Write ${selectedLetter}${selectedLetter.toLowerCase()} by yourself on the handwriting lines.`}
-                tone="teal"
-              />
-
-              <div className="p-3 sm:p-5">
-                <DrawingCanvas
-                  key={`free-${selectedLetter}`}
-                  letter={selectedLetter}
-                  variant="free"
-                />
-              </div>
-            </section>
-
-            <section className="rounded-[30px] border border-[#DFE4EF] bg-white p-4 shadow-[0_10px_28px_rgba(25,39,74,0.05)] sm:p-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.13em] text-[#A5B0C2]">
-                    Letter Progress
-                  </p>
-
-                  <h3 className="mt-1 text-lg font-black text-[#101A3B]">
-                    Finished practising{" "}
-                    {selectedLetter}
-                    {selectedLetter.toLowerCase()}?
-                  </h3>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={markComplete}
-                  disabled={isCompleted}
-                  className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-[16px] px-5 text-sm font-black transition ${
-                    isCompleted
-                      ? "cursor-default bg-[#EAFBF6] text-[#08A989]"
-                      : "bg-[#7C3CFF] text-white shadow-[0_10px_24px_rgba(124,60,255,0.2)] hover:-translate-y-0.5"
-                  }`}
-                >
-                  <Check size={17} strokeWidth={3} />
-
-                  {isCompleted
-                    ? "Completed"
-                    : "Mark as Complete"}
-                </button>
-              </div>
-            </section>
-
-            <nav className="flex items-center justify-between gap-3 pb-8">
-              <button
-                type="button"
-                onClick={previousLetter}
-                disabled={currentIndex === 0}
-                className="inline-flex min-h-12 items-center gap-2 rounded-[15px] border border-[#DFE4EF] bg-white px-4 text-sm font-black text-[#60708D] shadow-sm transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-30"
-              >
-                <ArrowLeft size={17} />
-                <span className="hidden sm:inline">Previous</span>
-              </button>
-
-              <div className="text-center">
-                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-[#A6B0C1]">
-                  Letter
-                </p>
-
-                <p className="mt-1 text-sm font-black text-[#101A3B]">
-                  {currentIndex + 1} / 26
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={nextLetter}
-                disabled={currentIndex === ALPHABET.length - 1}
-                className="inline-flex min-h-12 items-center gap-2 rounded-[15px] bg-[#7C3CFF] px-4 text-sm font-black text-white shadow-[0_10px_24px_rgba(124,60,255,0.2)] transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-30"
-              >
-                <span className="hidden sm:inline">Next Letter</span>
-                <ArrowRight size={17} />
-              </button>
-            </nav>
+          <div className="grid gap-5 border-t border-[#EEF0F6] p-4 sm:p-6 lg:grid-cols-2">
+            <LearnStrokeCard
+              label="UPPERCASE"
+              letter={currentLetter}
+              side="upper"
+            />
+            <LearnStrokeCard
+              label="LOWERCASE"
+              letter={lowerLetter}
+              side="lower"
+            />
           </div>
-        </div>
+        </section>
+
+        <section className="mt-5 rounded-[30px] border border-[#E2E5F0] bg-white shadow-[0_12px_35px_rgba(35,45,90,0.06)]">
+          <SectionHeader
+            step="STEP 02"
+            title="Trace the Letter"
+            subtitle="Start at the highlighted number and trace the dotted letter."
+            number="02"
+            color="pink"
+          />
+
+          <TraceLetters key={`trace-${currentLetter}`} currentLetter={currentLetter} />
+        </section>
+
+        <section className="mt-5 rounded-[30px] border border-[#E2E5F0] bg-white shadow-[0_12px_35px_rgba(35,45,90,0.06)]">
+          <SectionHeader
+            step="STEP 03"
+            title="Write It Yourself"
+            subtitle={`Write ${currentLetter}${lowerLetter} by yourself on the handwriting lines.`}
+            number="03"
+            color="teal"
+          />
+
+          <WriteYourself key={`write-${currentLetter}`} />
+        </section>
+
+        <section className="mt-5 rounded-[24px] border border-[#E2E5F0] bg-white p-3 shadow-[0_10px_25px_rgba(35,45,90,0.05)]">
+          <div className="grid items-center gap-3 sm:grid-cols-[auto_1fr_auto]">
+            <button
+              type="button"
+              onClick={previousLetter}
+              className="flex min-h-[54px] items-center justify-center gap-2 rounded-[17px] bg-gradient-to-r from-[#7847F2] to-[#6735E8] px-5 font-black text-white"
+            >
+              <ChevronLeft size={20} />
+              Previous
+            </button>
+
+            <div className="px-2 text-center">
+              <p
+                className="text-lg text-[#14214B]"
+                style={{
+                  fontFamily:
+                    '"KG Black Space", "KG Miss Kindergarten", sans-serif',
+                }}
+              >
+                {letterIndex + 1} / 26 Letters
+              </p>
+
+              <div className="mx-auto mt-2 h-2 max-w-[420px] overflow-hidden rounded-full bg-[#E4E5EA]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#7041F1] to-[#8B5DF7] transition-[width] duration-300"
+                  style={{
+                    width: `${((letterIndex + 1) / 26) * 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={nextLetter}
+              className="flex min-h-[54px] items-center justify-center gap-2 rounded-[17px] bg-gradient-to-r from-[#7847F2] to-[#6735E8] px-5 font-black text-white"
+            >
+              Next
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        </section>
       </div>
+
+      <style jsx global>{`
+        @keyframes strokePulse {
+          0%,
+          100% {
+            transform: scale(0.88);
+            transform-origin: center;
+            opacity: 0.10;
+          }
+
+          50% {
+            transform: scale(1.18);
+            transform-origin: center;
+            opacity: 0.24;
+          }
+        }
+      `}</style>
     </main>
   );
 }
 
-function CanvasToolButton({
-  active,
-  onClick,
-  children,
+function TopStat({
+  icon,
+  value,
 }: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
+  icon: ReactNode;
+  value: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[11px] border px-3 text-xs font-black transition ${
-        active
-          ? "border-[#7C3CFF] bg-[#7C3CFF] text-white shadow-sm"
-          : "border-[#E1E6EF] bg-white text-[#596A87] hover:-translate-y-0.5"
-      }`}
-    >
-      {children}
-    </button>
+    <div className="flex h-11 items-center gap-2 rounded-full border border-[#E7E8F1] bg-white px-4 shadow-sm">
+      {icon}
+      <span className="font-black text-[#16214A]">{value}</span>
+    </div>
   );
 }
 
-function SmallButton({
-  children,
-  onClick,
-  disabled,
-  danger = false,
+function SectionHeader({
+  step,
+  title,
+  subtitle,
+  number,
+  color,
 }: {
-  children: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  danger?: boolean;
+  step: string;
+  title: string;
+  subtitle: string;
+  number: string;
+  color: "purple" | "pink" | "teal";
+}) {
+  const colorClass =
+    color === "purple"
+      ? "bg-[#EEE7FF] text-[#7345F2]"
+      : color === "pink"
+        ? "bg-[#FFEAF4] text-[#F12F83]"
+        : "bg-[#E8FAF6] text-[#10A98D]";
+
+  return (
+    <div className="flex items-start gap-4 px-4 py-5 sm:px-6">
+      <div
+        className={`grid h-16 w-16 shrink-0 place-items-center rounded-[20px] text-xl font-black ${colorClass}`}
+      >
+        {number}
+      </div>
+
+      <div>
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#A8B2C9]">
+          {step}
+        </p>
+
+        <h2
+          className="mt-1 text-2xl text-[#14214B]"
+          style={{
+            fontFamily:
+              '"KG Black Space", "KG Miss Kindergarten", sans-serif',
+          }}
+        >
+          {title}
+        </h2>
+
+        <p className="mt-1 text-base text-[#8D99B5]">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function LearnStrokeCard({
+  label,
+  letter,
+  side,
+}: {
+  label: string;
+  letter: string;
+  side: TraceSide;
+}) {
+  const letterKey = letter.toUpperCase();
+  const guideSet = LETTER_GUIDES[letterKey];
+  const guides =
+    side === "upper"
+      ? guideSet.upper
+      : guideSet.lower;
+
+  return (
+    <div className="relative min-h-[430px] overflow-hidden rounded-[24px] border border-[#DDE2EF] bg-white p-4">
+      <div className="mx-auto w-fit rounded-full bg-[#F3EEFF] px-4 py-2 text-xs font-black tracking-[0.05em] text-[#7445F3]">
+        {label}
+      </div>
+
+      <svg
+        viewBox="0 0 300 360"
+        className="mx-auto mt-3 block h-[330px] w-full max-w-[390px]"
+      >
+        {/* Same stroke geometry used by Step 02, but solid for learning. */}
+        {guides.map((guide) => (
+          <path
+            key={`learn-${guide.number}`}
+            d={guide.d}
+            fill="none"
+            stroke="#172B59"
+            strokeWidth={
+              side === "upper" ? 34 : 30
+            }
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+
+        {/* Small numbered badges outside the letter. No tick in Step 01. */}
+        {guides.map((guide) => (
+          <StrokeBadge
+            key={`learn-badge-${guide.number}`}
+            x={
+              guide.badgeX ??
+              guide.startX - 24
+            }
+            y={
+              guide.badgeY ??
+              guide.startY - 18
+            }
+            no={guide.number}
+            size="small"
+          />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function StrokeBadge({
+  x,
+  y,
+  no,
+  size = "normal",
+  active = false,
+}: {
+  x: number;
+  y: number;
+  no: number;
+  size?: "small" | "normal";
+  active?: boolean;
+}) {
+  const radius = size === "small" ? 13 : 16;
+  const fontSize = size === "small" ? 12 : 14;
+
+  return (
+    <g>
+      {active ? (
+        <circle
+          cx={x}
+          cy={y}
+          r={radius + 10}
+          fill="#F52F85"
+          opacity="0.14"
+          className="animate-[strokePulse_1.2s_ease-in-out_infinite]"
+        />
+      ) : null}
+
+      <circle
+        cx={x}
+        cy={y}
+        r={radius}
+        fill="#F52F85"
+        stroke="white"
+        strokeWidth="3"
+      />
+
+      <text
+        x={x}
+        y={y + fontSize * 0.35}
+        textAnchor="middle"
+        fontSize={fontSize}
+        fontWeight="900"
+        fill="white"
+      >
+        {no}
+      </text>
+    </g>
+  );
+}
+
+function TraceLetters({
+  currentLetter,
+}: {
+  currentLetter: string;
+}) {
+  const [tool, setTool] = useState<ToolMode>("pen");
+  const [penColor, setPenColor] = useState(PEN_COLORS[0]);
+  const [penSize, setPenSize] = useState(18);
+
+  const [upperLines, setUpperLines] = useState<StrokeLine[]>([]);
+  const [lowerLines, setLowerLines] = useState<StrokeLine[]>([]);
+
+  const [upperDone, setUpperDone] = useState(false);
+  const [lowerDone, setLowerDone] = useState(false);
+
+  function clearAll() {
+    setUpperLines([]);
+    setLowerLines([]);
+    setUpperDone(false);
+    setLowerDone(false);
+  }
+
+  function undo() {
+    if (lowerLines.length > 0) {
+      setLowerLines((lines) => lines.slice(0, -1));
+      setLowerDone(false);
+      return;
+    }
+
+    if (upperLines.length > 0) {
+      setUpperLines((lines) => lines.slice(0, -1));
+      setUpperDone(false);
+    }
+  }
+
+  const guideSet = LETTER_GUIDES[currentLetter];
+
+  return (
+    <div className="border-t border-[#EEF0F6] p-4 sm:p-6">
+      <div className="grid gap-5 lg:grid-cols-2">
+        <TracePad
+          label="UPPERCASE"
+          side="upper"
+          lines={upperLines}
+          setLines={setUpperLines}
+          color={penColor}
+          penSize={penSize}
+          tool={tool}
+          done={upperDone}
+          onDone={() => setUpperDone(true)}
+          guides={guideSet.upper}
+        />
+
+        <TracePad
+          label="LOWERCASE"
+          side="lower"
+          lines={lowerLines}
+          setLines={setLowerLines}
+          color={penColor}
+          penSize={penSize}
+          tool={tool}
+          done={lowerDone}
+          onDone={() => setLowerDone(true)}
+          guides={guideSet.lower}
+        />
+      </div>
+
+      <ToolBar
+        tool={tool}
+        setTool={setTool}
+        penColor={penColor}
+        setPenColor={setPenColor}
+        penSize={penSize}
+        setPenSize={setPenSize}
+        onUndo={undo}
+        onClear={clearAll}
+      />
+    </div>
+  );
+}
+
+function TracePad({
+  label,
+  side,
+  lines,
+  setLines,
+  color,
+  penSize,
+  tool,
+  done,
+  onDone,
+  guides,
+}: {
+  label: string;
+  side: TraceSide;
+  lines: StrokeLine[];
+  setLines: Dispatch<SetStateAction<StrokeLine[]>>;
+  color: string;
+  penSize: number;
+  tool: ToolMode;
+  done: boolean;
+  onDone: () => void;
+  guides: GuideDef[];
+}) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  /*
+    Performance:
+    - Jangan set React state pada setiap pointermove.
+    - Stroke semasa dilukis terus pada <polyline> melalui ref.
+    - State hanya commit bila jari diangkat / stroke selesai.
+  */
+  const livePolylineRef =
+    useRef<SVGPolylineElement | null>(null);
+
+  const drawingRef = useRef(false);
+  const livePointsRef = useRef<Point[]>([]);
+  const lastMoveTimeRef = useRef(0);
+
+  const [activeStroke, setActiveStroke] =
+    useState(0);
+
+  const initialProgress =
+    side === "upper"
+      ? [0, 0, 0]
+      : [0, 0];
+
+  const [strokeProgress, setStrokeProgress] =
+    useState<number[]>(initialProgress);
+
+  const activeStrokeRef = useRef(0);
+  const strokeProgressRef =
+    useRef<number[]>(initialProgress);
+
+  /*
+    Pre-sampled path points.
+    Ini jauh lebih ringan daripada getPointAtLength 120 kali
+    pada SETIAP pointermove.
+  */
+  const guideSamplesRef = useRef<
+    Array<Array<Point>>
+  >([]);
+
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const sampleCount = 180;
+
+    guideSamplesRef.current = guides.map(
+      (_, index) => {
+        const path =
+          svg.querySelector<SVGPathElement>(
+            `[data-guide-index="${index}"]`
+          );
+
+        if (!path) return [];
+
+        const total = path.getTotalLength();
+
+        return Array.from(
+          { length: sampleCount + 1 },
+          (_, sampleIndex) => {
+            const p = path.getPointAtLength(
+              total *
+                (sampleIndex / sampleCount)
+            );
+
+            return {
+              x: p.x,
+              y: p.y,
+            };
+          }
+        );
+      }
+    );
+  }, [guides, side]);
+
+  function updateActiveStroke(value: number) {
+    activeStrokeRef.current = value;
+    setActiveStroke(value);
+  }
+
+  function updateStrokeProgress(
+    value: number[]
+  ) {
+    strokeProgressRef.current = value;
+    setStrokeProgress(value);
+  }
+
+  function getSvgPoint(
+    event: ReactPointerEvent<SVGSVGElement>
+  ): Point {
+    const svg = svgRef.current;
+
+    if (!svg) {
+      return { x: 0, y: 0 };
+    }
+
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+
+    const matrix = svg.getScreenCTM();
+
+    if (!matrix) {
+      return { x: 0, y: 0 };
+    }
+
+    const transformed =
+      point.matrixTransform(
+        matrix.inverse()
+      );
+
+    return {
+      x: transformed.x,
+      y: transformed.y,
+    };
+  }
+
+  /*
+    STRICT FORWARD SEARCH
+
+    Jangan cari nearest point pada seluruh path.
+    Untuk lowercase a, awal dan akhir bulatan sangat dekat.
+    Kalau global nearest digunakan, student sentuh No.1
+    boleh terus dianggap hampir 100%.
+
+    Kita hanya cari sedikit di depan progress semasa.
+  */
+  function findForwardPosition(
+    strokeIndex: number,
+    point: Point
+  ) {
+    const samples =
+      guideSamplesRef.current[
+        strokeIndex
+      ] || [];
+
+    if (samples.length === 0) {
+      return null;
+    }
+
+    const currentPercent =
+      strokeProgressRef.current[
+        strokeIndex
+      ] || 0;
+
+    const currentIndex = Math.round(
+      (currentPercent / 100) *
+        (samples.length - 1)
+    );
+
+    const backwardAllowance =
+      currentPercent === 0 ? 0 : 8;
+
+    /*
+      Maksimum gerakan ke depan sekali gus.
+      Ini prevent lompat terus ke hujung.
+    */
+    const forwardAllowance = 28;
+
+    const startIndex = Math.max(
+      0,
+      currentIndex - backwardAllowance
+    );
+
+    const endIndex = Math.min(
+      samples.length - 1,
+      currentIndex + forwardAllowance
+    );
+
+    let bestIndex = -1;
+    let bestDistance =
+      Number.POSITIVE_INFINITY;
+
+    for (
+      let i = startIndex;
+      i <= endIndex;
+      i++
+    ) {
+      const sample = samples[i];
+
+      const distance = Math.hypot(
+        point.x - sample.x,
+        point.y - sample.y
+      );
+
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = i;
+      }
+    }
+
+    if (bestIndex < 0) {
+      return null;
+    }
+
+    return {
+      distance: bestDistance,
+      percent:
+        (bestIndex /
+          (samples.length - 1)) *
+        100,
+      point: samples[bestIndex],
+    };
+  }
+
+  function isNearAllowedStart(
+    strokeIndex: number,
+    point: Point
+  ) {
+    const samples =
+      guideSamplesRef.current[
+        strokeIndex
+      ] || [];
+
+    if (samples.length === 0) {
+      return false;
+    }
+
+    const currentPercent =
+      strokeProgressRef.current[
+        strokeIndex
+      ] || 0;
+
+    /*
+      Kalau belum mula:
+      hanya kawasan 0-10% stroke yang aktif.
+
+      Kalau sambung:
+      hanya sekitar tempat progress terakhir.
+    */
+    const centerIndex =
+      currentPercent === 0
+        ? 0
+        : Math.round(
+            (currentPercent / 100) *
+              (samples.length - 1)
+          );
+
+    const startIndex =
+      currentPercent === 0
+        ? 0
+        : Math.max(
+            0,
+            centerIndex - 14
+          );
+
+    const endIndex =
+      currentPercent === 0
+        ? Math.min(
+            samples.length - 1,
+            18
+          )
+        : Math.min(
+            samples.length - 1,
+            centerIndex + 14
+          );
+
+    /*
+      Toleransi besar untuk jari kanak-kanak,
+      tetapi masih LOCK kepada stroke aktif.
+    */
+    const allowedRadius = 38;
+
+    for (
+      let i = startIndex;
+      i <= endIndex;
+      i++
+    ) {
+      const sample = samples[i];
+
+      if (
+        Math.hypot(
+          point.x - sample.x,
+          point.y - sample.y
+        ) <= allowedRadius
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function setLivePolyline(
+    points: Point[]
+  ) {
+    const node =
+      livePolylineRef.current;
+
+    if (!node) return;
+
+    node.setAttribute(
+      "points",
+      points
+        .map(
+          (p) =>
+            `${p.x.toFixed(
+              1
+            )},${p.y.toFixed(1)}`
+        )
+        .join(" ")
+    );
+
+    node.setAttribute(
+      "stroke",
+      color
+    );
+
+    node.setAttribute(
+      "stroke-width",
+      String(penSize)
+    );
+  }
+
+  function clearLivePolyline() {
+    livePointsRef.current = [];
+
+    const node =
+      livePolylineRef.current;
+
+    if (node) {
+      node.setAttribute(
+        "points",
+        ""
+      );
+    }
+  }
+
+  function commitLiveStroke() {
+    const points =
+      livePointsRef.current;
+
+    if (points.length < 2) {
+      clearLivePolyline();
+      return;
+    }
+
+    setLines((old) => [
+      ...old,
+      {
+        id: `${Date.now()}-${Math.random()}`,
+        color,
+        size: penSize,
+        points: [...points],
+      },
+    ]);
+
+    clearLivePolyline();
+  }
+
+  /*
+    Eraser hanya buang USER STROKES.
+    Guide, dotted alphabet, badge dan handwriting line
+    berada pada layer berasingan dan tak pernah disentuh.
+  */
+  function eraseNearbyUserStroke(
+    point: Point
+  ) {
+    const radius = Math.max(
+      22,
+      penSize * 1.15
+    );
+
+    setLines((old) =>
+      old.filter((line) => {
+        const hit = line.points.some(
+          (p) =>
+            Math.hypot(
+              p.x - point.x,
+              p.y - point.y
+            ) <= radius
+        );
+
+        return !hit;
+      })
+    );
+  }
+
+  function startDrawing(
+    event: ReactPointerEvent<SVGSVGElement>
+  ) {
+    const point = getSvgPoint(event);
+
+    if (tool === "eraser") {
+      drawingRef.current = true;
+
+      eraseNearbyUserStroke(point);
+
+      try {
+        event.currentTarget.setPointerCapture(
+          event.pointerId
+        );
+      } catch {}
+
+      return;
+    }
+
+    if (guides.length === 0 || done) {
+      return;
+    }
+
+    const strokeIndex =
+      activeStrokeRef.current;
+
+    /*
+      HARD LOCK:
+      Student hanya boleh mula stroke semasa.
+      Stroke 2 tak boleh disentuh selagi stroke 1
+      belum 100%.
+    */
+    if (
+      strokeIndex > 0 &&
+      (strokeProgressRef.current[
+        strokeIndex - 1
+      ] || 0) < 100
+    ) {
+      return;
+    }
+
+    if (
+      !isNearAllowedStart(
+        strokeIndex,
+        point
+      )
+    ) {
+      return;
+    }
+
+    try {
+      event.currentTarget.setPointerCapture(
+        event.pointerId
+      );
+    } catch {}
+
+    drawingRef.current = true;
+
+    livePointsRef.current = [point];
+
+    setLivePolyline(
+      livePointsRef.current
+    );
+  }
+
+  function moveDrawing(
+    event: ReactPointerEvent<SVGSVGElement>
+  ) {
+    if (!drawingRef.current) {
+      return;
+    }
+
+    const now =
+      performance.now();
+
+    /*
+      Limit kepada ~60fps.
+      iPhone boleh hantar pointermove jauh lebih laju
+      dan itu yang buat UI lag.
+    */
+    if (
+      now -
+        lastMoveTimeRef.current <
+      14
+    ) {
+      return;
+    }
+
+    lastMoveTimeRef.current = now;
+
+    const point = getSvgPoint(event);
+
+    if (tool === "eraser") {
+      eraseNearbyUserStroke(point);
+      return;
+    }
+
+    const strokeIndex =
+      activeStrokeRef.current;
+
+    const forward =
+      findForwardPosition(
+        strokeIndex,
+        point
+      );
+
+    if (!forward) {
+      return;
+    }
+
+    /*
+      User boleh lari sedikit dari dotted guide,
+      tapi bukan terlalu jauh.
+    */
+    if (forward.distance > 34) {
+      return;
+    }
+
+    const previous =
+      strokeProgressRef.current[
+        strokeIndex
+      ] || 0;
+
+    let accepted = Math.max(
+      previous,
+      forward.percent
+    );
+
+    /*
+      Jangan complete terlalu awal.
+      Untuk loop lowercase a, kena betul-betul
+      hampir habis keliling dulu.
+    */
+    if (accepted >= 97) {
+      accepted = 100;
+    }
+
+    const nextProgress = [
+      ...strokeProgressRef.current,
+    ];
+
+    nextProgress[
+      strokeIndex
+    ] = accepted;
+
+    /*
+      State progress tak perlu update setiap pixel.
+      Update visual apabila berubah ~2%.
+    */
+    if (
+      Math.abs(
+        accepted - previous
+      ) >= 1.5 ||
+      accepted === 100
+    ) {
+      updateStrokeProgress(
+        nextProgress
+      );
+    } else {
+      strokeProgressRef.current =
+        nextProgress;
+    }
+
+    /*
+      Snap lukisan ke GUIDE POINT,
+      bukan raw finger point.
+      Hasil lebih smooth dan kemas.
+    */
+    const lastPoint =
+      livePointsRef.current[
+        livePointsRef.current.length -
+          1
+      ];
+
+    const snapped =
+      forward.point;
+
+    if (
+      !lastPoint ||
+      Math.hypot(
+        lastPoint.x - snapped.x,
+        lastPoint.y - snapped.y
+      ) > 2.2
+    ) {
+      livePointsRef.current.push(
+        snapped
+      );
+
+      /*
+        Elakkan array terlalu besar pada mobile.
+      */
+      if (
+        livePointsRef.current.length >
+        220
+      ) {
+        livePointsRef.current =
+          livePointsRef.current.filter(
+            (_, i) =>
+              i % 2 === 0
+          );
+      }
+
+      setLivePolyline(
+        livePointsRef.current
+      );
+    }
+
+    if (accepted >= 100) {
+      finishStroke();
+    }
+  }
+
+  function finishStroke() {
+    const strokeIndex =
+      activeStrokeRef.current;
+
+    const nextProgress = [
+      ...strokeProgressRef.current,
+    ];
+
+    nextProgress[
+      strokeIndex
+    ] = 100;
+
+    updateStrokeProgress(
+      nextProgress
+    );
+
+    commitLiveStroke();
+
+    drawingRef.current = false;
+
+    /*
+      STRICT SEQUENCE:
+      baru unlock next stroke selepas 100%.
+    */
+    if (
+      strokeIndex >=
+      guides.length - 1
+    ) {
+      onDone();
+      return;
+    }
+
+    updateActiveStroke(
+      strokeIndex + 1
+    );
+  }
+
+  function endDrawing(
+    event: ReactPointerEvent<SVGSVGElement>
+  ) {
+    try {
+      event.currentTarget.releasePointerCapture(
+        event.pointerId
+      );
+    } catch {}
+
+    if (tool === "eraser") {
+      drawingRef.current = false;
+      return;
+    }
+
+    if (!drawingRef.current) {
+      return;
+    }
+
+    const strokeIndex =
+      activeStrokeRef.current;
+
+    const progress =
+      strokeProgressRef.current[
+        strokeIndex
+      ] || 0;
+
+    /*
+      Hanya complete kalau benar-benar hampir hujung.
+      Kalau belum, commit segment dan student
+      boleh sambung dari tempat terakhir.
+    */
+    if (progress >= 97) {
+      finishStroke();
+      return;
+    }
+
+    commitLiveStroke();
+    drawingRef.current = false;
+  }
+
+  /*
+    Badge positions:
+    lowercase a No.1 di kiri luar circle,
+    No.2 di kanan atas straight stroke.
+  */
+  function getBadgePosition(
+    guide: GuideDef
+  ) {
+    return {
+      x:
+        guide.badgeX ??
+        guide.startX - 24,
+      y:
+        guide.badgeY ??
+        guide.startY - 18,
+    };
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-[24px] border border-[#DDE2EF] bg-white">
+      <div className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full bg-[#F2EDFF] px-4 py-2 text-xs font-black tracking-[0.05em] text-[#7445F3]">
+        {label}
+      </div>
+
+      <svg
+        ref={svgRef}
+        viewBox="0 0 300 360"
+        className="block h-[440px] w-full touch-none select-none sm:h-[500px]"
+        onPointerDown={startDrawing}
+        onPointerMove={moveDrawing}
+        onPointerUp={endDrawing}
+        onPointerCancel={endDrawing}
+      >
+        {/* HANDWRITING LINES — permanent */}
+        <g pointerEvents="none">
+          <line
+            x1="25"
+            y1="86"
+            x2="275"
+            y2="86"
+            stroke="#DCE2EF"
+            strokeWidth="2"
+          />
+
+          <line
+            x1="25"
+            y1="220"
+            x2="275"
+            y2="220"
+            stroke="#D8DFF0"
+            strokeWidth="2"
+            strokeDasharray="5 7"
+          />
+
+          <line
+            x1="25"
+            y1="330"
+            x2="275"
+            y2="330"
+            stroke="#B9C7E4"
+            strokeWidth="2"
+          />
+        </g>
+
+        {guides.length > 0 ? (
+          <g pointerEvents="none">
+            {guides.map(
+              (guide, index) => {
+                const locked =
+                  index >
+                  activeStroke;
+
+                const finished =
+                  index <
+                    activeStroke ||
+                  done;
+
+                return (
+                  <path
+                    key={`guide-${guide.number}`}
+                    data-guide-index={index}
+                    d={guide.d}
+                    fill="none"
+                    stroke={
+                      locked
+                        ? "#D8DFEC"
+                        : finished
+                          ? "#C3CDDF"
+                          : "#AAB7D0"
+                    }
+                    strokeWidth="10"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="2 12"
+                    opacity={
+                      locked
+                        ? 0.45
+                        : finished
+                          ? 0.5
+                          : 0.9
+                    }
+                  />
+                );
+              }
+            )}
+
+            {guides.map(
+              (guide, index) => {
+                const pos =
+                  getBadgePosition(
+                    guide
+                  );
+
+                const locked =
+                  index >
+                  activeStroke;
+
+                const finished =
+                  index <
+                    activeStroke ||
+                  done;
+
+                return (
+                  <g
+                    key={`badge-${guide.number}`}
+                    opacity={
+                      locked
+                        ? 0.36
+                        : finished
+                          ? 0.55
+                          : 1
+                    }
+                  >
+                    <StrokeBadge
+                      x={pos.x}
+                      y={pos.y}
+                      no={guide.number}
+                      size="small"
+                      active={
+                        !done &&
+                        index ===
+                          activeStroke
+                      }
+                    />
+                  </g>
+                );
+              }
+            )}
+          </g>
+        ) : null}
+
+        {/* SAVED USER STROKES */}
+        <g pointerEvents="none">
+          {lines.map((line) => (
+            <polyline
+              key={line.id}
+              points={line.points
+                .map(
+                  (p) =>
+                    `${p.x},${p.y}`
+                )
+                .join(" ")}
+              fill="none"
+              stroke={line.color}
+              strokeWidth={line.size}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+        </g>
+
+        {/* LIVE STROKE — imperative, no React rerender per move */}
+        <polyline
+          ref={livePolylineRef}
+          points=""
+          fill="none"
+          stroke={color}
+          strokeWidth={penSize}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          pointerEvents="none"
+        />
+      </svg>
+
+      {done ? (
+        <div className="absolute bottom-5 right-5 grid h-11 w-11 place-items-center rounded-full bg-[#2CC77F] text-white shadow-[0_8px_18px_rgba(44,199,127,0.24)]">
+          <Check
+            size={23}
+            strokeWidth={4}
+          />
+        </div>
+      ) : null}
+
+      {/* tiny status to make locked sequence clear */}
+      {!done && guides.length > 0 ? (
+        <div className="pointer-events-none absolute bottom-5 left-5 rounded-full border border-[#E3D9FF] bg-white/92 px-3 py-1.5 text-xs font-black text-[#7445F3] shadow-sm backdrop-blur">
+          Stroke {activeStroke + 1} /{" "}
+          {guides.length}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function WriteYourself() {
+  const [tool, setTool] = useState<ToolMode>("pen");
+  const [penColor, setPenColor] = useState(PEN_COLORS[0]);
+  const [penSize, setPenSize] = useState(18);
+
+  const [upperLines, setUpperLines] = useState<StrokeLine[]>([]);
+  const [lowerLines, setLowerLines] = useState<StrokeLine[]>([]);
+
+  function undo() {
+    if (lowerLines.length > 0) {
+      setLowerLines((lines) => lines.slice(0, -1));
+      return;
+    }
+
+    if (upperLines.length > 0) {
+      setUpperLines((lines) => lines.slice(0, -1));
+    }
+  }
+
+  function clear() {
+    setUpperLines([]);
+    setLowerLines([]);
+  }
+
+  return (
+    <div className="border-t border-[#EEF0F6] p-4 sm:p-6">
+      <div className="grid gap-5 lg:grid-cols-2">
+        <FreeWritePad
+          label="UPPERCASE"
+          lines={upperLines}
+          setLines={setUpperLines}
+          color={penColor}
+          penSize={penSize}
+          tool={tool}
+        />
+
+        <FreeWritePad
+          label="LOWERCASE"
+          lines={lowerLines}
+          setLines={setLowerLines}
+          color={penColor}
+          penSize={penSize}
+          tool={tool}
+        />
+      </div>
+
+      <ToolBar
+        tool={tool}
+        setTool={setTool}
+        penColor={penColor}
+        setPenColor={setPenColor}
+        penSize={penSize}
+        setPenSize={setPenSize}
+        onUndo={undo}
+        onClear={clear}
+      />
+    </div>
+  );
+}
+
+function FreeWritePad({
+  label,
+  lines,
+  setLines,
+  color,
+  penSize,
+  tool,
+}: {
+  label: string;
+  lines: StrokeLine[];
+  setLines: Dispatch<SetStateAction<StrokeLine[]>>;
+  color: string;
+  penSize: number;
+  tool: ToolMode;
+}) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const drawingRef = useRef(false);
+  const activeIdRef = useRef<string | null>(null);
+
+  function getPoint(
+    event: ReactPointerEvent<SVGSVGElement>
+  ): Point {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+
+    const p = svg.createSVGPoint();
+    p.x = event.clientX;
+    p.y = event.clientY;
+
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return { x: 0, y: 0 };
+
+    const result = p.matrixTransform(matrix.inverse());
+    return { x: result.x, y: result.y };
+  }
+
+  function down(
+    event: ReactPointerEvent<SVGSVGElement>
+  ) {
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {}
+
+    const p = getPoint(event);
+    const id = `${Date.now()}-${Math.random()}`;
+
+    drawingRef.current = true;
+    activeIdRef.current = id;
+
+    setLines((old) => [
+      ...old,
+      {
+        id,
+        color: tool === "eraser" ? "#FFFFFF" : color,
+        size:
+          tool === "eraser"
+            ? Math.max(38, penSize + 18)
+            : penSize,
+        points: [p],
+      },
+    ]);
+  }
+
+  function move(
+    event: ReactPointerEvent<SVGSVGElement>
+  ) {
+    if (!drawingRef.current || !activeIdRef.current) return;
+
+    const p = getPoint(event);
+    const id = activeIdRef.current;
+
+    setLines((old) =>
+      old.map((line) =>
+        line.id === id
+          ? { ...line, points: [...line.points, p] }
+          : line
+      )
+    );
+  }
+
+  function up(
+    event: ReactPointerEvent<SVGSVGElement>
+  ) {
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {}
+
+    drawingRef.current = false;
+    activeIdRef.current = null;
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-[24px] border border-[#DDE2EF] bg-white">
+      <div className="absolute left-5 top-4 z-20 rounded-full bg-[#F2EDFF] px-4 py-2 text-xs font-black tracking-[0.05em] text-[#7445F3]">
+        {label}
+      </div>
+
+      <svg
+        ref={svgRef}
+        viewBox="0 0 300 260"
+        className="block h-[320px] w-full touch-none select-none sm:h-[360px]"
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+      >
+        <line
+          x1="20"
+          y1="70"
+          x2="280"
+          y2="70"
+          stroke="#DCE2EF"
+          strokeWidth="2"
+        />
+        <line
+          x1="20"
+          y1="165"
+          x2="280"
+          y2="165"
+          stroke="#D4DDEE"
+          strokeWidth="2"
+          strokeDasharray="5 7"
+        />
+        <line
+          x1="20"
+          y1="240"
+          x2="280"
+          y2="240"
+          stroke="#B7C5E1"
+          strokeWidth="2"
+        />
+
+        {lines.map((line) => (
+          <polyline
+            key={line.id}
+            points={line.points
+              .map((p) => `${p.x},${p.y}`)
+              .join(" ")}
+            fill="none"
+            stroke={line.color}
+            strokeWidth={line.size}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function ToolBar({
+  tool,
+  setTool,
+  penColor,
+  setPenColor,
+  penSize,
+  setPenSize,
+  onUndo,
+  onClear,
+}: {
+  tool: ToolMode;
+  setTool: Dispatch<SetStateAction<ToolMode>>;
+  penColor: string;
+  setPenColor: Dispatch<SetStateAction<string>>;
+  penSize: number;
+  setPenSize: Dispatch<SetStateAction<number>>;
+  onUndo: () => void;
+  onClear: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[11px] border bg-white px-3 text-xs font-black transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-30 ${
-        danger
-          ? "border-[#F6D6E5] text-[#F52C8C]"
-          : "border-[#E1E6EF] text-[#596A87]"
-      }`}
-    >
-      {children}
-    </button>
+    <div className="mt-4 rounded-[22px] border border-[#E2E6F0] bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setTool("pen")}
+            className={`flex h-14 items-center gap-2 rounded-[16px] px-4 font-black ${
+              tool === "pen"
+                ? "bg-gradient-to-r from-[#7948F4] to-[#6535E9] text-white shadow-md"
+                : "border border-[#DFE3ED] bg-white text-[#42516E]"
+            }`}
+          >
+            <PenLine size={19} />
+            Pen
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTool("eraser")}
+            className={`flex h-14 items-center gap-2 rounded-[16px] px-4 font-black ${
+              tool === "eraser"
+                ? "bg-gradient-to-r from-[#7948F4] to-[#6535E9] text-white shadow-md"
+                : "border border-[#DFE3ED] bg-white text-[#42516E]"
+            }`}
+          >
+            <Eraser size={19} />
+            Eraser
+          </button>
+
+          <button
+            type="button"
+            onClick={onUndo}
+            className="flex h-14 items-center gap-2 rounded-[16px] border border-[#DFE3ED] bg-white px-4 font-black text-[#42516E]"
+          >
+            <Undo2 size={19} />
+            Undo
+          </button>
+
+          <button
+            type="button"
+            onClick={onClear}
+            className="flex h-14 items-center gap-2 rounded-[16px] border border-[#FFD7E8] bg-white px-4 font-black text-[#F33684]"
+          >
+            <Trash2 size={19} />
+            Clear
+          </button>
+        </div>
+
+        <div className="hidden h-12 w-px bg-[#E7E8EF] lg:block" />
+
+        <div className="min-w-[260px] flex-1">
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-[#8491AC]">
+            Pen Color
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {PEN_COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => {
+                  setPenColor(color);
+                  setTool("pen");
+                }}
+                className={`h-9 w-9 rounded-full border-[3px] transition ${
+                  penColor === color
+                    ? "scale-110 border-[#6C3BF0]"
+                    : "border-white"
+                }`}
+                style={{
+                  backgroundColor: color,
+                  boxShadow:
+                    penColor === color
+                      ? "0 0 0 2px #D9CCFF"
+                      : "0 0 0 1px #E5E7EF",
+                }}
+                aria-label={`Choose ${color}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="hidden h-12 w-px bg-[#E7E8EF] lg:block" />
+
+        <div className="min-w-[280px] flex-1">
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-[#8491AC]">
+            Pen Size
+          </p>
+
+          <div className="flex items-end gap-2">
+            {PEN_SIZES.map((size) => {
+              const dotSize = Math.max(10, Math.min(28, size));
+
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => setPenSize(size)}
+                  className={`grid h-11 w-11 place-items-center rounded-full border transition ${
+                    penSize === size
+                      ? "border-[#7040F1] bg-[#F3EEFF]"
+                      : "border-transparent"
+                  }`}
+                  aria-label={`Pen size ${size}`}
+                >
+                  <span
+                    className="rounded-full bg-[#56678D]"
+                    style={{
+                      width: `${dotSize}px`,
+                      height: `${dotSize}px`,
+                    }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="mt-1 text-xs font-bold text-[#9AA5BC]">
+            Minimum 10px — comfortable for finger and stylus.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
