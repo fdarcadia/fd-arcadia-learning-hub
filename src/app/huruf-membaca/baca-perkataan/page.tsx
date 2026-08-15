@@ -214,14 +214,14 @@ const FALLBACK_QUESTION: ReadingQuestion = {
 ========================================================= */
 
 const letterColours = [
-  "#7C3AED",
-  "#EC4899",
-  "#F59E0B",
-  "#14B8A6",
-  "#3B82F6",
-  "#F97316",
-  "#06B6D4",
-  "#8B5CF6",
+  "#0F9FA8", // teal
+  "#F59E0B", // amber
+  "#2563EB", // blue
+  "#10B981", // emerald
+  "#F97316", // orange
+  "#06B6D4", // cyan
+  "#84CC16", // lime
+  "#EAB308", // yellow
 ];
 
 /* =========================================================
@@ -1454,9 +1454,39 @@ function ReadingGame() {
           ===================================================== */}
 
           {question ? (
-            <div className="relative mx-4 mt-6 overflow-hidden rounded-[28px] border border-violet-100 bg-gradient-to-b from-white to-[#fafaff] px-3 py-8 sm:mx-7 sm:px-6">
-              {/* LETTER CARDS */}
-              <div className="flex flex-wrap items-end justify-center gap-3 sm:gap-5 lg:gap-6">
+            <div className="relative mx-3 mt-6 overflow-visible rounded-[28px] border border-slate-200 bg-gradient-to-b from-white to-[#fbfcff] px-3 py-7 sm:mx-6 sm:px-5 lg:mx-7 lg:px-7">
+              {/* =====================================================
+                  LETTER CARDS
+                  Auto responsive ikut lebar phone / iPad / desktop.
+                  Sentiasa kekal SATU BARIS walaupun perkataan panjang.
+              ===================================================== */}
+              <div
+                className="mx-auto grid w-full items-end justify-center"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.max(
+                    letters.length,
+                    1
+                  )}, minmax(0, 1fr))`,
+                  gap:
+                    letters.length >= 9
+                      ? "3px"
+                      : letters.length >= 7
+                        ? "5px"
+                        : letters.length >= 5
+                          ? "7px"
+                          : "10px",
+                  maxWidth:
+                    letters.length <= 2
+                      ? "520px"
+                      : letters.length === 3
+                        ? "650px"
+                        : letters.length === 4
+                          ? "760px"
+                          : letters.length <= 6
+                            ? "900px"
+                            : "100%",
+                }}
+              >
                 {letters.map((letter, index) => {
                   const active =
                     mode === "finger"
@@ -1473,8 +1503,70 @@ function ReadingGame() {
                   const colour =
                     letterColours[index % letterColours.length];
 
-                  const letterVisual =
-                    getLetterVisualStyle(letter);
+                  const lower = letter.toLowerCase();
+                  const isDescender = [
+                    "g",
+                    "j",
+                    "p",
+                    "q",
+                    "y",
+                  ].includes(lower);
+
+                  const isWide = ["m", "w"].includes(lower);
+
+                  const maxCircleSize =
+                    letters.length <= 2
+                      ? 210
+                      : letters.length === 3
+                        ? 185
+                        : letters.length === 4
+                          ? 160
+                          : letters.length === 5
+                            ? 138
+                            : letters.length === 6
+                              ? 118
+                              : letters.length <= 8
+                                ? 98
+                                : letters.length <= 10
+                                  ? 82
+                                  : 70;
+
+                  const minFontSize =
+                    letters.length >= 11
+                      ? 18
+                      : letters.length >= 9
+                        ? 20
+                        : letters.length >= 7
+                          ? 23
+                          : letters.length >= 5
+                            ? 27
+                            : 34;
+
+                  const fluidFontSize =
+                    letters.length <= 2
+                      ? "10vw"
+                      : letters.length === 3
+                        ? "8.5vw"
+                        : letters.length === 4
+                          ? "7.2vw"
+                          : letters.length <= 6
+                            ? "5.8vw"
+                            : letters.length <= 8
+                              ? "4.7vw"
+                              : "3.7vw";
+
+                  const maxFontSize =
+                    letters.length <= 2
+                      ? 108
+                      : letters.length === 3
+                        ? 92
+                        : letters.length === 4
+                          ? 78
+                          : letters.length <= 6
+                            ? 62
+                            : letters.length <= 8
+                              ? 48
+                              : 40;
 
                   return (
                     <button
@@ -1483,82 +1575,79 @@ function ReadingGame() {
                       disabled={mode !== "tap"}
                       onClick={() => tapLetter(index)}
                       aria-label={`Huruf ${letter}`}
-                      className={`flex flex-col items-center ${
+                      className={`flex min-w-0 flex-col items-center ${
                         mode === "tap"
                           ? "cursor-pointer"
                           : "cursor-default"
                       }`}
                     >
+                      {/* BULATAN HURUF */}
                       <div
-  className={`relative flex
-    h-[150px] w-[150px]
-    shrink-0
-    items-center justify-center
-    rounded-full
-    border-[3px]
-    bg-white
-    transition-all duration-300
-
-    sm:h-[180px] sm:w-[180px]
-    lg:h-[210px] lg:w-[210px]
-
-    ${
-      isCurrent
-        ? "-translate-y-3 scale-[1.045]"
-        : "translate-y-0 scale-100"
-    }
-  `}
-  style={{
-    borderColor: isCurrent
-      ? letterColours[index % letterColours.length]
-      : "#D9DEE8",
-
-    boxShadow: isCurrent
-      ? `0 18px 38px ${
-          letterColours[index % letterColours.length]
-        }25`
-      : "0 12px 30px rgba(30,41,59,0.05)",
-  }}
->
-  <span
-    className="
-      flex
-      h-full
-      w-full
-      items-center
-      justify-center
-      overflow-visible
-      text-center
-      font-black
-      lowercase
-      text-[#AEB6C5]
-    "
-    style={getLetterVisualStyle(letter)}
-  >
-    {letter}
-  </span>
-
-  <span
-    className="absolute bottom-[18px] right-[18px] h-3 w-3 rounded-full border border-slate-100 bg-white shadow-sm"
-  />
-</div>
-
-                      {/* DOT BAWAH HURUF — KEKAL */}
-                      <span
-                        className={`mt-4 h-3.5 w-3.5 rounded-full transition-all duration-300 ${
+                        className={`relative flex aspect-square w-full shrink-0 items-center justify-center rounded-full border-[3px] bg-white transition-all duration-300 ${
                           isCurrent
-                            ? "-translate-y-1 scale-125"
+                            ? "-translate-y-1 scale-[1.025]"
                             : "translate-y-0 scale-100"
+                        }`}
+                        style={{
+                          maxWidth: `${maxCircleSize}px`,
+                          maxHeight: `${maxCircleSize}px`,
+                          borderColor: active
+                            ? colour
+                            : "#D8DEE8",
+                          background: active
+                            ? `linear-gradient(145deg, #FFFFFF 0%, ${colour}12 100%)`
+                            : "linear-gradient(145deg, #FFFFFF 0%, #F8FAFC 100%)",
+                          boxShadow: isCurrent
+                            ? `0 14px 30px ${colour}2E`
+                            : active
+                              ? `0 9px 22px ${colour}18`
+                              : "0 8px 20px rgba(30,41,59,0.05)",
+                        }}
+                      >
+                        {/* HURUF — auto fit, termasuk g/j/p/q/y */}
+                        <span
+                          className="flex h-full w-full select-none items-center justify-center overflow-visible text-center font-black lowercase transition-all duration-300"
+                          style={{
+                            fontFamily:
+                              '"Century Gothic", "Futura", "Avenir Next", Arial, sans-serif',
+                            fontSize: `clamp(${minFontSize}px, ${fluidFontSize}, ${maxFontSize}px)`,
+                            lineHeight: isDescender ? 1.28 : 1.08,
+                            transform: isDescender
+                              ? "translateY(-2%)"
+                              : "translateY(0)",
+                            paddingTop: isDescender ? "3%" : "0",
+                            paddingBottom: isDescender ? "9%" : "0",
+                            paddingLeft: isWide ? "3%" : "0",
+                            paddingRight: isWide ? "3%" : "0",
+                            color: active
+                              ? colour
+                              : "#AEB6C5",
+                          }}
+                        >
+                          {letter}
+                        </span>
+                      </div>
+
+                      {/* DOT PROGRESS BAWAH — dot putih dalam bulatan dibuang */}
+                      <span
+                        className={`mt-2 rounded-full transition-all duration-300 ${
+                          letters.length >= 8
+                            ? "h-2 w-2"
+                            : letters.length >= 5
+                              ? "h-2.5 w-2.5"
+                              : "h-3.5 w-3.5"
+                        } ${
+                          isCurrent
+                            ? "scale-125"
+                            : "scale-100"
                         }`}
                         style={{
                           backgroundColor: active
                             ? colour
-                            : "#D8DBE4",
+                            : "#D8DEE8",
                           boxShadow: isCurrent
-                            ? `0 5px 14px ${colour}55`
-                            : active
-                              ? `0 3px 8px ${colour}30`
-                              : "none",
+                            ? `0 4px 12px ${colour}55`
+                            : "none",
                         }}
                       />
                     </button>

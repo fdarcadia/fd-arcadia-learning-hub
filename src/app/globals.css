@@ -1,199 +1,1016 @@
 @import "tailwindcss";
 
+/* =========================================================
+   FD ARCADIA PREMIUM GAME UI
+   Fonts:
+   - KG Black Space Solid = headings / buttons / strong labels
+   - KG Miss Kindergarten = body / navigation / tasks / descriptions
+
+   IMPORTANT:
+   Put your font files here:
+   /public/fonts/KGBlackSpaceSolid.ttf
+   /public/fonts/KGMissKindergarten.ttf
+
+   If your real filenames are different, change ONLY the url(...)
+   below to match your actual filenames.
+========================================================= */
+
 @font-face {
-  font-family: "KG Blank Space";
-  src: url("/fonts/KGBlankSpaceSketch.ttf") format("truetype");
+  font-family: "KG Black Space";
+  src: url("/fonts/KGBlackSpaceSolid.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400 900;
   font-display: swap;
 }
 
 @font-face {
   font-family: "KG Miss Kindergarten";
   src: url("/fonts/KGMissKindergarten.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400 900;
   font-display: swap;
 }
 
 :root {
-  --background: #fffaf0;
-  --foreground: #35405f;
+  /* BRAND */
+  --arcadia-navy-950: #111329;
+  --arcadia-navy-900: #171933;
+  --arcadia-navy-800: #232544;
+
+  --arcadia-purple-700: #6941e8;
+  --arcadia-purple-600: #7c52f4;
+  --arcadia-purple-500: #8b65f6;
+  --arcadia-purple-300: #c9b8ff;
+  --arcadia-purple-100: #eee9ff;
+  --arcadia-purple-50: #f8f6ff;
+
+  --arcadia-pink: #f093c1;
+  --arcadia-peach: #ffc89d;
+  --arcadia-yellow: #ffc84b;
+  --arcadia-teal: #4dc8bd;
+  --arcadia-green: #55c990;
+
+  /* PAGE */
+  --arcadia-page: #f5f3fb;
+  --arcadia-surface: #ffffff;
+  --arcadia-soft: #f8f6fd;
+
+  /* TEXT */
+  --arcadia-text: #22243f;
+  --arcadia-text-soft: #747690;
+  --arcadia-text-muted: #9ca0b5;
+
+  /* BORDER */
+  --arcadia-border: #e5e0f2;
+  --arcadia-border-soft: #eeeaf6;
+
+  /* RADIUS */
+  --arcadia-radius-sm: 14px;
+  --arcadia-radius-md: 18px;
+  --arcadia-radius-lg: 24px;
+  --arcadia-radius-xl: 30px;
+  --arcadia-radius-2xl: 36px;
+
+  /* SHADOW */
+  --arcadia-shadow-xs:
+    0 3px 8px rgba(32, 29, 67, 0.04);
+
+  --arcadia-shadow-sm:
+    0 7px 20px rgba(42, 35, 82, 0.07);
+
+  --arcadia-shadow-md:
+    0 14px 35px rgba(42, 35, 82, 0.10);
+
+  --arcadia-shadow-lg:
+    0 22px 60px rgba(29, 24, 65, 0.15);
+
+  --arcadia-purple-shadow:
+    0 12px 30px rgba(108, 65, 232, 0.24);
 }
+
+/* =========================================================
+   RESET / BASE
+========================================================= */
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  background: var(--arcadia-page);
+}
+
 body {
   margin: 0;
-  min-height: 100vh;
+
+  color: var(--arcadia-text);
+
   background:
-    radial-gradient(circle at top left, rgba(255, 221, 134, 0.32), transparent 32rem),
-    radial-gradient(circle at bottom right, rgba(173, 216, 230, 0.32), transparent 30rem),
-    var(--background);
-  color: var(--foreground);
-  font-family: "KG Miss Kindergarten", Arial, sans-serif;
+    radial-gradient(
+      circle at 8% 5%,
+      rgba(139, 101, 246, 0.10),
+      transparent 25%
+    ),
+    radial-gradient(
+      circle at 90% 90%,
+      rgba(240, 147, 193, 0.08),
+      transparent 25%
+    ),
+    var(--arcadia-page);
+
+  font-family:
+    "KG Miss Kindergarten",
+    "Avenir Next",
+    Arial,
+    sans-serif;
+
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
 input,
-select,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
-.font-display {
-  font-family: "KG Blank Space", Arial, sans-serif;
+button {
+  -webkit-tap-highlight-color: transparent;
 }
 
-.font-kindergarten {
-  font-family: "KG Miss Kindergarten", Arial, sans-serif;
+/* =========================================================
+   FONT UTILITY CLASSES
+========================================================= */
+
+.arcadia-font-title {
+  font-family:
+    "KG Black Space",
+    "KG Miss Kindergarten",
+    sans-serif;
 }
 
-.page-shell {
-  width: min(1120px, calc(100% - 32px));
-  margin: 0 auto;
+.arcadia-font-body {
+  font-family:
+    "KG Miss Kindergarten",
+    sans-serif;
 }
 
-.soft-card {
-  border: 1px solid rgba(92, 104, 181, 0.14);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 18px 45px rgba(72, 80, 140, 0.12);
+/* =========================================================
+   PAGE
+========================================================= */
+
+.arcadia-page {
+  min-height: 100vh;
+
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      rgba(122, 82, 244, 0.10),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at 100% 100%,
+      rgba(77, 200, 189, 0.07),
+      transparent 25%
+    ),
+    #f6f4fb;
 }
 
-.button-shadow {
-  box-shadow: 0 12px 24px rgba(82, 93, 175, 0.22);
+.arcadia-container {
+  width: min(1440px, calc(100% - 32px));
+  margin-inline: auto;
 }
 
-.premium-action {
+/* =========================================================
+   MAIN DARK GAME SHELL
+========================================================= */
+
+.arcadia-game-shell {
+  overflow: hidden;
+
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: var(--arcadia-radius-2xl);
+
+  background:
+    linear-gradient(
+      145deg,
+      #242440 0%,
+      #17182f 55%,
+      #20213d 100%
+    );
+
+  box-shadow:
+    0 30px 80px rgba(18, 17, 43, 0.25);
+}
+
+/* =========================================================
+   CARDS
+========================================================= */
+
+.arcadia-card {
+  position: relative;
+
+  border: 1px solid var(--arcadia-border);
+  border-radius: var(--arcadia-radius-lg);
+
+  background:
+    linear-gradient(
+      150deg,
+      #ffffff 0%,
+      #fdfcff 100%
+    );
+
+  box-shadow: var(--arcadia-shadow-sm);
+
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.arcadia-card:hover {
+  border-color: #dcd4f7;
+  box-shadow: var(--arcadia-shadow-md);
+}
+
+.arcadia-card-xl {
+  border-radius: var(--arcadia-radius-xl);
+
+  background:
+    linear-gradient(
+      155deg,
+      rgba(255, 255, 255, 0.99),
+      rgba(249, 247, 255, 0.98)
+    );
+
+  border: 1px solid #e4dff1;
+
+  box-shadow:
+    0 18px 45px rgba(40, 34, 80, 0.09);
+}
+
+.arcadia-card-purple {
+  border: 1px solid #ded3ff;
+
+  background:
+    linear-gradient(
+      145deg,
+      #f8f4ff,
+      #eee7ff
+    );
+
+  border-radius: var(--arcadia-radius-lg);
+
+  box-shadow:
+    0 10px 28px rgba(111, 71, 219, 0.11);
+}
+
+.arcadia-glass {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+
+  border-radius: var(--arcadia-radius-lg);
+
+  background: rgba(255, 255, 255, 0.78);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  box-shadow: var(--arcadia-shadow-md);
+}
+
+/* headings inside cards */
+.arcadia-card h1,
+.arcadia-card h2,
+.arcadia-card h3,
+.arcadia-card-xl h1,
+.arcadia-card-xl h2,
+.arcadia-card-xl h3,
+.arcadia-card-purple h1,
+.arcadia-card-purple h2,
+.arcadia-card-purple h3 {
+  font-family:
+    "KG Black Space",
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* =========================================================
+   SIDEBAR
+========================================================= */
+
+.arcadia-sidebar {
+  border-radius: 28px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #fbfaff 0%,
+      #f4f0ff 100%
+    );
+
+  border: 1px solid #ddd5f6;
+
+  box-shadow:
+    0 16px 40px rgba(35, 29, 71, 0.10);
+}
+
+.arcadia-sidebar h1,
+.arcadia-sidebar h2,
+.arcadia-sidebar h3 {
+  font-family:
+    "KG Black Space",
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-weight: 700;
+}
+
+.arcadia-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  min-height: 48px;
+
+  padding-inline: 16px;
+
+  border-radius: 16px;
+
+  color: #54536d;
+
+  font-family:
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-size: 16px;
+  font-weight: 600;
+
+  transition: 160ms ease;
+}
+
+.arcadia-nav-item:hover {
+  color: #643be0;
+  background: #f0ebff;
+}
+
+.arcadia-nav-item-active {
+  color: white;
+
+  background:
+    linear-gradient(
+      135deg,
+      #895ef5,
+      #6e43e6
+    );
+
+  box-shadow:
+    0 8px 20px rgba(109, 67, 229, 0.26);
+}
+
+/* =========================================================
+   TITLES
+========================================================= */
+
+.arcadia-eyebrow {
+  color: #8b6de6;
+
+  font-family:
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.arcadia-title {
+  color: #22223f;
+
+  font-family:
+    "KG Black Space",
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-size: clamp(27px, 3vw, 40px);
+  font-weight: 700;
+
+  letter-spacing: 0.005em;
+}
+
+.arcadia-subtitle {
+  color: var(--arcadia-text-soft);
+
+  font-family:
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-size: 16px;
+  font-weight: 500;
+
+  line-height: 1.55;
+}
+
+/* =========================================================
+   BUTTONS
+========================================================= */
+
+.arcadia-button {
+  min-height: 50px;
+
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  border-radius: 1.25rem;
-  padding: 0.85rem 1.1rem;
-  font-weight: 800;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-  transition: 0.2s ease;
+  justify-content: center;
+
+  gap: 9px;
+
+  padding-inline: 20px;
+
+  border: none;
+  border-radius: 17px;
+
+  font-family:
+    "KG Black Space",
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-size: 15px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease;
 }
 
-.premium-action:hover {
+.arcadia-button:hover {
+  transform: translateY(-1px);
+}
+
+.arcadia-button:active {
+  transform: scale(0.97);
+}
+
+.arcadia-button-primary {
+  color: white;
+
+  background:
+    linear-gradient(
+      135deg,
+      #895ef6,
+      #6c43e7
+    );
+
+  box-shadow:
+    0 10px 24px rgba(108, 67, 231, 0.26);
+}
+
+.arcadia-button-teal {
+  color: white;
+
+  background:
+    linear-gradient(
+      135deg,
+      #4dcbbf,
+      #2cadab
+    );
+
+  box-shadow:
+    0 10px 24px rgba(44, 173, 171, 0.22);
+}
+
+.arcadia-button-yellow {
+  color: #5b4614;
+
+  background:
+    linear-gradient(
+      135deg,
+      #ffdb63,
+      #ffc542
+    );
+
+  box-shadow:
+    0 9px 22px rgba(236, 180, 46, 0.20);
+}
+
+.arcadia-button-light {
+  color: #6242ca;
+
+  border: 1px solid #dfd6ff;
+
+  background:
+    linear-gradient(
+      145deg,
+      #ffffff,
+      #f5f1ff
+    );
+
+  box-shadow: var(--arcadia-shadow-sm);
+}
+
+/* =========================================================
+   ICON BUTTON
+========================================================= */
+
+.arcadia-icon-button {
+  width: 48px;
+  height: 48px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid #e4e0ec;
+
+  border-radius: 16px;
+
+  background: white;
+
+  box-shadow: var(--arcadia-shadow-sm);
+
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.arcadia-icon-button:hover {
   transform: translateY(-2px);
-}
-@keyframes fdFadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  box-shadow: var(--arcadia-shadow-md);
 }
 
-@keyframes fdFloat {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-5px);
-  }
+/* =========================================================
+   STATS
+========================================================= */
+
+.arcadia-stat {
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  min-height: 44px;
+
+  padding: 8px 14px;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  border-radius: 18px;
+
+  color: white;
+
+  background:
+    rgba(17, 19, 41, 0.60);
+
+  backdrop-filter: blur(12px);
+
+  font-family:
+    "KG Miss Kindergarten",
+    sans-serif;
 }
 
-@keyframes fdIconPop {
-  0% {
-    opacity: 0;
-    transform: scale(0.75);
+.arcadia-stat strong,
+.arcadia-stat .arcadia-stat-value {
+  font-family:
+    "KG Black Space",
+    "KG Miss Kindergarten",
+    sans-serif;
+}
+
+.arcadia-stat-light {
+  color: #272441;
+
+  border-color: #e7e2f1;
+
+  background: #ffffff;
+
+  box-shadow: var(--arcadia-shadow-xs);
+}
+
+/* =========================================================
+   BADGES
+========================================================= */
+
+.arcadia-badge {
+  display: inline-flex;
+  align-items: center;
+
+  gap: 6px;
+
+  min-height: 30px;
+
+  padding-inline: 11px;
+
+  border-radius: 999px;
+
+  color: #7049dd;
+
+  background: #f0ebff;
+
+  font-family:
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.arcadia-badge-green {
+  color: #26845e;
+  background: #e7faef;
+}
+
+.arcadia-badge-yellow {
+  color: #8f6615;
+  background: #fff5d6;
+}
+
+/* =========================================================
+   PROGRESS
+========================================================= */
+
+.arcadia-progress {
+  height: 10px;
+
+  overflow: hidden;
+
+  border-radius: 999px;
+
+  background: #e7e5ec;
+}
+
+.arcadia-progress-bar {
+  height: 100%;
+
+  border-radius: inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      #8156f3,
+      #9e71ff
+    );
+
+  transition: width 220ms ease;
+}
+
+.arcadia-progress-green .arcadia-progress-bar {
+  background:
+    linear-gradient(
+      90deg,
+      #42c68e,
+      #69d9a8
+    );
+}
+
+/* =========================================================
+   TASK CARD
+========================================================= */
+
+.arcadia-task {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  min-height: 68px;
+
+  padding: 12px 14px;
+
+  border: 1px solid #e9e5f2;
+
+  border-radius: 17px;
+
+  background: white;
+
+  box-shadow:
+    0 4px 12px rgba(32, 29, 65, 0.035);
+
+  font-family:
+    "KG Miss Kindergarten",
+    sans-serif;
+}
+
+.arcadia-task-title {
+  font-family:
+    "KG Black Space",
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-weight: 700;
+}
+
+.arcadia-task-check {
+  width: 32px;
+  height: 32px;
+
+  flex: 0 0 32px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  border: 3px solid #8e65f3;
+
+  color: white;
+}
+
+.arcadia-task-complete .arcadia-task-check {
+  border-color: #44c888;
+  background: #44c888;
+}
+
+/* =========================================================
+   INVENTORY
+========================================================= */
+
+.arcadia-item {
+  position: relative;
+
+  overflow: hidden;
+
+  border: 1px solid #e8e4ef;
+  border-radius: 17px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #ffffff,
+      #f8f6fc
+    );
+
+  box-shadow:
+    0 4px 10px rgba(35, 31, 65, 0.035);
+
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.arcadia-item:hover {
+  transform: translateY(-3px);
+
+  box-shadow:
+    0 12px 25px rgba(42, 34, 78, 0.10);
+}
+
+/* =========================================================
+   VIRTUAL ROOM
+========================================================= */
+
+.arcadia-room {
+  position: relative;
+
+  overflow: hidden;
+
+  border-radius: 30px;
+
+  background: #eae5ef;
+
+  box-shadow:
+    inset 0 0 0 1px
+      rgba(255, 255, 255, 0.45);
+}
+
+.arcadia-room-toolbar {
+  position: absolute;
+
+  left: 50%;
+  bottom: 18px;
+
+  transform: translateX(-50%);
+
+  display: flex;
+  align-items: center;
+
+  gap: 7px;
+
+  padding: 7px;
+
+  border-radius: 22px;
+
+  background:
+    rgba(36, 29, 52, 0.62);
+
+  backdrop-filter: blur(15px);
+
+  box-shadow:
+    0 12px 28px rgba(26, 21, 48, 0.22);
+}
+
+.arcadia-room-action {
+  min-width: 54px;
+
+  padding: 8px 12px;
+
+  border-radius: 15px;
+
+  color: white;
+
+  text-align: center;
+
+  font-family:
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  transition: 150ms ease;
+}
+
+.arcadia-room-action:hover {
+  background:
+    rgba(255, 255, 255, 0.13);
+}
+
+/* =========================================================
+   BOTTOM NAV
+========================================================= */
+
+.arcadia-bottom-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 6px;
+
+  padding: 8px;
+
+  border-radius: 25px;
+
+  color: #bcbcd1;
+
+  background:
+    linear-gradient(
+      135deg,
+      #292947,
+      #20213c
+    );
+
+  box-shadow:
+    0 18px 40px rgba(20, 18, 46, 0.22);
+}
+
+.arcadia-bottom-nav-item {
+  min-height: 48px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+
+  padding-inline: 22px;
+
+  border-radius: 17px;
+
+  font-family:
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  transition: 160ms ease;
+}
+
+.arcadia-bottom-nav-item-active {
+  color: white;
+
+  background:
+    linear-gradient(
+      135deg,
+      #8358ef,
+      #6841dd
+    );
+
+  box-shadow:
+    0 8px 18px rgba(111, 69, 224, 0.24);
+}
+
+/* =========================================================
+   DAILY REWARD
+========================================================= */
+
+.arcadia-reward {
+  border-radius: 24px;
+
+  color: white;
+
+  background:
+    linear-gradient(
+      145deg,
+      #6340a7,
+      #8d4ec2
+    );
+
+  box-shadow:
+    0 16px 34px rgba(73, 43, 116, 0.24);
+
+  font-family:
+    "KG Miss Kindergarten",
+    sans-serif;
+}
+
+.arcadia-reward h1,
+.arcadia-reward h2,
+.arcadia-reward h3,
+.arcadia-reward strong {
+  font-family:
+    "KG Black Space",
+    "KG Miss Kindergarten",
+    sans-serif;
+}
+
+/* =========================================================
+   INPUT
+========================================================= */
+
+.arcadia-input {
+  min-height: 48px;
+
+  width: 100%;
+
+  padding-inline: 15px;
+
+  outline: none;
+
+  border: 1px solid #e1ddeb;
+
+  border-radius: 15px;
+
+  color: #24223d;
+
+  background: #fbfafd;
+
+  font-family:
+    "KG Miss Kindergarten",
+    sans-serif;
+
+  font-size: 16px;
+
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.arcadia-input:focus {
+  border-color: #a98bf5;
+
+  box-shadow:
+    0 0 0 4px rgba(139, 101, 246, 0.11);
+
+  background: white;
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 768px) {
+  .arcadia-container {
+    width: min(100% - 20px, 1440px);
   }
-  65% {
-    transform: scale(1.08);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
 
-@keyframes fdProgress {
-  from {
-    width: 0%;
-  }
-  to {
-    width: 72%;
-  }
-}
-
-.fd-fade-up {
-  opacity: 0;
-  animation: fdFadeUp 0.65s ease-out forwards;
-}
-
-.fd-float {
-  animation: fdFloat 3.5s ease-in-out infinite;
-}
-
-.fd-icon-pop {
-  animation: fdIconPop 0.55s ease-out both;
-}
-
-.fd-progress {
-  width: 0;
-  animation: fdProgress 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.5s forwards;
-}
-@keyframes fdProgress {
-  from {
-    width: 0%;
+  .arcadia-card,
+  .arcadia-card-purple {
+    border-radius: 20px;
   }
 
-  to {
-    width: 72%;
-  }
-}
-
-.fd-progress {
-  width: 0;
-  animation: fdProgress 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.5s forwards;
-}
-@keyframes fdIconPop {
-  0% {
-    opacity: 0;
-    transform: scale(0.65);
+  .arcadia-card-xl {
+    border-radius: 24px;
   }
 
-  65% {
-    opacity: 1;
-    transform: scale(1.12);
+  .arcadia-game-shell {
+    border-radius: 25px;
   }
 
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.fd-icon-pop {
-  animation: fdIconPop 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.45s both;
-}
-@keyframes fdFloat {
-  0%,
-  100% {
-    transform: translateY(0);
+  .arcadia-bottom-nav {
+    border-radius: 21px;
   }
 
-  50% {
-    transform: translateY(-6px);
+  .arcadia-bottom-nav-item {
+    min-width: 52px;
+    padding-inline: 12px;
+    font-size: 13px;
   }
-}
 
-.fd-float {
-  animation: fdFloat 3.5s ease-in-out infinite;
-}
+  .arcadia-button {
+    min-height: 48px;
+    font-size: 13px;
+  }
 
-@font-face {
-  font-family: "Kabel";
-  src: url("/fonts/Kabel.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
+  .arcadia-title {
+    font-size: clamp(25px, 8vw, 34px);
+  }
 
-.font-kabel {
-  font-family: "Kabel", "Arial Rounded MT Bold", Arial, sans-serif;
+  .arcadia-subtitle {
+    font-size: 15px;
+  }
 }
