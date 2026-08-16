@@ -37,7 +37,7 @@ import {
 
 type Difficulty = "easy" | "medium" | "hard";
 
-type EasyType = "uppercase" | "lowercase" | "number";
+type EasyType = "uppercase" | "lowercase";
 
 type MediumCase = "uppercase" | "lowercase" | "mixed";
 
@@ -48,6 +48,7 @@ type EasyItem = {
   value: string;
   order: number;
 };
+
 
 type MediumQuestion = {
   sequence: string[];
@@ -226,26 +227,6 @@ function generateEasyItems(
   type: EasyType
 ): EasyItem[] {
   const count = EASY_LEVEL_COUNTS[level - 1] ?? 5;
-
-  if (type === "number") {
-    if (level === 1) {
-      return Array.from({ length: 20 }, (_, index) => ({
-        id: `number-${index + 1}`,
-        value: String(index + 1),
-        order: index + 1,
-      }));
-    }
-
-    const safeCount = Math.min(count, 10);
-    const maxStart = 20 - safeCount + 1;
-    const start = randomInteger(1, Math.max(1, maxStart));
-
-    return Array.from({ length: safeCount }, (_, index) => ({
-      id: `number-${start + index}`,
-      value: String(start + index),
-      order: start + index,
-    }));
-  }
 
   const source = type === "uppercase" ? UPPERCASE : LOWERCASE;
 
@@ -466,6 +447,7 @@ export default function ABCOrderPage() {
   const [draggedEasyItem, setDraggedEasyItem] =
     useState<EasyItem | null>(null);
 
+
   /* MEDIUM */
   const [mediumQuestion, setMediumQuestion] =
     useState<MediumQuestion | null>(null);
@@ -536,18 +518,12 @@ export default function ABCOrderPage() {
     setDraggedMediumOption(null);
 
     if (difficulty === "easy") {
-      const generated = generateEasyItems(
-        level,
-        easyType
-      );
+      const generated = generateEasyItems(level, easyType);
 
       setEasyItems(shuffle(generated));
 
       setEasyPlaced(
-        Array.from(
-          { length: generated.length },
-          () => null
-        )
+        Array.from({ length: generated.length }, () => null)
       );
     }
 
@@ -679,6 +655,7 @@ export default function ABCOrderPage() {
 
     completeCurrentLevel(100);
   }
+
 
   /* =======================================================
      MEDIUM
@@ -1239,7 +1216,7 @@ export default function ABCOrderPage() {
             tone="green"
             title="Easy Bee"
             subtitle="Drag & Drop"
-            description="Susun huruf atau nombor."
+            description="Susun huruf mengikut turutan."
             onClick={() => changeDifficulty("easy")}
           />
 
@@ -1284,15 +1261,6 @@ export default function ABCOrderPage() {
                     sublabel="Huruf Kecil"
                     onClick={() =>
                       setEasyType("lowercase")
-                    }
-                  />
-
-                  <ModeOption
-                    active={easyType === "number"}
-                    label="Number 1-20"
-                    sublabel="Susun Nombor"
-                    onClick={() =>
-                      setEasyType("number")
                     }
                   />
                 </div>
@@ -1512,7 +1480,7 @@ export default function ABCOrderPage() {
             {/* EASY */}
 
             {difficulty === "easy" && (
-              <div className="p-4 sm:p-6">
+<div className="p-4 sm:p-6">
                 <InstructionBanner>
                   {level === 1
                     ? "Susun semua item mengikut turutan yang betul."
@@ -1585,7 +1553,7 @@ export default function ABCOrderPage() {
                               event.stopPropagation();
                               removeEasyItem(index);
                             }}
-                            className="kg-letter text-[clamp(36px,4vw,58px)] font-black text-[#6F9E2C] drop-shadow-[0_2px_0_rgba(255,255,255,0.95)]"
+                            className="kg-letter text-[54px] sm:text-[60px] md:text-[66px] lg:text-[72px] xl:text-[76px] font-black leading-none text-[#6F9E2C] drop-shadow-[0_2px_0_rgba(255,255,255,0.95)]"
                           >
                             {item.value}
                           </button>
@@ -1645,7 +1613,7 @@ export default function ABCOrderPage() {
 
                               speak(item.value);
                             }}
-                            className={`honeycomb-tile kg-letter flex aspect-square min-h-[76px] touch-manipulation items-center justify-center rounded-[18px] border-[3px] text-[clamp(38px,4.3vw,62px)] font-black shadow-[0_8px_18px_rgba(126,79,15,0.09)] transition active:scale-95 sm:min-h-[88px] ${
+                            className={`honeycomb-tile kg-letter flex aspect-square min-h-[92px] touch-manipulation items-center justify-center rounded-[18px] border-[3px] text-[56px] sm:min-h-[100px] sm:text-[62px] md:text-[68px] lg:text-[72px] xl:text-[78px] font-black leading-none shadow-[0_8px_18px_rgba(126,79,15,0.09)] transition active:scale-95 ${
                               selected
                                 ? "border-[#7C3CFF] ring-4 ring-[#FFF1B8]"
                                 : "border-[#E8D8AF] hover:-translate-y-1"
@@ -1747,7 +1715,7 @@ export default function ABCOrderPage() {
                                 );
                               }
                             }}
-                            className={`flex h-[82px] w-[68px] items-center justify-center rounded-[17px] border-[3px] kg-letter text-[46px] font-black sm:h-[108px] sm:w-[92px] sm:text-[58px] ${
+                            className={`flex h-[82px] w-[68px] items-center justify-center rounded-[17px] border-[3px] kg-letter text-[54px] font-black leading-none sm:h-[112px] sm:w-[96px] sm:text-[68px] ${
                               missing
                                 ? answer
                                   ? "border-[#BEEADB] bg-[#ECFBF5] text-[#08A989]"
@@ -1826,7 +1794,7 @@ export default function ABCOrderPage() {
 
                                 speak(option);
                               }}
-                              className={`flex h-[64px] w-[64px] touch-manipulation items-center justify-center rounded-[15px] border honeycomb-tile bg-white kg-letter text-[42px] font-black shadow-[0_7px_16px_rgba(126,79,15,0.09)] transition ${
+                              className={`flex h-[64px] w-[64px] touch-manipulation items-center justify-center rounded-[15px] border honeycomb-tile bg-white kg-letter text-[52px] sm:text-[58px] font-black leading-none shadow-[0_7px_16px_rgba(126,79,15,0.09)] transition ${
                                 used
                                   ? "opacity-25"
                                   : selected
@@ -1878,7 +1846,7 @@ export default function ABCOrderPage() {
                               {question.direction}
                             </p>
 
-                            <p className="kg-letter mt-1 text-[40px] font-black text-[#4A2A13]">
+                            <p className="kg-letter mt-1 text-[54px] sm:text-[62px] font-black leading-none text-[#4A2A13]">
                               {question.letter}
                             </p>
                           </div>
@@ -1897,7 +1865,7 @@ export default function ABCOrderPage() {
                                 event.target.value
                               )
                             }
-                            className="h-12 min-w-0 flex-1 rounded-[13px] border-2 border-[#DEE3ED] bg-white kg-letter text-center text-[36px] font-black text-[#C97900] outline-none transition focus:border-[#7C3CFF]"
+                            className="h-14 min-w-0 flex-1 rounded-[13px] border-2 border-[#DEE3ED] bg-white kg-letter text-center text-[48px] sm:text-[54px] font-black leading-none text-[#C97900] outline-none transition focus:border-[#7C3CFF]"
                             maxLength={1}
                             autoComplete="off"
                             autoCapitalize="off"
@@ -2061,9 +2029,7 @@ export default function ABCOrderPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (
-                      difficulty === "easy"
-                    ) {
+                    if (difficulty === "easy") {
                       checkEasy();
                     }
 
@@ -2095,25 +2061,10 @@ export default function ABCOrderPage() {
               <div className="space-y-3">
                 {difficulty === "easy" && (
                   <>
-                    <InstructionRow
-                      number={1}
-                      text="Pilih item dari bawah."
-                    />
-
-                    <InstructionRow
-                      number={2}
-                      text="Drag atau tap item."
-                    />
-
-                    <InstructionRow
-                      number={3}
-                      text="Letakkan pada slot yang betul."
-                    />
-
-                    <InstructionRow
-                      number={4}
-                      text="Lengkapkan semua turutan."
-                    />
+                    <InstructionRow number={1} text="Pilih huruf dari bawah." />
+                    <InstructionRow number={2} text="Drag atau tap huruf." />
+                    <InstructionRow number={3} text="Letakkan pada slot yang betul." />
+                    <InstructionRow number={4} text="Lengkapkan susunan A hingga Z." />
                   </>
                 )}
 
@@ -2646,7 +2597,7 @@ function AlphabetGuide({
         {source.map((letter) => (
           <div
             key={letter}
-            className="flex h-8 items-center justify-center rounded-[8px] bg-white text-[10px] font-black text-[#566784] sm:text-xs"
+            className="kg-letter flex h-12 items-center justify-center rounded-[10px] bg-white text-[22px] sm:text-[26px] font-black leading-none text-[#566784]"
           >
             {letter}
           </div>

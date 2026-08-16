@@ -7,8 +7,9 @@ import {
   ChevronRight,
   ImageOff,
   Loader2,
-  RefreshCcw,
   RotateCcw,
+  Shuffle,
+  Sparkles,
   Star,
   Trash2,
   X,
@@ -148,10 +149,33 @@ function shuffleDifferent(
 
 function createTiles(letters: string[]) {
   return letters.map((value, index) => ({
-    id: `${value}-${index}-${Math.random().toString(36).slice(2)}`,
+    id: `${value}-${index}-${Math.random().toString(36).slice(2)}-${Date.now()}-${index}`,
     value,
     colorIndex: index % SLOT_COLORS.length,
   }));
+}
+
+function uniqueTilesById(tiles: LetterTile[]) {
+  const seen = new Set<string>();
+
+  return tiles.filter((tile) => {
+    if (seen.has(tile.id)) return false;
+    seen.add(tile.id);
+    return true;
+  });
+}
+
+function getLetterFontFamily(letter: string) {
+  /*
+    KG Blank Space kekal font utama.
+    Untuk huruf kecil "a", fallback sengaja guna font single-storey
+    supaya tidak keluar bentuk "a" dua tingkat yang susah untuk preschool.
+  */
+  if (letter.toLowerCase() === "a") {
+    return '"KG Blank Space Bold", "KG Blank Space Solid", "KG Blank Space", "Comic Sans MS", "Chalkboard SE", "Marker Felt", cursive';
+  }
+
+  return '"KG Blank Space Bold", "KG Blank Space Solid", "KG Blank Space", "Arial Rounded MT Bold", "Comic Sans MS", "Chalkboard SE", Arial, sans-serif';
 }
 
 /* =========================================================
@@ -167,6 +191,34 @@ export default function BinaPerkataanPage() {
         </PortalShell>
       )}
     </ProtectedPage>
+  );
+}
+
+/* =========================================================
+   CONFETTI
+========================================================= */
+
+function ConfettiBurst() {
+  const pieces = Array.from({ length: 30 });
+  const colours = ["#7C3CFF", "#FF4F9A", "#18BFA0", "#36A3FF", "#FFB31A", "#6AD468"];
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      {pieces.map((_, index) => (
+        <span
+          key={index}
+          className="premium-confetti absolute -top-5 rounded-[3px]"
+          style={{
+            left: `${4 + ((index * 17) % 92)}%`,
+            width: `${6 + (index % 4) * 2}px`,
+            height: `${5 + (index % 3) * 2}px`,
+            backgroundColor: colours[index % colours.length],
+            animationDelay: `${(index % 8) * 0.055}s`,
+            animationDuration: `${1.1 + (index % 5) * 0.13}s`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -276,6 +328,10 @@ function BinaPerkataanOceanGame() {
     setFeedback({ type: "idle", message: "" });
 
     setAnswerTiles((current) => {
+      if (current.some((slot) => slot?.id === tile.id)) {
+        return current;
+      }
+
       const next = [...current];
 
       let destination = targetIndex;
@@ -294,7 +350,9 @@ function BinaPerkataanOceanGame() {
       next[destination] = tile;
 
       setAvailableTiles((tiles) =>
-        tiles.filter((item) => item.id !== tile.id)
+        uniqueTilesById(
+          tiles.filter((item) => item.id !== tile.id)
+        )
       );
 
       return next;
@@ -312,7 +370,9 @@ function BinaPerkataanOceanGame() {
       const next = [...current];
       next[slotIndex] = null;
 
-      setAvailableTiles((tiles) => [...tiles, tile]);
+      setAvailableTiles((tiles) =>
+        uniqueTilesById([...tiles, tile])
+      );
 
       return next;
     });
@@ -323,7 +383,11 @@ function BinaPerkataanOceanGame() {
       (tile): tile is LetterTile => Boolean(tile)
     );
 
-    setAvailableTiles((tiles) => shuffleArray([...tiles, ...returned]));
+    setAvailableTiles((tiles) =>
+      shuffleArray(
+        uniqueTilesById([...tiles, ...returned])
+      )
+    );
 
     setAnswerTiles(
       Array(currentQuestion?.word.length || 0).fill(null)
@@ -462,7 +526,7 @@ function BinaPerkataanOceanGame() {
 
       setFeedback({
         type: "success",
-        message: `Hebat! ${currentQuestion.word} betul.`,
+        message: "Jawapan tepat!",
       });
     } finally {
       setChecking(false);
@@ -550,7 +614,7 @@ function BinaPerkataanOceanGame() {
       className="relative min-h-screen overflow-hidden bg-[#EAF8FF] px-3 py-4 sm:px-5 lg:px-7"
       style={{
         backgroundImage:
-          'linear-gradient(rgba(235,249,255,.38),rgba(235,249,255,.58)), url("/images/reading-ocean-background.png")',
+          'linear-gradient(rgba(235,249,255,.14),rgba(235,249,255,.24)), url("/images/reading-ocean-background.png")',
         backgroundSize: "cover",
         backgroundPosition: "center top",
         backgroundAttachment: "fixed",
@@ -573,9 +637,16 @@ function BinaPerkataanOceanGame() {
         ))}
       </div>
 
+      {/* animated fish */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <span className="fish-swim fish-one absolute left-[-90px] top-[24%] text-5xl drop-shadow-md">🐠</span>
+        <span className="fish-swim fish-two absolute right-[-90px] top-[48%] text-4xl drop-shadow-md">🐟</span>
+        <span className="fish-swim fish-three absolute left-[-80px] top-[72%] hidden text-4xl opacity-90 md:block">🐡</span>
+      </div>
+
       <div className="relative mx-auto w-full max-w-[1480px]">
         {/* TOP */}
-        <header className="rounded-[28px] border border-white/90 bg-white/82 p-3 shadow-[0_16px_48px_rgba(65,130,170,.14)] backdrop-blur-xl">
+        <header className="rounded-[28px] border border-white/80 bg-white/48 p-3 shadow-[0_16px_48px_rgba(65,130,170,.12)] backdrop-blur-[5px]">
           <div className="flex items-center gap-3 overflow-x-auto pb-1">
             <Link
               href="/huruf-membaca"
@@ -622,20 +693,20 @@ function BinaPerkataanOceanGame() {
         </header>
 
         {/* MAIN CARD */}
-        <section className="mt-4 overflow-hidden rounded-[34px] border border-white/90 bg-white/80 shadow-[0_24px_70px_rgba(58,124,168,.17)] backdrop-blur-xl">
+        <section className="mt-4 overflow-hidden rounded-[34px] border border-white/75 bg-white/42 shadow-[0_24px_70px_rgba(58,124,168,.14)] backdrop-blur-[5px]">
           {/* IMAGE + INSTRUCTION */}
-          <div className="grid gap-5 border-b border-[#E5EEF5] p-4 sm:p-6 lg:grid-cols-[260px_minmax(0,1fr)_260px] lg:items-center">
+          <div className="grid gap-3 border-b border-[#E5EEF5]/70 p-3 sm:p-4 lg:grid-cols-[220px_minmax(0,1fr)_200px] lg:items-center">
             {/* instruction */}
             <div className="order-2 lg:order-1">
               <p className="text-sm sm:text-base md:text-lg font-black uppercase tracking-[0.12em] text-violet-600">
                 Arahan
               </p>
 
-              <p className="mt-3 text-base font-bold leading-7 text-[#53637D]">
+              <p className="mt-2 text-sm font-bold leading-6 text-[#53637D] sm:text-base">
                 Susun huruf untuk bina perkataan yang betul berdasarkan gambar.
               </p>
 
-              <div className="mt-4 rounded-[20px] border border-sky-100 bg-sky-50/80 p-4">
+              <div className="mt-3 rounded-[18px] border border-sky-100/80 bg-sky-50/45 p-3">
                 <p className="text-sm font-black text-sky-700">
                   Petunjuk
                 </p>
@@ -652,7 +723,7 @@ function BinaPerkataanOceanGame() {
                 Gambar Petunjuk
               </p>
 
-              <div className="mx-auto grid min-h-[300px] w-full max-w-[640px] place-items-center overflow-hidden rounded-[30px] border border-white bg-gradient-to-br from-white via-[#F7FCFF] to-[#EAF8FF] p-4 shadow-[inset_0_0_40px_rgba(66,169,220,.07)] sm:min-h-[350px]">
+              <div className="mx-auto grid min-h-[210px] w-full max-w-[520px] place-items-center overflow-hidden rounded-[24px] border border-white/75 bg-gradient-to-br from-white/42 via-[#F7FCFF]/36 to-[#EAF8FF]/30 p-3 shadow-[inset_0_0_32px_rgba(66,169,220,.06)] sm:min-h-[230px] md:min-h-[245px]">
                 {currentQuestion.image_url ? (
                   <img
                     src={currentQuestion.image_url}
@@ -660,7 +731,7 @@ function BinaPerkataanOceanGame() {
                       currentQuestion.image_alt ||
                       `Gambar ${currentQuestion.word}`
                     }
-                    className="max-h-[320px] max-w-[94%] object-contain drop-shadow-[0_14px_22px_rgba(24,62,88,.16)]"
+                    className="max-h-[195px] max-w-[92%] object-contain drop-shadow-[0_10px_18px_rgba(24,62,88,.14)] sm:max-h-[215px] md:max-h-[230px]"
                     draggable={false}
                   />
                 ) : (
@@ -679,7 +750,7 @@ function BinaPerkataanOceanGame() {
 
             {/* compact status only — no word sound */}
             <div className="order-3">
-              <div className="rounded-[22px] border border-violet-100 bg-gradient-to-br from-white to-violet-50/70 p-5 text-center">
+              <div className="rounded-[20px] border border-violet-100/80 bg-gradient-to-br from-white/50 to-violet-50/34 p-4 text-center">
                 <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-500">
                   Kemajuan
                 </p>
@@ -709,7 +780,7 @@ function BinaPerkataanOceanGame() {
           </div>
 
           {/* ANSWER */}
-          <div className="p-4 sm:p-6 lg:p-8">
+          <div className="p-3 sm:p-4 lg:p-5">
             <div>
               <p className="text-sm sm:text-base md:text-lg font-black uppercase tracking-[0.12em] text-violet-600">
                 Susun Huruf Di Sini
@@ -721,7 +792,7 @@ function BinaPerkataanOceanGame() {
             </div>
 
             <div
-              className="mx-auto mt-6 grid max-w-[920px] gap-3 sm:gap-4"
+              className="mx-auto mt-3 grid max-w-[920px] gap-2.5 sm:mt-4 sm:gap-3"
               style={{
                 gridTemplateColumns: `repeat(${Math.min(
                   currentQuestion.word.length,
@@ -736,7 +807,7 @@ function BinaPerkataanOceanGame() {
                   <div
                     key={`slot-${index}`}
                     data-word-slot={index}
-                    className="relative grid aspect-square min-h-[118px] place-items-center rounded-[24px] border-2 border-dashed transition-all duration-200 sm:min-h-[155px] md:min-h-[175px]"
+                    className="relative grid aspect-square min-h-[88px] place-items-center rounded-[20px] border-2 border-dashed transition-all duration-200 sm:min-h-[112px] md:min-h-[130px] lg:min-h-[145px]"
                     style={{
                       borderColor: tile ? palette.border : `${palette.border}80`,
                       backgroundColor: tile ? palette.pale : "rgba(255,255,255,.72)",
@@ -749,9 +820,12 @@ function BinaPerkataanOceanGame() {
                       <button
                         type="button"
                         onClick={() => removeTile(index)}
-                        className="grid h-full w-full place-items-center rounded-[22px] text-5xl font-black leading-none transition-transform hover:scale-105 sm:text-6xl md:text-7xl lg:text-8xl"
+                        className="grid h-full w-full place-items-center rounded-[22px] font-black leading-none transition-transform hover:scale-105"
                         style={{
                           color: palette.strong,
+                          fontFamily: getLetterFontFamily(tile.value),
+                          fontSize: "clamp(58px, 7vw, 112px)",
+                          fontWeight: 900,
                         }}
                       >
                         {tile.value}
@@ -776,66 +850,85 @@ function BinaPerkataanOceanGame() {
               })}
             </div>
 
-            {/* FEEDBACK */}
-            {feedback.type !== "idle" ? (
-              <div
-                className={`mx-auto mt-5 flex max-w-[920px] items-center gap-3 rounded-[18px] border px-4 py-3 ${
-                  feedback.type === "success"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-red-200 bg-red-50 text-red-600"
-                }`}
-              >
-                <span
-                  className={`grid h-9 w-9 place-items-center rounded-full text-white ${
-                    feedback.type === "success"
-                      ? "bg-emerald-500"
-                      : "bg-red-500"
-                  }`}
-                >
-                  {feedback.type === "success" ? (
-                    <Check size={18} strokeWidth={4} />
-                  ) : (
-                    <X size={18} strokeWidth={4} />
-                  )}
+            {/* PREMIUM FEEDBACK */}
+            {feedback.type === "success" ? (
+              <div className="success-card relative mx-auto mt-6 max-w-[920px] overflow-hidden rounded-[26px] border border-emerald-200/80 bg-white/62 px-5 py-5 shadow-[0_14px_34px_rgba(16,185,129,.14)] backdrop-blur-[4px]">
+                <ConfettiBurst />
+
+                <div className="relative z-10 flex flex-col items-center justify-center text-center sm:flex-row sm:gap-5 sm:text-left">
+                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-[0_8px_20px_rgba(16,185,129,.25)]">
+                    <Check size={28} strokeWidth={4} />
+                  </div>
+
+                  <div className="mt-3 sm:mt-0">
+                    <div className="flex items-center justify-center gap-2 sm:justify-start">
+                      <Sparkles size={18} className="text-amber-400" />
+                      <p className="text-[11px] font-black uppercase tracking-[0.15em] text-emerald-600">
+                        Tahniah
+                      </p>
+                    </div>
+
+                    <p className="mt-1 text-2xl font-black text-[#174D43] sm:text-3xl">
+                      Perkataan betul!
+                    </p>
+
+                    <p
+                      className="mt-1 font-black text-violet-600"
+                      style={{
+                        fontFamily: '"KG Blank Space Bold", "KG Blank Space Solid", "KG Blank Space", "Comic Sans MS", "Chalkboard SE", "Marker Felt", cursive',
+                        fontSize: "clamp(36px, 4.2vw, 56px)",
+                        lineHeight: 1,
+                      }}
+                    >
+                      {currentQuestion.word}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : feedback.type === "error" ? (
+              <div className="mx-auto mt-5 flex max-w-[920px] items-center gap-3 rounded-[18px] border border-red-200 bg-red-50/80 px-4 py-3 text-red-600 backdrop-blur-sm">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-red-500 text-white">
+                  <X size={18} strokeWidth={4} />
                 </span>
 
-                <p className="text-base sm:text-lg font-black">
+                <p className="text-base font-black sm:text-lg">
                   {feedback.message}
                 </p>
               </div>
             ) : null}
 
             {/* AVAILABLE LETTERS */}
-            <div className="mt-8 border-t border-[#E7EEF5] pt-5">
+            <div className="mt-5 border-t border-[#E7EEF5]/70 pt-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm sm:text-base md:text-lg font-black uppercase tracking-[0.12em] text-violet-600">
+                  <p className="text-xl font-black uppercase tracking-[0.08em] text-violet-600 sm:text-2xl md:text-[30px]">
                     Huruf Tersedia
                   </p>
 
-                  <p className="mt-1 text-sm sm:text-base font-semibold text-[#9AA8BB]">
-                    Setiap kali main, susunan huruf akan berubah.
+                  <p className="mt-2 text-base font-semibold text-[#6F829B] sm:text-lg md:text-xl">
+                    Susun huruf untuk bina perkataan yang betul.
                   </p>
                 </div>
 
                 <button
                   type="button"
                   onClick={reshuffle}
-                  className="inline-flex h-11 items-center gap-2 rounded-[15px] border border-violet-200 bg-white px-4 text-xs font-black text-violet-700 shadow-sm transition hover:bg-violet-50"
+                  aria-label="Acak semula huruf"
+                  title="Acak semula"
+                  className="grid h-12 w-12 shrink-0 place-items-center rounded-full border-2 border-violet-200 bg-white/78 text-violet-700 shadow-[0_8px_20px_rgba(124,60,255,.12)] transition hover:-translate-y-0.5 hover:bg-violet-50 active:scale-95"
                 >
-                  <RefreshCcw size={15} />
-                  Acak Semula
+                  <Shuffle size={20} strokeWidth={2.6} />
                 </button>
               </div>
 
-              <div className="mt-5 flex min-h-[120px] flex-wrap items-center justify-center gap-4 rounded-[24px] bg-white/55 p-4">
-                {availableTiles.map((tile) => {
+              <div className="mt-3 flex min-h-[100px] flex-wrap items-center justify-center gap-3 rounded-[22px] bg-white/26 p-3">
+                {availableTiles.map((tile, tileIndex) => {
                   const palette =
                     SLOT_COLORS[tile.colorIndex % SLOT_COLORS.length];
 
                   return (
                     <button
-                      key={tile.id}
+                      key={`${tile.id}-${tileIndex}`}
                       type="button"
                       onPointerDown={(event) =>
                         startPointerDrag(event, tile)
@@ -848,13 +941,15 @@ function BinaPerkataanOceanGame() {
                           placeTile(tile);
                         }
                       }}
-                     className="touch-none select-none grid h-[108px] w-[108px] place-items-center rounded-[24px] border-2 bg-white font-black leading-none shadow-[0_10px_24px_rgba(38,74,103,.12)] transition hover:-translate-y-1 active:scale-95 sm:h-[124px] sm:w-[124px] md:h-[140px] md:w-[140px] lg:h-[150px] lg:w-[150px]"
-  style={{
-    borderColor: `${palette.border}75`,
-    color: palette.strong,
-    boxShadow: `0 10px 24px ${palette.shadow}`,
-    fontSize: "96px",
-  }}
+                     className="touch-none select-none grid h-[92px] w-[92px] place-items-center rounded-[22px] border-2 bg-white/72 font-black leading-none shadow-[0_8px_20px_rgba(38,74,103,.10)] backdrop-blur-[2px] transition hover:-translate-y-1 active:scale-95 sm:h-[108px] sm:w-[108px] md:h-[122px] md:w-[122px] lg:h-[136px] lg:w-[136px]"
+                     style={{
+                       borderColor: `${palette.border}85`,
+                       color: palette.strong,
+                       boxShadow: `0 10px 24px ${palette.shadow}`,
+                       fontFamily: getLetterFontFamily(tile.value),
+                       fontSize: "clamp(62px, 7vw, 108px)",
+                       fontWeight: 900,
+                     }}
 >
   {tile.value}
 </button>
@@ -862,7 +957,7 @@ function BinaPerkataanOceanGame() {
                 })}
 
                 {availableTiles.length === 0 ? (
-                  <p className="text-sm font-bold text-[#A0ADBF]">
+                  <p className="text-base font-bold text-[#72859D]">
                     Semua huruf sudah diletakkan.
                   </p>
                 ) : null}
@@ -870,7 +965,7 @@ function BinaPerkataanOceanGame() {
             </div>
 
             {/* ACTIONS */}
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -913,7 +1008,7 @@ function BinaPerkataanOceanGame() {
         </section>
 
         {/* BOTTOM NAV */}
-        <section className="mt-4 rounded-[24px] border border-white/90 bg-white/82 p-3 shadow-[0_14px_38px_rgba(58,124,168,.12)] backdrop-blur-xl">
+        <section className="mt-4 rounded-[24px] border border-white/75 bg-white/46 p-3 shadow-[0_14px_38px_rgba(58,124,168,.10)] backdrop-blur-[5px]">
           <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
             <button
               type="button"
@@ -958,10 +1053,12 @@ function BinaPerkataanOceanGame() {
       {/* FLOATING TILE GHOST */}
       {dragState ? (
         <div
-          className="pointer-events-none fixed z-[9999] grid h-[92px] w-[92px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[22px] border-2 bg-white text-5xl font-black shadow-[0_18px_38px_rgba(24,70,105,.23)]"
+          className="pointer-events-none fixed z-[9999] grid h-[100px] w-[100px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[22px] border-2 bg-white/90 font-black shadow-[0_18px_38px_rgba(24,70,105,.23)]"
           style={{
             left: dragState.x,
             top: dragState.y,
+            fontFamily: getLetterFontFamily(dragState.tile.value),
+            fontSize: "76px",
             color:
               SLOT_COLORS[
                 dragState.tile.colorIndex % SLOT_COLORS.length
@@ -991,6 +1088,106 @@ function BinaPerkataanOceanGame() {
 
         .ocean-float-bubble {
           animation: oceanBubbleFloat 5.8s ease-in-out infinite;
+        }
+
+        @keyframes fishAcross {
+          0% {
+            transform: translateX(0) translateY(0) scaleX(1);
+          }
+
+          45% {
+            transform: translateX(calc(100vw + 170px)) translateY(-18px) scaleX(1);
+          }
+
+          50% {
+            transform: translateX(calc(100vw + 170px)) translateY(-18px) scaleX(-1);
+          }
+
+          95% {
+            transform: translateX(0) translateY(10px) scaleX(-1);
+          }
+
+          100% {
+            transform: translateX(0) translateY(0) scaleX(1);
+          }
+        }
+
+        @keyframes fishAcrossReverse {
+          0% {
+            transform: translateX(0) translateY(0) scaleX(-1);
+          }
+
+          45% {
+            transform: translateX(calc(-100vw - 170px)) translateY(14px) scaleX(-1);
+          }
+
+          50% {
+            transform: translateX(calc(-100vw - 170px)) translateY(14px) scaleX(1);
+          }
+
+          95% {
+            transform: translateX(0) translateY(-10px) scaleX(1);
+          }
+
+          100% {
+            transform: translateX(0) translateY(0) scaleX(-1);
+          }
+        }
+
+        .fish-one {
+          animation: fishAcross 18s linear infinite;
+        }
+
+        .fish-two {
+          animation: fishAcrossReverse 22s linear infinite;
+          animation-delay: -7s;
+        }
+
+        .fish-three {
+          animation: fishAcross 26s linear infinite;
+          animation-delay: -12s;
+        }
+
+        @keyframes premiumConfettiFall {
+          0% {
+            transform: translate3d(0, -22px, 0) rotate(0deg);
+            opacity: 0;
+          }
+
+          12% {
+            opacity: 1;
+          }
+
+          100% {
+            transform: translate3d(18px, 155px, 0) rotate(480deg);
+            opacity: 0;
+          }
+        }
+
+        @keyframes premiumSuccessPop {
+          0% {
+            transform: scale(0.96);
+            opacity: 0;
+          }
+
+          70% {
+            transform: scale(1.015);
+            opacity: 1;
+          }
+
+          100% {
+            transform: scale(1);
+          }
+        }
+
+        .premium-confetti {
+          animation-name: premiumConfettiFall;
+          animation-timing-function: cubic-bezier(.2,.75,.25,1);
+          animation-fill-mode: both;
+        }
+
+        .success-card {
+          animation: premiumSuccessPop .42s ease-out both;
         }
       `}</style>
     </main>

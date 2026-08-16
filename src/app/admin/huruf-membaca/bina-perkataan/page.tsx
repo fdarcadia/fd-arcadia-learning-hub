@@ -26,12 +26,26 @@ import { supabase } from "@/lib/supabase";
 const ADMIN_EMAIL = "fdarcadia.hello@gmail.com";
 const STORAGE_BUCKET = "word-build-images";
 
+const WORD_LEVELS = [
+  { id: "KV", label: "KV", hint: "Contoh: ba, mi, ku" },
+  { id: "KVKV", label: "KVKV", hint: "Contoh: batu, baju, buku" },
+  { id: "KVK", label: "KVK", hint: "Contoh: bas, van, jam" },
+  { id: "KV + KV", label: "KV + KV", hint: "Gabungan dua suku kata KV" },
+  { id: "KVK + KV", label: "KVK + KV", hint: "Gabungan KVK dan KV" },
+  { id: "KVK + KVK", label: "KVK + KVK", hint: "Gabungan dua suku kata KVK" },
+  { id: "Diftong", label: "Diftong", hint: "Perkataan yang mengandungi ai, au atau oi" },
+  { id: "Vokal Berganding", label: "Vokal Berganding", hint: "Dua vokal bersebelahan" },
+  { id: "Digraf", label: "Digraf", hint: "Contoh: ng, ny, sy, kh" },
+] as const;
+
+type WordLevel = (typeof WORD_LEVELS)[number]["id"];
+
 type WordQuestion = {
   id: string;
-  level: string;
+  level: WordLevel;
   word: string;
-  syllable_1: string;
-  syllable_2: string;
+  syllable_1: string | null;
+  syllable_2: string | null;
   letter_pool: string[];
   image_url: string | null;
   image_alt: string | null;
@@ -43,7 +57,7 @@ type WordQuestion = {
 
 type FormState = {
   id: string | null;
-  level: string;
+  level: WordLevel;
   word: string;
   syllable1: string;
   syllable2: string;
@@ -106,6 +120,7 @@ function AdminBinaPerkataan() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
+  const [selectedLevel, setSelectedLevel] = useState<WordLevel>("KVKV");
   const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">(
     "all"
   );
@@ -130,7 +145,7 @@ function AdminBinaPerkataan() {
         .select(
           "id,level,word,syllable_1,syllable_2,letter_pool,image_url,image_alt,display_order,is_active,created_at,updated_at"
         )
-        .eq("level", "KVKV")
+        .order("level", { ascending: true })
         .order("display_order", { ascending: true });
 
       if (error) {
@@ -154,30 +169,40 @@ function AdminBinaPerkataan() {
     const keyword = search.trim().toLowerCase();
 
     return questions.filter((item) => {
+      const matchesLevel = item.level === selectedLevel;
+
       const matchesSearch =
         !keyword ||
         item.word.toLowerCase().includes(keyword) ||
-        item.syllable_1.toLowerCase().includes(keyword) ||
-        item.syllable_2.toLowerCase().includes(keyword);
+        (item.syllable_1 || "").toLowerCase().includes(keyword) ||
+        (item.syllable_2 || "").toLowerCase().includes(keyword);
 
       const matchesStatus =
         activeFilter === "all" ||
         (activeFilter === "active" && item.is_active) ||
         (activeFilter === "inactive" && !item.is_active);
 
-      return matchesSearch && matchesStatus;
+      return matchesLevel && matchesSearch && matchesStatus;
     });
-  }, [questions, search, activeFilter]);
+  }, [questions, search, activeFilter, selectedLevel]);
 
-  const totalWithImages = questions.filter((item) => item.image_url).length;
-  const activeCount = questions.filter((item) => item.is_active).length;
+  const levelQuestions = questions.filter((item) => item.level === selectedLevel);
+  const totalWithImages = levelQuestions.filter((item) => item.image_url).length;
+  const activeCount = levelQuestions.filter((item) => item.is_active).length;
 
   function resetForm() {
+    const currentLevelQuestions = questions.filter(
+      (item) => item.level === selectedLevel
+    );
+
     setForm({
       ...EMPTY_FORM,
+      level: selectedLevel,
       displayOrder:
-        questions.length > 0
-          ? Math.max(...questions.map((item) => item.display_order || 0)) + 1
+        currentLevelQuestions.length > 0
+          ? Math.max(
+              ...currentLevelQuestions.map((item) => item.display_order || 0)
+            ) + 1
           : 1,
     });
     setMessage("");
@@ -188,6 +213,8 @@ function AdminBinaPerkataan() {
   }
 
   function editQuestion(item: WordQuestion) {
+    setSelectedLevel(item.level);
+
     setForm({
       id: item.id,
       level: item.level || "KVKV",
@@ -247,7 +274,12 @@ function AdminBinaPerkataan() {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
 
-      const objectPath = `kvkv/${cleanWord || "question"}-${Date.now()}.${extension}`;
+      const cleanLevel = form.level
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+
+      const objectPath = `${cleanLevel}/${cleanWord || "question"}-${Date.now()}.${extension}`;
 
       const { error: uploadError } = await supabase.storage
         .from(STORAGE_BUCKET)
@@ -291,8 +323,8 @@ function AdminBinaPerkataan() {
     const syllable2 = form.syllable2.trim().toLowerCase();
     const letters = normaliseLetterPool(form.letterPool);
 
-    if (!word || !syllable1 || !syllable2) {
-      setErrorMessage("Isi perkataan, Suku Kata 1 dan Suku Kata 2 dahulu.");
+    if (!word || !syllable1) {
+      setErrorMessage("Isi perkataan dan sekurang-kurangnya Suku Kata 1 dahulu.");
       return;
     }
 
@@ -307,10 +339,10 @@ function AdminBinaPerkataan() {
       setMessage("");
 
       const payload = {
-        level: "KVKV",
+        level: form.level,
         word,
         syllable_1: syllable1,
-        syllable_2: syllable2,
+        syllable_2: syllable2 || null,
         letter_pool: letters,
         image_url: form.imageUrl.trim() || null,
         image_alt:
@@ -440,18 +472,65 @@ function AdminBinaPerkataan() {
               </h1>
 
               <p className="mt-1 max-w-2xl text-sm font-semibold text-slate-400">
-                Urus 30 soalan KVKV dan gambar petunjuk untuk aktiviti parent.
-                Parent dashboard lain tidak diubah.
+                Urus semua tahap Bina Perkataan, gambar petunjuk dan susunan
+                soalan untuk aktiviti parent.
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <MetricPill label="Soalan" value={questions.length} />
+            <MetricPill label="Soalan" value={levelQuestions.length} />
             <MetricPill label="Ada Gambar" value={totalWithImages} />
             <MetricPill label="Aktif" value={activeCount} />
           </div>
         </header>
+
+        <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-3 shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
+          <div className="mb-3 flex items-center justify-between gap-3 px-1">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">Pilih Tahap</p>
+              <p className="mt-1 text-xs font-semibold text-slate-400">Library dan borang akan ikut tahap yang dipilih.</p>
+            </div>
+            <span className="rounded-full bg-violet-100 px-3 py-1.5 text-[10px] font-black text-violet-700">{selectedLevel}</span>
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {WORD_LEVELS.map((level) => {
+              const active = selectedLevel === level.id;
+              const count = questions.filter((item) => item.level === level.id).length;
+
+              return (
+                <button
+                  key={level.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedLevel(level.id);
+                    setSearch("");
+                    setActiveFilter("all");
+
+                    const sameLevelQuestions = questions.filter((item) => item.level === level.id);
+
+                    setForm({
+                      ...EMPTY_FORM,
+                      level: level.id,
+                      displayOrder:
+                        sameLevelQuestions.length > 0
+                          ? Math.max(...sameLevelQuestions.map((item) => item.display_order || 0)) + 1
+                          : 1,
+                    });
+
+                    setMessage("");
+                    setErrorMessage("");
+                  }}
+                  className={`min-w-fit shrink-0 rounded-[16px] border px-4 py-3 text-left transition ${active ? "border-violet-500 bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-[0_8px_20px_rgba(109,73,232,.22)]" : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-white"}`}
+                >
+                  <p className={`text-[9px] font-black ${active ? "text-violet-200" : "text-slate-400"}`}>{count} soalan</p>
+                  <p className="mt-0.5 whitespace-nowrap text-xs font-black">{level.label}</p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         {errorMessage ? (
           <div className="mt-5 flex items-start justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
@@ -499,6 +578,30 @@ function AdminBinaPerkataan() {
             </div>
 
             <div className="mt-5 space-y-4">
+              <Field label="Tahap">
+                <div className="relative">
+                  <select
+                    value={form.level}
+                    onChange={(event) => {
+                      const level = event.target.value as WordLevel;
+                      setSelectedLevel(level);
+                      setForm((current) => ({ ...current, level }));
+                    }}
+                    className="admin-input appearance-none pr-10"
+                  >
+                    {WORD_LEVELS.map((level) => (
+                      <option key={level.id} value={level.id}>{level.label}</option>
+                    ))}
+                  </select>
+
+                  <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                </div>
+
+                <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                  {WORD_LEVELS.find((level) => level.id === form.level)?.hint}
+                </p>
+              </Field>
+
               <Field label="Perkataan">
                 <input
                   value={form.word}
@@ -528,7 +631,7 @@ function AdminBinaPerkataan() {
                   />
                 </Field>
 
-                <Field label="Suku Kata 2">
+                <Field label="Suku Kata 2 (Pilihan)">
                   <input
                     value={form.syllable2}
                     onChange={(event) =>
@@ -708,7 +811,7 @@ function AdminBinaPerkataan() {
 
                   <div className="min-w-0">
                     <p className="text-[10px] font-black uppercase text-slate-400">
-                      KVKV
+                      {form.level}
                     </p>
                     <p className="mt-1 truncate text-2xl font-black text-slate-900">
                       {form.word || "batu"}
@@ -741,9 +844,9 @@ function AdminBinaPerkataan() {
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[0.16em] text-cyan-600">
-                  KVKV Question Library
+                  {selectedLevel} Question Library
                 </p>
-                <h2 className="mt-1 text-2xl font-black">30 Soalan</h2>
+                <h2 className="mt-1 text-2xl font-black">{levelQuestions.length} Soalan</h2>
               </div>
 
               <button
@@ -766,7 +869,7 @@ function AdminBinaPerkataan() {
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Cari batu, buku, baju..."
+                  placeholder="Cari perkataan atau suku kata..."
                   className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-bold outline-none transition focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
                 />
               </label>
@@ -959,12 +1062,13 @@ function QuestionCard({
             </h3>
 
             <p className="mt-2 text-lg text-violet-600">
-              {item.syllable_1} + {item.syllable_2}
+              {item.syllable_1 || ""}
+              {item.syllable_2 ? ` + ${item.syllable_2}` : ""}
             </p>
           </div>
 
           <span className="shrink-0 rounded-xl bg-cyan-50 px-2.5 py-1.5 text-[10px] font-black text-cyan-700">
-            KVKV
+            {item.level}
           </span>
         </div>
 
