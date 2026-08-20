@@ -948,6 +948,11 @@ function ParentDashboard({ userId }: { userId: string }) {
   const hasReadingModules = Boolean(profile?.flashcard_modul_unlocked);
   const hasHurufMembaca = Boolean(profile?.huruf_membaca_unlocked);
 
+  // Virtual World is available only for Learning Hub, Custom Worksheet,
+  // or Digital Reading Module subscribers.
+  const hasVirtualWorld =
+    hasLearningHub || hasCustomWorksheet || hasReadingModules;
+
   const unlockedCount = moduleCards.filter((card) => {
     if (!card.field) return true;
     if (card.field === "flashcard_unlocked") return hasFlashcardLibrary;
@@ -1221,7 +1226,7 @@ function ParentDashboard({ userId }: { userId: string }) {
           <nav className="mt-4 space-y-1.5">
             <GameSideLink href="/dashboard" icon={Home} label="Home" active />
             <GameSideLink href="/learning-hub" icon={BookOpenCheck} label="Learning" show={hasLearningHub} />
-            <GameSideLink href="/virtual-world" icon={Sparkles} label="Virtual World" />
+            <GameSideLink href="/virtual-world" icon={Sparkles} label="Virtual World" show={hasVirtualWorld} />
             <GameSideLink href="/flashcard-modules" icon={BarChart3} label="Progress" show={hasReadingModules} />
             <GameSideLink href="/profile" icon={UserRound} label="Profile" />
           </nav>
@@ -1347,9 +1352,9 @@ function ParentDashboard({ userId }: { userId: string }) {
                       ) : null}
 
                       <div className="mt-5 flex flex-wrap gap-2">
-                        {hasLearningHub ? (
+                        {hasReadingModules ? (
                           <Link
-                            href="/learning-hub"
+                            href="/flashcard-modules"
                             className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-xs font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-700"
                           >
                             <BookOpenCheck size={16} />
@@ -1357,13 +1362,15 @@ function ParentDashboard({ userId }: { userId: string }) {
                           </Link>
                         ) : null}
 
-                        <Link
-                          href="/virtual-world"
-                          className="inline-flex items-center gap-2 rounded-2xl border border-white/80 bg-white/85 px-4 py-3 text-xs font-black text-violet-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white"
-                        >
-                          <Sparkles size={16} />
-                          Enter Virtual World
-                        </Link>
+                        {hasVirtualWorld ? (
+                          <Link
+                            href="/virtual-world"
+                            className="inline-flex items-center gap-2 rounded-2xl border border-white/80 bg-white/85 px-4 py-3 text-xs font-black text-violet-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white"
+                          >
+                            <Sparkles size={16} />
+                            Enter Virtual World
+                          </Link>
+                        ) : null}
 
                         <Link
                           href="/children/avatar"
@@ -1393,7 +1400,8 @@ function ParentDashboard({ userId }: { userId: string }) {
                 </section>
 
                 {/* CONTENT CARDS: ORIGINAL MODULE CONTENT, NEW GAME LOOK */}
-                <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+                <div className={`grid gap-4 ${hasReadingModules ? "xl:grid-cols-[0.85fr_1.15fr]" : "xl:grid-cols-1"}`}>
+                  {hasReadingModules ? (
                   <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -1403,32 +1411,29 @@ function ParentDashboard({ userId }: { userId: string }) {
                       <div className="text-4xl">📘</div>
                     </div>
 
-                    {hasReadingModules ? (
-                      readingLoading ? (
-                        <div className="mt-5 rounded-2xl bg-violet-50 p-4 text-xs font-black text-violet-600">Loading reading progress...</div>
-                      ) : latestReadingModule ? (
-                        <>
-                          <div className="mt-5 rounded-[20px] border border-violet-100 bg-gradient-to-br from-violet-50 to-indigo-50 p-4">
-                            <p className="text-sm font-black text-slate-900">{latestReadingModule.title}</p>
-                            <p className="mt-1 text-[11px] font-semibold text-slate-500">Page {latestReadingModule.lastPage} / {latestReadingModule.totalPages}</p>
-                            <div className="mt-3 flex items-center gap-2">
-                              <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
-                                <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${latestReadingModule.progressPercent}%` }} />
-                              </div>
-                              <span className="text-[10px] font-black text-violet-600">{latestReadingModule.progressPercent}%</span>
+                    {readingLoading ? (
+                      <div className="mt-5 rounded-2xl bg-violet-50 p-4 text-xs font-black text-violet-600">Loading reading progress...</div>
+                    ) : latestReadingModule ? (
+                      <>
+                        <div className="mt-5 rounded-[20px] border border-violet-100 bg-gradient-to-br from-violet-50 to-indigo-50 p-4">
+                          <p className="text-sm font-black text-slate-900">{latestReadingModule.title}</p>
+                          <p className="mt-1 text-[11px] font-semibold text-slate-500">Page {latestReadingModule.lastPage} / {latestReadingModule.totalPages}</p>
+                          <div className="mt-3 flex items-center gap-2">
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
+                              <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${latestReadingModule.progressPercent}%` }} />
                             </div>
+                            <span className="text-[10px] font-black text-violet-600">{latestReadingModule.progressPercent}%</span>
                           </div>
-                          <Link href="/flashcard-modules" className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-xs font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5">
-                            Continue Adventure <ChevronRight size={15} />
-                          </Link>
-                        </>
-                      ) : (
-                        <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-xs font-semibold text-slate-500">No reading module available yet.</div>
-                      )
+                        </div>
+                        <Link href="/flashcard-modules" className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-xs font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5">
+                          Continue Adventure <ChevronRight size={15} />
+                        </Link>
+                      </>
                     ) : (
-                      <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs font-semibold text-slate-500">Modul Membaca is not included in your current access.</div>
+                      <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-xs font-semibold text-slate-500">No reading module available yet.</div>
                     )}
                   </section>
+                  ) : null}
 
                   <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
                     <div className="flex items-center justify-between gap-3">
@@ -1582,32 +1587,34 @@ function ParentDashboard({ userId }: { userId: string }) {
                   ) : null}
                 </section>
 
-                <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.10)]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">This Week</p>
-                      <h2 className="mt-1 text-lg font-black text-[#312e68]">Weekly Progress</h2>
-                    </div>
-                    <span className="text-4xl">🏆</span>
-                  </div>
-                  <p className="mt-4 text-2xl font-black text-[#312e68]">{Math.round(subjectTabs.reduce((sum, item) => sum + item.progress, 0) / subjectTabs.length)}%</p>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-violet-100">
-                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-violet-500" style={{ width: `${Math.round(subjectTabs.reduce((sum, item) => sum + item.progress, 0) / subjectTabs.length)}%` }} />
-                  </div>
-                  <div className="mt-5 space-y-3">
-                    {subjectTabs.map((subject) => (
-                      <div key={subject.title}>
-                        <div className="mb-1 flex items-center justify-between text-[10px] font-black">
-                          <span className="text-slate-700">{subject.icon} {subject.title}</span>
-                          <span className="text-slate-400">{subject.progress}%</span>
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${subject.progress}%` }} />
-                        </div>
+                {hasLearningHub ? (
+                  <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.10)]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">This Week</p>
+                        <h2 className="mt-1 text-lg font-black text-[#312e68]">Weekly Progress</h2>
                       </div>
-                    ))}
-                  </div>
-                </section>
+                      <span className="text-4xl">🏆</span>
+                    </div>
+                    <p className="mt-4 text-2xl font-black text-[#312e68]">{Math.round(subjectTabs.reduce((sum, item) => sum + item.progress, 0) / subjectTabs.length)}%</p>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-violet-100">
+                      <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-violet-500" style={{ width: `${Math.round(subjectTabs.reduce((sum, item) => sum + item.progress, 0) / subjectTabs.length)}%` }} />
+                    </div>
+                    <div className="mt-5 space-y-3">
+                      {subjectTabs.map((subject) => (
+                        <div key={subject.title}>
+                          <div className="mb-1 flex items-center justify-between text-[10px] font-black">
+                            <span className="text-slate-700">{subject.icon} {subject.title}</span>
+                            <span className="text-slate-400">{subject.progress}%</span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${subject.progress}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
 
                 <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.10)]">
                   <div className="flex items-center justify-between">
@@ -1632,7 +1639,7 @@ function ParentDashboard({ userId }: { userId: string }) {
           <nav className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-[760px] items-center justify-around rounded-[24px] border border-white/15 bg-[#15183d]/95 p-2 text-white shadow-[0_20px_60px_rgba(13,10,48,0.35)] backdrop-blur-xl xl:hidden">
             <BottomGameLink href="/dashboard" icon={Home} label="Home" active />
             <BottomGameLink href="/learning-hub" icon={BookOpenCheck} label="Learning" show={hasLearningHub} />
-            <BottomGameLink href="/virtual-world" icon={Sparkles} label="Virtual World" />
+            <BottomGameLink href="/virtual-world" icon={Sparkles} label="Virtual World" show={hasVirtualWorld} />
             <BottomGameLink href="/flashcard-modules" icon={BarChart3} label="Progress" show={hasReadingModules} />
             <BottomGameLink href="/profile" icon={UserRound} label="Profile" />
           </nav>

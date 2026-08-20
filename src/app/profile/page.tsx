@@ -46,6 +46,7 @@ type DashboardProfile = Profile & {
   draw_learn_unlocked?: boolean | null;
   sifir_deck_unlocked?: boolean | null;
   freebies_unlocked?: boolean | null;
+  huruf_membaca_unlocked?: boolean | null;
   package_type?: string | null;
   subscription_start?: string | null;
   subscription_end?: string | null;
@@ -168,23 +169,27 @@ function ProfileContent({ userId, email }: { userId: string; email: string }) {
 
   const hasLearningHub = Boolean(profile?.learning_hub_unlocked);
   const hasCustomWorksheet = Boolean(profile?.custom_worksheet_unlocked);
-  const hasFlashcard = Boolean(profile?.flashcard_modul_unlocked || profile?.flashcard_unlocked);
+  const hasFlashcard = Boolean(profile?.flashcard_unlocked);
+  const hasDigitalModule = Boolean(profile?.flashcard_modul_unlocked);
+  const hasHurufMembaca = Boolean(profile?.huruf_membaca_unlocked);
   const hasMath = Boolean(profile?.math_activity_unlocked);
   const hasDrawLearn = Boolean(profile?.draw_learn_unlocked);
   const hasSifir = Boolean(profile?.sifir_deck_unlocked);
-  const hasFreebies = profile?.freebies_unlocked !== false;
+  const hasFreebies = Boolean(profile?.freebies_unlocked);
 
   const accessCount = [
     hasLearningHub,
     hasCustomWorksheet,
     hasFlashcard,
+    hasDigitalModule,
+    hasHurufMembaca,
     hasMath,
     hasDrawLearn,
     hasSifir,
     hasFreebies,
   ].filter(Boolean).length;
 
-  const completion = Math.round((accessCount / 7) * 100);
+  const completion = Math.round((accessCount / 9) * 100);
 
   const accountType = profile?.user_type
     ? userTypeLabels[profile.user_type] || profile.user_type
@@ -308,6 +313,15 @@ function ProfileContent({ userId, email }: { userId: string; email: string }) {
           fullName={fullName}
           avatarUrl={avatarUrl}
           packageName={packageName}
+          hasLearningHub={hasLearningHub}
+          hasCustomWorksheet={hasCustomWorksheet}
+          hasFlashcard={hasFlashcard}
+          hasDigitalModule={hasDigitalModule}
+          hasHurufMembaca={hasHurufMembaca}
+          hasMath={hasMath}
+          hasDrawLearn={hasDrawLearn}
+          hasSifir={hasSifir}
+          hasFreebies={hasFreebies}
         />
 
         <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
@@ -620,6 +634,8 @@ function ProfileContent({ userId, email }: { userId: string; email: string }) {
                 hasLearningHub={hasLearningHub}
                 hasCustomWorksheet={hasCustomWorksheet}
                 hasFlashcard={hasFlashcard}
+                hasDigitalModule={hasDigitalModule}
+                hasHurufMembaca={hasHurufMembaca}
                 hasMath={hasMath}
                 hasDrawLearn={hasDrawLearn}
                 hasSifir={hasSifir}
@@ -646,10 +662,28 @@ function ProfileSidebar({
   fullName,
   avatarUrl,
   packageName,
+  hasLearningHub,
+  hasCustomWorksheet,
+  hasFlashcard,
+  hasDigitalModule,
+  hasHurufMembaca,
+  hasMath,
+  hasDrawLearn,
+  hasSifir,
+  hasFreebies,
 }: {
   fullName: string;
   avatarUrl: string;
   packageName: string;
+  hasLearningHub: boolean;
+  hasCustomWorksheet: boolean;
+  hasFlashcard: boolean;
+  hasDigitalModule: boolean;
+  hasHurufMembaca: boolean;
+  hasMath: boolean;
+  hasDrawLearn: boolean;
+  hasSifir: boolean;
+  hasFreebies: boolean;
 }) {
   return (
     <aside className="hidden border-r border-indigo-950/10 bg-[#111735] px-4 py-6 text-white xl:flex xl:flex-col">
@@ -686,21 +720,68 @@ function ProfileSidebar({
         <SidebarLink href="/dashboard" icon={<Home size={18} />}>
           Dashboard
         </SidebarLink>
+
         <SidebarLink href="/profile" icon={<UserRound size={18} />} active>
           My Profile
         </SidebarLink>
+
         <SidebarLink href="/children" icon={<Users size={18} />}>
           My Children
         </SidebarLink>
-        <SidebarLink href="/learning-hub" icon={<BookOpenCheck size={18} />}>
-          Learning Hub
-        </SidebarLink>
-        <SidebarLink href="/custom-worksheet" icon={<FileText size={18} />}>
-          Worksheet
-        </SidebarLink>
-        <SidebarLink href="/freebies" icon={<Gift size={18} />}>
-          Freebies
-        </SidebarLink>
+
+        {hasLearningHub ? (
+          <SidebarLink href="/learning-hub" icon={<BookOpenCheck size={18} />}>
+            Learning Hub
+          </SidebarLink>
+        ) : null}
+
+        {hasCustomWorksheet ? (
+          <SidebarLink href="/custom-worksheet" icon={<FileText size={18} />}>
+            Worksheet
+          </SidebarLink>
+        ) : null}
+
+        {hasFlashcard ? (
+          <SidebarLink href="/flashcard-library" icon={<BookOpen size={18} />}>
+            Flashcard Library
+          </SidebarLink>
+        ) : null}
+
+        {hasDigitalModule ? (
+          <SidebarLink href="/flashcard-modules" icon={<BookOpenCheck size={18} />}>
+            Modul Digital
+          </SidebarLink>
+        ) : null}
+
+        {hasHurufMembaca ? (
+          <SidebarLink href="/huruf-membaca" icon={<BookOpen size={18} />}>
+            Huruf & Membaca
+          </SidebarLink>
+        ) : null}
+
+        {hasMath ? (
+          <SidebarLink href="/math-activity" icon={<BarChart3 size={18} />}>
+            Math Activity
+          </SidebarLink>
+        ) : null}
+
+        {hasDrawLearn ? (
+          <SidebarLink href="/worksheet" icon={<Palette size={18} />}>
+            Draw & Learn
+          </SidebarLink>
+        ) : null}
+
+        {hasSifir ? (
+          <SidebarLink href="/sifir-deck" icon={<Star size={18} />}>
+            Sifir Deck
+          </SidebarLink>
+        ) : null}
+
+        {hasFreebies ? (
+          <SidebarLink href="/freebies" icon={<Gift size={18} />}>
+            Freebies
+          </SidebarLink>
+        ) : null}
       </nav>
     </aside>
   );
@@ -800,6 +881,8 @@ function AccessSummaryCard({
   hasLearningHub,
   hasCustomWorksheet,
   hasFlashcard,
+  hasDigitalModule,
+  hasHurufMembaca,
   hasMath,
   hasDrawLearn,
   hasSifir,
@@ -808,6 +891,8 @@ function AccessSummaryCard({
   hasLearningHub: boolean;
   hasCustomWorksheet: boolean;
   hasFlashcard: boolean;
+  hasDigitalModule: boolean;
+  hasHurufMembaca: boolean;
   hasMath: boolean;
   hasDrawLearn: boolean;
   hasSifir: boolean;
@@ -817,6 +902,8 @@ function AccessSummaryCard({
     { label: "Learning Hub", unlocked: hasLearningHub, icon: BookOpenCheck },
     { label: "Custom Worksheet", unlocked: hasCustomWorksheet, icon: FileText },
     { label: "Flashcard Library", unlocked: hasFlashcard, icon: BookOpen },
+    { label: "Modul Membaca", unlocked: hasDigitalModule, icon: BookOpenCheck },
+    { label: "Huruf & Membaca", unlocked: hasHurufMembaca, icon: BookOpen },
     { label: "Math Activity", unlocked: hasMath, icon: BarChart3 },
     { label: "Draw & Learn", unlocked: hasDrawLearn, icon: Palette },
     { label: "Sifir Deck", unlocked: hasSifir, icon: Star },
