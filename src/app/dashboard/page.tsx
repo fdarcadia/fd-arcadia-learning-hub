@@ -100,6 +100,24 @@ type ReadingModuleSummary = {
 
 type AvatarAction = "idle" | "sit" | "dance" | "wave" | "clap" | "jump";
 
+function getParentAvatarUrl(value: string | null | undefined) {
+  const raw = value?.trim();
+  if (!raw) return null;
+
+  // Parent avatar picker stores the selected avatar as values such as
+  // `13`, `13.svg`, or `/avatarsparent/13.svg`. Convert those values
+  // to the actual public asset path while keeping full URLs untouched.
+  if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
+
+  const normalized = raw.replace(/^\/+/, "");
+  if (normalized.startsWith("avatarsparent/")) {
+    return `/${normalized}`;
+  }
+
+  const fileName = normalized.endsWith(".svg") ? normalized : `${normalized}.svg`;
+  return `/avatarsparent/${fileName}`;
+}
+
 const packageLabels: Record<string, string> = {
   math_package: "Math Package RM25",
   learning_hub_weekly: "Learning Hub Weekly RM30",
@@ -1058,6 +1076,8 @@ function ParentDashboard({ userId }: { userId: string }) {
     primaryChild?.full_name ||
     displayName;
 
+  const parentAvatarUrl = getParentAvatarUrl(profile?.avatar_url);
+
   const primaryChildLevel =
     primaryChild?.level || primaryChild?.grade || "Learning Profile";
 
@@ -1177,34 +1197,40 @@ function ParentDashboard({ userId }: { userId: string }) {
       <div className="mx-auto min-h-screen w-full max-w-[1920px] xl:grid xl:h-screen xl:grid-cols-[230px_minmax(0,1fr)]">
         {/* DESKTOP PLAYER SIDEBAR */}
         <aside className="hidden min-h-0 border-r border-white/10 bg-gradient-to-b from-[#0c1238] via-[#111744] to-[#0b1032] px-4 py-5 text-white xl:flex xl:flex-col">
-          <Link href="/dashboard" className="flex items-center gap-3 px-2">
-            <div className="grid h-11 w-11 place-items-center rounded-[16px] bg-gradient-to-br from-violet-400 to-indigo-600 text-2xl shadow-lg shadow-violet-950/30">
-              🏠
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-[15px] font-black tracking-tight">FD Arcadia</p>
-              <p className="text-[9px] font-black tracking-[0.15em] text-violet-200">LEARNINGHUB</p>
+          <Link href="/dashboard" className="flex items-center px-2">
+            <div className="flex h-[58px] w-full max-w-[190px] items-center justify-start overflow-hidden rounded-[18px] bg-white px-2 shadow-lg shadow-violet-950/30">
+              <img
+                src="/fd-arcadia-logo1.png"
+                alt="FD Arcadia Learning Hub"
+                className="h-full w-full object-contain"
+              />
             </div>
           </Link>
 
           <div className="mt-5 rounded-[28px] border border-violet-300/20 bg-white/[0.07] p-4 text-center shadow-[0_18px_45px_rgba(0,0,0,0.18)] backdrop-blur">
-            <Link href="/children/avatar" className="relative mx-auto block h-24 w-24" title="Change avatar">
-              <div className="grid h-24 w-24 place-items-center overflow-hidden rounded-full border-4 border-white/80 bg-gradient-to-br from-violet-300 to-indigo-500 shadow-lg">
-                {primaryChild ? (
+            {primaryChild ? (
+              <Link href="/children/avatar" className="relative mx-auto block h-24 w-24" title="Change child avatar">
+                <div className="grid h-24 w-24 place-items-center overflow-hidden rounded-full border-4 border-white/80 bg-gradient-to-br from-violet-300 to-indigo-500 shadow-lg">
                   <img
                     src={gameAvatarIdleImage}
                     alt={primaryChildName}
                     className="h-full w-full object-contain"
                     draggable={false}
                   />
-                ) : profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt={displayName} className="h-full w-full object-cover" />
-                ) : (
-                  <UserRound size={42} className="text-white" />
-                )}
+                </div>
+                <span className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-[#111744] bg-white text-indigo-600">✎</span>
+              </Link>
+            ) : (
+              <div className="relative mx-auto block h-24 w-24">
+                <div className="grid h-24 w-24 place-items-center overflow-hidden rounded-full border-4 border-white/80 bg-gradient-to-br from-violet-300 to-indigo-500 shadow-lg">
+                  {parentAvatarUrl ? (
+                    <img src={parentAvatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                  ) : (
+                    <UserRound size={42} className="text-white" />
+                  )}
+                </div>
               </div>
-              <span className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-[#111744] bg-white text-indigo-600">✎</span>
-            </Link>
+            )}
 
             <h2 className="mt-3 truncate text-2xl font-black">{primaryChildName}</h2>
             <span className="mt-1 inline-flex rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 px-3 py-1 text-[10px] font-black">
@@ -1251,7 +1277,13 @@ function ParentDashboard({ userId }: { userId: string }) {
           <header className="sticky top-0 z-40 border-b border-indigo-100/80 bg-[#f9f7ff]/90 px-3 py-3 backdrop-blur-xl sm:px-5 lg:px-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-xl text-white shadow-md xl:hidden">🏠</div>
+                <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white shadow-md xl:hidden">
+                  <img
+                    src="/fd-arcadia-logo1.png"
+                    alt="FD Arcadia Learning Hub"
+                    className="h-full w-full object-contain p-1"
+                  />
+                </div>
                 <div className="min-w-0">
                   <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-violet-500">FD Arcadia LearningHub</p>
                   <h1 className="truncate text-lg font-black text-[#28245d] sm:text-xl">Home</h1>
@@ -1262,8 +1294,31 @@ function ParentDashboard({ userId }: { userId: string }) {
                 <TopCurrency emoji="🪙" value={coinCount} />
                 <TopCurrency emoji="⭐" value={starCount} className="hidden sm:flex" />
                 <TopCurrency emoji="💎" value={gemCount} className="hidden md:flex" />
-                <Link href="/profile" className="grid h-10 w-10 place-items-center rounded-2xl bg-[#292958] text-white shadow-sm transition hover:-translate-y-0.5">
-                  <UserRound size={18} />
+                <button
+                  type="button"
+                  title="Notifications"
+                  aria-label="Notifications"
+                  className="relative grid h-10 w-10 place-items-center rounded-2xl bg-[#292958] text-white shadow-sm transition hover:-translate-y-0.5"
+                >
+                  <Bell size={18} />
+                  {profile?.subscription_end ? (
+                    <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full border-2 border-[#292958] bg-rose-400" />
+                  ) : null}
+                </button>
+                <Link
+                  href="/profile"
+                  title="My Profile"
+                  className="grid h-10 w-10 place-items-center overflow-hidden rounded-2xl border border-white/15 bg-[#292958] text-white shadow-sm transition hover:-translate-y-0.5"
+                >
+                  {parentAvatarUrl ? (
+                    <img
+                      src={parentAvatarUrl}
+                      alt={displayName}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <UserRound size={18} />
+                  )}
                 </Link>
                 <LogoutGameButton />
               </div>
@@ -1278,20 +1333,25 @@ function ParentDashboard({ userId }: { userId: string }) {
             <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="min-w-0 space-y-4">
                 {/* HOME HERO - SELECTED CHILD */}
-                <section className="relative isolate overflow-hidden rounded-[30px] border border-white/70 bg-gradient-to-br from-[#f6ded3] via-[#ded5fb] to-[#bab6f1] p-5 shadow-[0_22px_70px_rgba(66,53,140,0.18)] sm:p-7">
-                  <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/30 blur-3xl" />
-                  <div className="absolute -bottom-24 left-[20%] h-48 w-48 rounded-full bg-violet-300/25 blur-3xl" />
+                <section className="relative isolate overflow-hidden rounded-[32px] border border-white/80 bg-gradient-to-br from-[#f8dfd4] via-[#e6dcfb] to-[#b9b8f4] p-5 shadow-[0_24px_80px_rgba(66,53,140,0.20)] sm:p-7 lg:p-8">
+                  <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/35 blur-3xl" />
+                  <div className="absolute -bottom-24 left-[12%] h-64 w-64 rounded-full bg-violet-300/25 blur-3xl" />
+                  <div className="absolute right-[35%] top-10 text-3xl opacity-70">⭐</div>
+                  <div className="absolute bottom-10 left-[48%] text-2xl opacity-60">✦</div>
 
-                  <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-center">
+                  <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)] lg:items-center">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-600">
-                        Today&apos;s Home
-                      </p>
-                      <h2 className="mt-1 text-2xl font-black text-[#2b285c] sm:text-3xl">
-                        Hi {primaryChildName}! 👋
+                      <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/55 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-violet-600 shadow-sm backdrop-blur">
+                        <Sparkles size={12} /> Today&apos;s Home
+                      </div>
+
+                      <h2 className="mt-3 max-w-2xl text-3xl font-black leading-tight text-[#29265f] sm:text-4xl">
+                        {primaryChild ? `Hi ${primaryChildName}!` : `Hi ${displayName}!`} 👋
                       </h2>
-                      <p className="mt-1 text-sm font-semibold text-slate-600">
-                        Here&apos;s your learning overview for today.
+                      <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-slate-600 sm:text-base">
+                        {primaryChild
+                          ? "Here&apos;s your little learner&apos;s progress, activities and learning journey for today."
+                          : "Your learning space is ready. Add a child profile to unlock their personalised learning journey."}
                       </p>
 
                       {children.length > 1 ? (
@@ -1341,7 +1401,6 @@ function ParentDashboard({ userId }: { userId: string }) {
                                       draggable={false}
                                     />
                                   </span>
-
                                   <span>{childName}</span>
                                   {active ? <span>✓</span> : null}
                                 </button>
@@ -1351,11 +1410,11 @@ function ParentDashboard({ userId }: { userId: string }) {
                         </div>
                       ) : null}
 
-                      <div className="mt-5 flex flex-wrap gap-2">
+                      <div className="mt-6 flex flex-wrap gap-2">
                         {hasReadingModules ? (
                           <Link
                             href="/flashcard-modules"
-                            className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-xs font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-700"
+                            className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-xs font-black text-white shadow-lg shadow-violet-500/20 transition hover:-translate-y-0.5 hover:bg-violet-700"
                           >
                             <BookOpenCheck size={16} />
                             Continue Learning
@@ -1372,29 +1431,81 @@ function ParentDashboard({ userId }: { userId: string }) {
                           </Link>
                         ) : null}
 
-                        <Link
-                          href="/children/avatar"
-                          className="inline-flex items-center gap-2 rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-xs font-black text-[#484172] transition hover:bg-white"
-                        >
-                          <UserRound size={16} />
-                          Change Avatar
-                        </Link>
+                        {primaryChild ? (
+                          <Link
+                            href="/children/avatar"
+                            className="inline-flex items-center gap-2 rounded-2xl border border-white/80 bg-white/65 px-4 py-3 text-xs font-black text-[#484172] transition hover:bg-white"
+                          >
+                            <UserRound size={16} />
+                            Change Avatar
+                          </Link>
+                        ) : (
+                          <Link
+                            href="/children"
+                            className="inline-flex items-center gap-2 rounded-2xl border border-white/80 bg-white/65 px-4 py-3 text-xs font-black text-[#484172] transition hover:bg-white"
+                          >
+                            <Users size={16} />
+                            Add Child Profile
+                          </Link>
+                        )}
                       </div>
                     </div>
 
-                    <div className="relative mx-auto flex h-[250px] w-[210px] items-end justify-center sm:h-[300px] sm:w-[250px]">
-                      <div className="absolute bottom-2 h-7 w-36 rounded-full bg-indigo-950/15 blur-md" />
+                    <div className="relative min-h-[270px] rounded-[28px] border border-white/65 bg-white/25 p-4 shadow-inner backdrop-blur-sm sm:min-h-[300px]">
+                      <div className="absolute right-4 top-4 rounded-2xl border border-white/70 bg-white/60 px-3 py-2 text-[9px] font-black text-violet-700 shadow-sm">
+                        {primaryChild ? "LEARNING JOURNEY" : "PARENT ACCOUNT"}
+                      </div>
 
-                      {primaryChild ? (
-                        <img
-                          src={gameAvatarIdleImage}
-                          alt={primaryChildName}
-                          className="relative z-10 max-h-full max-w-full select-none object-contain drop-shadow-[0_20px_22px_rgba(43,40,92,0.22)]"
-                          draggable={false}
-                        />
-                      ) : (
-                        <UserRound size={90} className="mb-16 text-violet-400" />
-                      )}
+                      <div className="absolute bottom-5 left-1/2 h-7 w-44 -translate-x-1/2 rounded-full bg-indigo-950/15 blur-md" />
+
+                      <div className="relative z-10 flex h-full flex-col items-center justify-end">
+                        {primaryChild ? (
+                          <img
+                            src={gameAvatarIdleImage}
+                            alt={primaryChildName}
+                            className={`max-h-[245px] max-w-[82%] select-none object-contain drop-shadow-[0_22px_24px_rgba(43,40,92,0.24)] ${
+                              avatarAction === "idle" ? "fd-avatar-idle" : ""
+                            } ${avatarAction !== "idle" ? `fd-avatar-${avatarAction}` : ""}`}
+                            draggable={false}
+                          />
+                        ) : parentAvatarUrl ? (
+                          <div className="relative mb-3 grid h-40 w-40 place-items-center overflow-hidden rounded-full border-8 border-white/80 bg-gradient-to-br from-violet-200 to-indigo-300 shadow-[0_18px_45px_rgba(65,54,131,0.20)]">
+                            <img
+                              src={parentAvatarUrl}
+                              alt={displayName}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="relative mb-5 grid h-40 w-40 place-items-center overflow-hidden rounded-full border-8 border-white/80 bg-gradient-to-br from-violet-200 to-indigo-300 shadow-[0_18px_45px_rgba(65,54,131,0.20)]">
+                            <UserRound size={74} className="text-white" />
+                          </div>
+                        )}
+
+                        <div className="relative z-20 rounded-2xl border border-white/75 bg-white/70 px-4 py-2 text-center shadow-sm backdrop-blur">
+                          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">
+                            {primaryChild ? primaryChildLevel : "Parent Account"}
+                          </p>
+                          <p className="mt-0.5 text-sm font-black text-[#312e68]">
+                            {primaryChild ? primaryChildName : displayName}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="relative mt-5 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-white/70 bg-white/55 px-4 py-3 backdrop-blur">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-500">Today</p>
+                      <p className="mt-1 text-xs font-black text-[#302c67]">Keep learning, little star ✨</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/70 bg-white/55 px-4 py-3 backdrop-blur">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-500">Progress</p>
+                      <p className="mt-1 text-xs font-black text-[#302c67]">{overallProgress}% learning access</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/70 bg-white/55 px-4 py-3 backdrop-blur">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-500">Reward</p>
+                      <p className="mt-1 text-xs font-black text-[#302c67]">{starCount} stars earned ⭐</p>
                     </div>
                   </div>
                 </section>
@@ -1415,9 +1526,23 @@ function ParentDashboard({ userId }: { userId: string }) {
                       <div className="mt-5 rounded-2xl bg-violet-50 p-4 text-xs font-black text-violet-600">Loading reading progress...</div>
                     ) : latestReadingModule ? (
                       <>
-                        <div className="mt-5 rounded-[20px] border border-violet-100 bg-gradient-to-br from-violet-50 to-indigo-50 p-4">
-                          <p className="text-sm font-black text-slate-900">{latestReadingModule.title}</p>
-                          <p className="mt-1 text-[11px] font-semibold text-slate-500">Page {latestReadingModule.lastPage} / {latestReadingModule.totalPages}</p>
+                        <div className="mt-5 rounded-[20px] border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">
+                                {latestReadingModule.progressPercent > 0 ? "Continue Reading" : "Ready to Start"}
+                              </p>
+                              <p className="mt-1 text-sm font-black text-slate-900">{latestReadingModule.title}</p>
+                              <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                                {latestReadingModule.progressPercent > 0
+                                  ? `Page ${latestReadingModule.lastPage} / ${latestReadingModule.totalPages}`
+                                  : `${latestReadingModule.totalPages} pages ready to read`}
+                              </p>
+                            </div>
+                            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-600">
+                              <BookOpen size={19} />
+                            </div>
+                          </div>
                           <div className="mt-3 flex items-center gap-2">
                             <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
                               <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${latestReadingModule.progressPercent}%` }} />
@@ -1425,8 +1550,8 @@ function ParentDashboard({ userId }: { userId: string }) {
                             <span className="text-[10px] font-black text-violet-600">{latestReadingModule.progressPercent}%</span>
                           </div>
                         </div>
-                        <Link href="/flashcard-modules" className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-xs font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5">
-                          Continue Adventure <ChevronRight size={15} />
+                        <Link href={`/flashcard-modules/${latestReadingModule.moduleId}/read`} className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-xs font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5">
+                          {latestReadingModule.progressPercent > 0 ? "Continue Adventure" : "Start Reading"} <ChevronRight size={15} />
                         </Link>
                       </>
                     ) : (
@@ -1444,19 +1569,48 @@ function ParentDashboard({ userId }: { userId: string }) {
                       <Link href="/pricing" className="rounded-xl bg-violet-50 px-3 py-2 text-[10px] font-black text-violet-700">View Plans</Link>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {visibleDashboardModules.map((card) => {
+                    <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {visibleDashboardModules.map((card, index) => {
                         const Icon = card.icon;
                         const isReading = card.title === "Modul Membaca";
                         const progressValue = isReading ? readingAverageProgress : 100;
+                        const tones = [
+                          "from-violet-50 to-indigo-50 border-violet-100",
+                          "from-sky-50 to-cyan-50 border-sky-100",
+                          "from-amber-50 to-yellow-50 border-amber-100",
+                          "from-pink-50 to-rose-50 border-pink-100",
+                          "from-emerald-50 to-teal-50 border-emerald-100",
+                          "from-orange-50 to-amber-50 border-orange-100",
+                        ];
+                        const iconTones = [
+                          "from-violet-200 to-indigo-200 text-indigo-700",
+                          "from-sky-200 to-cyan-200 text-cyan-700",
+                          "from-amber-200 to-yellow-200 text-amber-700",
+                          "from-pink-200 to-rose-200 text-rose-700",
+                          "from-emerald-200 to-teal-200 text-emerald-700",
+                          "from-orange-200 to-amber-200 text-orange-700",
+                        ];
                         return (
-                          <Link key={card.title} href={card.href} className="group rounded-[20px] border border-indigo-100 bg-gradient-to-b from-white to-[#faf8ff] p-3 text-center transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-lg">
-                            <div className="mx-auto grid h-14 w-14 place-items-center rounded-[18px] bg-gradient-to-br from-violet-100 to-indigo-100 text-indigo-600 shadow-inner">
-                              <Icon size={25} />
+                          <Link
+                            key={card.title}
+                            href={card.href}
+                            className={`group relative overflow-hidden rounded-[22px] border bg-gradient-to-br p-4 text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${tones[index % tones.length]}`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-[16px] bg-gradient-to-br shadow-sm ${iconTones[index % iconTones.length]}`}>
+                                <Icon size={24} />
+                              </div>
+                              <span className="grid h-8 w-8 place-items-center rounded-full bg-white/75 text-slate-500 transition group-hover:translate-x-0.5">
+                                <ChevronRight size={16} />
+                              </span>
                             </div>
-                            <p className="mt-3 line-clamp-2 min-h-[34px] text-[11px] font-black text-[#312e68]">{card.title}</p>
-                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                              <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${progressValue}%` }} />
+                            <p className="mt-3 text-sm font-black text-[#312e68]">{card.title}</p>
+                            <p className="mt-1 line-clamp-2 min-h-[30px] text-[10px] font-semibold leading-4 text-slate-500">{card.description}</p>
+                            <div className="mt-3 flex items-center gap-2">
+                              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/75">
+                                <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${progressValue}%` }} />
+                              </div>
+                              <span className="text-[9px] font-black text-violet-700">{progressValue}%</span>
                             </div>
                           </Link>
                         );
@@ -1533,6 +1687,80 @@ function ParentDashboard({ userId }: { userId: string }) {
                     )}
                   </div>
                 </section>
+
+                {/* PREMIUM HOME EXTRAS */}
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-rose-500">Weekly Plan</p>
+                        <h2 className="mt-1 text-lg font-black text-[#312e68]">This Week&apos;s Plan</h2>
+                      </div>
+                      <span className="text-3xl">📅</span>
+                    </div>
+                    <div className="mt-4 space-y-2.5">
+                      {weeklyTopics.slice(0, 3).map((topic, index) => (
+                        <div key={topic.week} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-[#fbfaff] p-3">
+                          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-100 text-lg">{topic.image}</div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[10px] font-black text-slate-800">{topic.title}</p>
+                            <p className="mt-0.5 text-[9px] font-semibold text-slate-400">{topic.week} • {topic.status}</p>
+                          </div>
+                          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${index < 2 ? "bg-emerald-400" : "bg-violet-400"}`} />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-indigo-500">Activity</p>
+                        <h2 className="mt-1 text-lg font-black text-[#312e68]">Recent Activity</h2>
+                      </div>
+                      <span className="text-3xl">⏱️</span>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-center gap-3 rounded-2xl bg-violet-50/70 p-3">
+                        <div className="grid h-9 w-9 place-items-center rounded-xl bg-white text-lg shadow-sm">📚</div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-black text-slate-800">{latestReadingModule ? latestReadingModule.title : "Reading Library"}</p>
+                          <p className="mt-0.5 text-[9px] font-semibold text-slate-400">{latestReadingModule ? `Page ${latestReadingModule.lastPage} • ${latestReadingModule.progressPercent}%` : "Ready for your first adventure"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 rounded-2xl bg-amber-50/70 p-3">
+                        <div className="grid h-9 w-9 place-items-center rounded-xl bg-white text-lg shadow-sm">⭐</div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-black text-slate-800">Stars collected</p>
+                          <p className="mt-0.5 text-[9px] font-semibold text-slate-400">{starCount} stars in your learning journey</p>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="relative overflow-hidden rounded-[26px] border border-indigo-100 bg-gradient-to-br from-[#eee9ff] via-white to-[#ffeef5] p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
+                    <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-pink-200/30 blur-2xl" />
+                    <div className="relative">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-pink-500">A Little Reminder</p>
+                          <h2 className="mt-1 text-lg font-black text-[#312e68]">You&apos;re doing great 💗</h2>
+                        </div>
+                        <span className="text-3xl">💖</span>
+                      </div>
+                      <div className="mt-4 rounded-[20px] border border-white/80 bg-white/65 p-4 backdrop-blur">
+                        <p className="text-sm font-black leading-6 text-[#312e68]">
+                          Small steps today can become big progress tomorrow.
+                        </p>
+                        <div className="mt-3 space-y-2 text-[10px] font-bold text-slate-500">
+                          <p>✓ Keep your child&apos;s routine consistent</p>
+                          <p>✓ Celebrate every little achievement</p>
+                          <p>✓ Make learning fun ✨</p>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
 
                 {/* ORIGINAL CURRENT PLAN CONTENT */}
                 <section className="flex flex-col gap-3 rounded-[22px] border border-indigo-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
