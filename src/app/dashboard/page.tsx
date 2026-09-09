@@ -100,6 +100,45 @@ type ReadingModuleSummary = {
 
 type AvatarAction = "idle" | "sit" | "dance" | "wave" | "clap" | "jump";
 
+type DailyPlanItem = {
+  id: string;
+  title: string;
+  done: boolean;
+};
+
+type DailyPlan = {
+  tasks: DailyPlanItem[];
+  reminder: string;
+};
+
+function getLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatPlanDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-MY", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(year, month - 1, day));
+}
+
+function createDefaultDailyPlan(): DailyPlan {
+  return {
+    tasks: dailySchedule.map((item, index) => ({
+      id: `task-${index + 1}`,
+      title: item.title,
+      done: false,
+    })),
+    reminder: "Small steps today can become big progress tomorrow.",
+  };
+}
+
 function getParentAvatarUrl(value: string | null | undefined) {
   const raw = value?.trim();
   if (!raw) return null;
@@ -845,6 +884,11 @@ function ParentDashboard({ userId }: { userId: string }) {
   const [error, setError] = useState("");
   const [avatarAction, setAvatarAction] = useState<AvatarAction>("idle");
   const [selectedChildId, setSelectedChildId] = useState<string>("");
+  const [planDate, setPlanDate] = useState(() => getLocalDateKey(new Date()));
+  const [dailyPlans, setDailyPlans] = useState<Record<string, DailyPlan>>({});
+  const [planReady, setPlanReady] = useState(false);
+  const [editingDailyPlan, setEditingDailyPlan] = useState(false);
+  const [editingReminder, setEditingReminder] = useState(false);
 
   useEffect(() => {
     async function loadDashboardData() {
@@ -938,6 +982,36 @@ function ParentDashboard({ userId }: { userId: string }) {
   }, [userId]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const storageKey = `fd-arcadia-daily-plans-${userId}`;
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored) as Record<string, DailyPlan>;
+        setDailyPlans(parsed || {});
+      }
+    } catch (storageError) {
+      console.error("Daily plan load error:", storageError);
+    } finally {
+      setPlanReady(true);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!planReady || typeof window === "undefined") return;
+
+    try {
+      window.localStorage.setItem(
+        `fd-arcadia-daily-plans-${userId}`,
+        JSON.stringify(dailyPlans)
+      );
+    } catch (storageError) {
+      console.error("Daily plan save error:", storageError);
+    }
+  }, [dailyPlans, planReady, userId]);
+
+  useEffect(() => {
     if (avatarAction === "idle" || avatarAction === "sit") return;
 
     const duration = avatarAction === "dance" ? 1800 : 1050;
@@ -966,10 +1040,8 @@ function ParentDashboard({ userId }: { userId: string }) {
   const hasReadingModules = Boolean(profile?.flashcard_modul_unlocked);
   const hasHurufMembaca = Boolean(profile?.huruf_membaca_unlocked);
 
-  // Virtual World is available only for Learning Hub, Custom Worksheet,
-  // or Digital Reading Module subscribers.
-  const hasVirtualWorld =
-    hasLearningHub || hasCustomWorksheet || hasReadingModules;
+  // Virtual World is available only for Learning Hub subscribers.
+  const hasVirtualWorld = hasLearningHub;
 
   const unlockedCount = moduleCards.filter((card) => {
     if (!card.field) return true;
@@ -1077,6 +1149,73 @@ function ParentDashboard({ userId }: { userId: string }) {
     displayName;
 
   const parentAvatarUrl = getParentAvatarUrl(profile?.avatar_url);
+
+  const currentDailyPlan = dailyPlans[planDate] || createDefaultDailyPlan();
+  const completedDailyTasks = currentDailyPlan.tasks.filter((task) => task.done).length;
+  const dailyPlanProgress = currentDailyPlan.tasks.length
+    ? Math.round((completedDailyTasks / currentDailyPlan.tasks.length) * 100)
+    : 0;
+  const todayPlanKey = getLocalDateKey(new Date());
+  const isTodayPlan = planDate === todayPlanKey;
+
+  function updateDailyPlan(updater: (plan: DailyPlan) => DailyPlan) {
+    setDailyPlans((current) => {
+      const existing = current[planDate] || createDefaultDailyPlan();
+      return { ...current, [planDate]: updater(existing) };
+    });
+  }
+
+  function changePlanDate(offset: number) {
+    const [year, month, day] = planDate.split("-").map(Number);
+    const next = new Date(year, month - 1, day);
+    next.setDate(next.getDate() + offset);
+    setPlanDate(getLocalDateKey(next));
+    setEditingDailyPlan(false);
+    setEditingReminder(false);
+  }
+
+  function toggleDailyTask(taskId: string) {
+    updateDailyPlan((plan) => ({
+      ...plan,
+      tasks: plan.tasks.map((task) =>
+        task.id === taskId ? { ...task, done: !task.done } : task
+      ),
+    }));
+  }
+
+  function updateDailyTaskTitle(taskId: string, title: string) {
+    updateDailyPlan((plan) => ({
+      ...plan,
+      tasks: plan.tasks.map((task) =>
+        task.id === taskId ? { ...task, title } : task
+      ),
+    }));
+  }
+
+  function addDailyTask() {
+    updateDailyPlan((plan) => ({
+      ...plan,
+      tasks: [
+        ...plan.tasks,
+        {
+          id: `task-${Date.now()}`,
+          title: "New task",
+          done: false,
+        },
+      ],
+    }));
+  }
+
+  function removeDailyTask(taskId: string) {
+    updateDailyPlan((plan) => ({
+      ...plan,
+      tasks: plan.tasks.filter((task) => task.id !== taskId),
+    }));
+  }
+
+  function updateReminder(value: string) {
+    updateDailyPlan((plan) => ({ ...plan, reminder: value }));
+  }
 
   const primaryChildLevel =
     primaryChild?.level || primaryChild?.grade || "Learning Profile";
@@ -1249,13 +1388,102 @@ function ParentDashboard({ userId }: { userId: string }) {
             </div>
           </div>
 
-          <nav className="mt-4 space-y-1.5">
-            <GameSideLink href="/dashboard" icon={Home} label="Home" active />
-            <GameSideLink href="/learning-hub" icon={BookOpenCheck} label="Learning" show={hasLearningHub} />
-            <GameSideLink href="/virtual-world" icon={Sparkles} label="Virtual World" show={hasVirtualWorld} />
-            <GameSideLink href="/flashcard-modules" icon={BarChart3} label="Progress" show={hasReadingModules} />
-            <GameSideLink href="/profile" icon={UserRound} label="Profile" />
-          </nav>
+          <nav className="mt-4 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+  {/* ALWAYS AVAILABLE */}
+  <GameSideLink
+    href="/dashboard"
+    icon={Home}
+    label="Home"
+    active
+  />
+
+  {/* UNLOCKED FEATURES */}
+  <GameSideLink
+    href="/learning-hub"
+    icon={BookOpenCheck}
+    label="Learning Hub"
+    show={hasLearningHub}
+  />
+
+  <GameSideLink
+    href="/flashcard-library"
+    icon={BookOpen}
+    label="Flashcard Library"
+    show={hasFlashcardLibrary}
+  />
+
+  <GameSideLink
+    href="/flashcard-modules"
+    icon={BookOpenCheck}
+    label="Modul Membaca"
+    show={hasReadingModules}
+  />
+
+  <GameSideLink
+    href="/huruf-membaca"
+    icon={BookOpenCheck}
+    label="Huruf & Membaca"
+    show={hasHurufMembaca}
+  />
+
+  <GameSideLink
+    href="/math-activity"
+    icon={Calculator}
+    label="Math Activity"
+    show={hasMathActivity}
+  />
+
+  <GameSideLink
+    href="/sifir-deck"
+    icon={Star}
+    label="Sifir Deck"
+    show={hasSifirDeck}
+  />
+
+  <GameSideLink
+    href="/worksheet"
+    icon={Palette}
+    label="Draw & Learn"
+    show={hasDrawLearn}
+  />
+
+  <GameSideLink
+    href="/custom-worksheet"
+    icon={FileText}
+    label="Custom Worksheet"
+    show={hasCustomWorksheet}
+  />
+
+  <GameSideLink
+    href="/freebies"
+    icon={Gift}
+    label="Freebies"
+    show={hasFreebies}
+  />
+
+  {/* LEARNING HUB ONLY */}
+  <GameSideLink
+    href="/virtual-world"
+    icon={Sparkles}
+    label="Virtual World"
+    show={hasVirtualWorld}
+  />
+
+  {/* READING MODULE PROGRESS */}
+  <GameSideLink
+    href="/flashcard-modules"
+    icon={BarChart3}
+    label="Progress"
+    show={hasReadingModules}
+  />
+
+  {/* ALWAYS AVAILABLE */}
+  <GameSideLink
+    href="/profile"
+    icon={UserRound}
+    label="Profile"
+  />
+</nav>
 
           <div className="mt-auto rounded-[22px] border border-violet-300/25 bg-gradient-to-br from-violet-600/35 to-fuchsia-500/15 p-4">
             <div className="flex items-center gap-3">
@@ -1689,74 +1917,178 @@ function ParentDashboard({ userId }: { userId: string }) {
                 </section>
 
                 {/* PREMIUM HOME EXTRAS */}
-                <div className="grid gap-4 lg:grid-cols-3">
-                  <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-rose-500">Weekly Plan</p>
-                        <h2 className="mt-1 text-lg font-black text-[#312e68]">This Week&apos;s Plan</h2>
+                <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
+                  {/* DAILY TO-DO / WEEKLY PLAN */}
+                  <section className="rounded-[26px] border border-indigo-100 bg-white p-4 shadow-[0_14px_40px_rgba(65,54,131,0.08)] sm:p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-rose-500">Daily Plan</p>
+                        <h2 className="mt-1 text-lg font-black text-[#312e68]">Today&apos;s To-Do ✨</h2>
+                        <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{formatPlanDate(planDate)}</p>
                       </div>
-                      <span className="text-3xl">📅</span>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => changePlanDate(-1)}
+                          className="grid h-9 w-9 place-items-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 transition hover:-translate-x-0.5 hover:bg-indigo-100"
+                          aria-label="Previous day"
+                          title="Previous day"
+                        >
+                          <ChevronRight size={16} className="rotate-180" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => changePlanDate(1)}
+                          disabled={isTodayPlan}
+                          className="grid h-9 w-9 place-items-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 transition hover:translate-x-0.5 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-35"
+                          aria-label="Next day"
+                          title={isTodayPlan ? "You are viewing today" : "Next day"}
+                        >
+                          <ChevronRight size={16} />
+                        </button>
+                        {isTodayPlan ? (
+                          <span className="hidden rounded-full bg-emerald-50 px-2.5 py-1.5 text-[9px] font-black text-emerald-600 sm:inline-flex">Today</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPlanDate(todayPlanKey);
+                              setEditingDailyPlan(false);
+                              setEditingReminder(false);
+                            }}
+                            className="rounded-full bg-violet-50 px-2.5 py-1.5 text-[9px] font-black text-violet-700 transition hover:bg-violet-100"
+                          >
+                            Back to Today
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-4 space-y-2.5">
-                      {weeklyTopics.slice(0, 3).map((topic, index) => (
-                        <div key={topic.week} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-[#fbfaff] p-3">
-                          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-100 text-lg">{topic.image}</div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-[10px] font-black text-slate-800">{topic.title}</p>
-                            <p className="mt-0.5 text-[9px] font-semibold text-slate-400">{topic.week} • {topic.status}</p>
+
+                    <div className="mt-4 rounded-[20px] border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-3.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-[10px] font-black text-[#312e68]">Little steps, big progress 💜</p>
+                            <span className="text-[9px] font-black text-violet-600">{completedDailyTasks}/{currentDailyPlan.tasks.length}</span>
                           </div>
-                          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${index < 2 ? "bg-emerald-400" : "bg-violet-400"}`} />
+                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+                            <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all duration-300" style={{ width: `${dailyPlanProgress}%` }} />
+                          </div>
                         </div>
-                      ))}
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-xl shadow-sm">📋</span>
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        {currentDailyPlan.tasks.map((task) => (
+                          <div key={task.id} className={`group flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition ${task.done ? "border-emerald-100 bg-emerald-50/70" : "border-white bg-white/80 hover:border-violet-100"}`}>
+                            <button
+                              type="button"
+                              onClick={() => toggleDailyTask(task.id)}
+                              className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition ${task.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-violet-300 bg-white text-transparent hover:border-violet-500"}`}
+                              aria-label={task.done ? `Mark ${task.title} incomplete` : `Mark ${task.title} complete`}
+                            >
+                              <CheckCircle2 size={15} />
+                            </button>
+
+                            {editingDailyPlan ? (
+                              <input
+                                value={task.title}
+                                onChange={(event) => updateDailyTaskTitle(task.id, event.target.value)}
+                                className={`min-w-0 flex-1 rounded-xl border border-indigo-100 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 ${task.done ? "line-through opacity-60" : ""}`}
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => toggleDailyTask(task.id)}
+                                className={`min-w-0 flex-1 truncate text-left text-[11px] font-black ${task.done ? "text-emerald-700 line-through opacity-70" : "text-slate-700"}`}
+                              >
+                                {task.title || "Untitled task"}
+                              </button>
+                            )}
+
+                            {editingDailyPlan ? (
+                              <button
+                                type="button"
+                                onClick={() => removeDailyTask(task.id)}
+                                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-300 transition hover:bg-rose-50 hover:text-rose-500"
+                                aria-label={`Remove ${task.title}`}
+                              >
+                                ×
+                              </button>
+                            ) : task.done ? (
+                              <span className="text-[9px] font-black text-emerald-600">Done</span>
+                            ) : (
+                              <span className="text-[9px] font-black text-violet-400">To do</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                        {editingDailyPlan ? (
+                          <button
+                            type="button"
+                            onClick={addDailyTask}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-violet-100 bg-white px-3 py-2 text-[9px] font-black text-violet-700 transition hover:bg-violet-50"
+                          >
+                            + Add Task
+                          </button>
+                        ) : (
+                          <span className="text-[9px] font-bold text-slate-400">Tick a task when it&apos;s done.</span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setEditingDailyPlan((current) => !current)}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-[9px] font-black text-white shadow-sm transition hover:bg-violet-700"
+                        >
+                          {editingDailyPlan ? "Save Plan" : "Edit Plan"}
+                        </button>
+                      </div>
                     </div>
                   </section>
 
-                  <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-indigo-500">Activity</p>
-                        <h2 className="mt-1 text-lg font-black text-[#312e68]">Recent Activity</h2>
-                      </div>
-                      <span className="text-3xl">⏱️</span>
-                    </div>
-                    <div className="mt-4 space-y-3">
-                      <div className="flex items-center gap-3 rounded-2xl bg-violet-50/70 p-3">
-                        <div className="grid h-9 w-9 place-items-center rounded-xl bg-white text-lg shadow-sm">📚</div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-black text-slate-800">{latestReadingModule ? latestReadingModule.title : "Reading Library"}</p>
-                          <p className="mt-0.5 text-[9px] font-semibold text-slate-400">{latestReadingModule ? `Page ${latestReadingModule.lastPage} • ${latestReadingModule.progressPercent}%` : "Ready for your first adventure"}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 rounded-2xl bg-amber-50/70 p-3">
-                        <div className="grid h-9 w-9 place-items-center rounded-xl bg-white text-lg shadow-sm">⭐</div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-black text-slate-800">Stars collected</p>
-                          <p className="mt-0.5 text-[9px] font-semibold text-slate-400">{starCount} stars in your learning journey</p>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="relative overflow-hidden rounded-[26px] border border-indigo-100 bg-gradient-to-br from-[#eee9ff] via-white to-[#ffeef5] p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
+                  {/* EDITABLE DAILY REMINDER */}
+                  <section className="relative overflow-hidden rounded-[26px] border border-indigo-100 bg-gradient-to-br from-[#eee9ff] via-white to-[#ffeef5] p-4 shadow-[0_14px_40px_rgba(65,54,131,0.08)] sm:p-5">
                     <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-pink-200/30 blur-2xl" />
                     <div className="relative">
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-pink-500">A Little Reminder</p>
-                          <h2 className="mt-1 text-lg font-black text-[#312e68]">You&apos;re doing great 💗</h2>
+                          <h2 className="mt-1 text-lg font-black text-[#312e68]">A note for today 💗</h2>
                         </div>
                         <span className="text-3xl">💖</span>
                       </div>
-                      <div className="mt-4 rounded-[20px] border border-white/80 bg-white/65 p-4 backdrop-blur">
-                        <p className="text-sm font-black leading-6 text-[#312e68]">
-                          Small steps today can become big progress tomorrow.
-                        </p>
-                        <div className="mt-3 space-y-2 text-[10px] font-bold text-slate-500">
-                          <p>✓ Keep your child&apos;s routine consistent</p>
+
+                      <div className="mt-4 rounded-[20px] border border-white/80 bg-white/70 p-4 shadow-sm backdrop-blur">
+                        {editingReminder ? (
+                          <textarea
+                            value={currentDailyPlan.reminder}
+                            onChange={(event) => updateReminder(event.target.value)}
+                            rows={4}
+                            className="w-full resize-none rounded-xl border border-pink-100 bg-white px-3 py-2.5 text-xs font-black leading-5 text-[#312e68] outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100"
+                            placeholder="Write a little reminder..."
+                          />
+                        ) : (
+                          <p className="text-sm font-black leading-6 text-[#312e68]">
+                            {currentDailyPlan.reminder || "Add a little reminder for today 💗"}
+                          </p>
+                        )}
+
+                        <div className="mt-3 space-y-1.5 text-[10px] font-bold text-slate-500">
+                          <p>✓ Keep the routine simple</p>
                           <p>✓ Celebrate every little achievement</p>
                           <p>✓ Make learning fun ✨</p>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setEditingReminder((current) => !current)}
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-pink-100 bg-pink-50 px-3 py-2 text-[9px] font-black text-pink-600 transition hover:bg-pink-100"
+                        >
+                          {editingReminder ? "Save Reminder" : "Edit Reminder"}
+                        </button>
                       </div>
                     </div>
                   </section>
