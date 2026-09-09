@@ -2237,7 +2237,7 @@ function ParentDashboard({ userId }: { userId: string }) {
           </div>
 
           {/* MOBILE/TABLET BOTTOM NAV */}
-          <nav className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-[980px] items-center gap-1 overflow-x-auto rounded-[24px] border border-white/15 bg-[#15183d]/95 p-2 text-white shadow-[0_20px_60px_rgba(13,10,48,0.35)] backdrop-blur-xl xl:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <nav className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-[980px] items-center gap-1 overflow-x-auto rounded-[24px] border border-indigo-100 bg-white/95 p-2 text-indigo-900 shadow-[0_12px_35px_rgba(80,60,140,0.18)] backdrop-blur-xl xl:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <BottomGameLink href="/dashboard" icon={Home} label="Home" active />
             <BottomGameLink href="/learning-hub" icon={BookOpenCheck} label="Learning" show={parentAccess.learning_hub_unlocked} />
             <BottomGameLink href="/flashcard-library" icon={BookOpen} label="Flashcard" show={parentAccess.flashcard_unlocked} />
@@ -2291,7 +2291,7 @@ function GameSideLink({ href, icon: Icon, label, active = false, show = true }: 
 function BottomGameLink({ href, icon: Icon, label, active = false, show = true }: { href: string; icon: React.ElementType; label: string; active?: boolean; show?: boolean }) {
   if (!show) return null;
   return (
-    <Link href={href} className={`flex min-w-[54px] flex-col items-center justify-center rounded-[16px] px-2 py-2 text-[9px] font-black transition sm:min-w-[88px] sm:flex-row sm:gap-2 sm:px-3 sm:text-[10px] ${active ? "bg-gradient-to-r from-violet-500 to-indigo-500 text-white" : "text-indigo-100 hover:bg-white/10"}`}>
+    <Link href={href} className={`flex min-w-[54px] flex-col items-center justify-center rounded-[16px] px-2 py-2 text-[9px] font-black transition sm:min-w-[88px] sm:flex-row sm:gap-2 sm:px-3 sm:text-[10px] ${active ? "bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md" : "text-indigo-500 hover:bg-indigo-50"}`}>
       <Icon size={18} />
       <span className="mt-1 sm:mt-0">{label}</span>
     </Link>
