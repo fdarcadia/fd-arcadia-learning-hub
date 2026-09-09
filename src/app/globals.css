@@ -182,27 +182,6 @@ button {
   margin-inline: auto;
 }
 
-/* =========================================================
-   MAIN DARK GAME SHELL
-========================================================= */
-
-.arcadia-game-shell {
-  overflow: hidden;
-
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: var(--arcadia-radius-2xl);
-
-  background:
-    linear-gradient(
-      145deg,
-      #242440 0%,
-      #17182f 55%,
-      #20213d 100%
-    );
-
-  box-shadow:
-    0 30px 80px rgba(18, 17, 43, 0.25);
-}
 
 /* =========================================================
    CARDS
@@ -985,10 +964,6 @@ button {
 
   .arcadia-card-xl {
     border-radius: 24px;
-  }
-
-  .arcadia-game-shell {
-    border-radius: 25px;
   }
 
   .arcadia-bottom-nav {
