@@ -128,6 +128,18 @@ const activities: Activity[] = [
     theme: "violet",
     preview: "word",
   },
+  {
+  id: "sukukata-drill",
+  number: 7,
+  title: "Suku Kata Drill",
+  description:
+    "Latih gabungan huruf konsonan dan vokal untuk membina suku kata dengan pantas.",
+  href: "/huruf-membaca/sukukata-drill",
+  tag: "Suku Kata",
+  icon: BookOpen,
+  theme: "blue",
+  preview: "word",
+},
 ];
 
 /* =========================================================
@@ -318,7 +330,7 @@ function HurufMembacaContent() {
           <div className="mx-auto mt-8 flex max-w-[950px] flex-wrap items-center justify-center gap-3">
             <BottomBadge
               icon={<BookOpen size={16} />}
-              text="6 Aktiviti"
+              text="7 Aktiviti"
             />
 
             <BottomBadge

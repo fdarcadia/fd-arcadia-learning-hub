@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  BookOpenCheck,
   LayoutDashboard,
   LogOut,
   UserRound,
-  ShieldCheck,
   Gift,
   BadgeDollarSign,
 } from "lucide-react";
@@ -38,19 +37,22 @@ export function Navbar() {
   return (
     <header className="border-b border-indigo-100 bg-white/88 backdrop-blur">
       <nav className="page-shell flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-yellow-100 text-indigo-600 shadow-sm">
-            <BookOpenCheck size={26} />
-          </span>
-          <span>
-            <span className="font-display block text-xl text-indigo-700">
-              FD Arcadia
-            </span>
-            <span className="text-sm text-emerald-700">Learning Hub</span>
-          </span>
+        
+        {/* LOGO */}
+        <Link href="/dashboard" className="flex items-center">
+          <Image
+            src="/fd-arcadia-logo1.png"
+            alt="FD Arcadia Learning Hub"
+            width={180}
+            height={60}
+            className="h-auto w-[180px] object-contain"
+            priority
+          />
         </Link>
 
+        {/* NAVIGATION */}
         <div className="flex flex-wrap items-center gap-3">
+          
           <Link
             href="/dashboard"
             className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
@@ -68,20 +70,20 @@ export function Navbar() {
           </Link>
 
           <Link
-  href="/pricing"
-  className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
->
-  <BadgeDollarSign size={20} />
-  Pricing
-</Link>
+            href="/pricing"
+            className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <BadgeDollarSign size={20} />
+            Pricing
+          </Link>
 
-<Link
-  href="/freebies"
-  className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
->
-  <Gift size={20} />
-  Freebies
-</Link>
+          <Link
+            href="/freebies"
+            className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <Gift size={20} />
+            Freebies
+          </Link>
 
           <button
             type="button"
@@ -91,6 +93,7 @@ export function Navbar() {
             <LogOut size={20} />
             Logout
           </button>
+
         </div>
       </nav>
     </header>

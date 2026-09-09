@@ -56,6 +56,36 @@ type ParentAccessField =
   | "flashcard_modul_unlocked"
   | "huruf_membaca_unlocked";
 
+type ParentAccessState = Record<ParentAccessField, boolean> & {
+  virtual_world_unlocked: boolean;
+  progress_unlocked: boolean;
+  isUnlocked: (field: ParentAccessField | null | undefined) => boolean;
+};
+
+function getParentAccess(profile: DashboardProfile | null): ParentAccessState {
+  const access = {
+    learning_hub_unlocked: Boolean(profile?.learning_hub_unlocked),
+    custom_worksheet_unlocked: Boolean(profile?.custom_worksheet_unlocked),
+    math_activity_unlocked: Boolean(profile?.math_activity_unlocked),
+    draw_learn_unlocked: Boolean(profile?.draw_learn_unlocked),
+    sifir_deck_unlocked: Boolean(profile?.sifir_deck_unlocked),
+    freebies_unlocked: Boolean(profile?.freebies_unlocked),
+    flashcard_unlocked: Boolean(profile?.flashcard_unlocked),
+    flashcard_modul_unlocked: Boolean(profile?.flashcard_modul_unlocked),
+    huruf_membaca_unlocked: Boolean(profile?.huruf_membaca_unlocked),
+  };
+
+  const virtual_world_unlocked = access.learning_hub_unlocked;
+  const progress_unlocked = access.flashcard_modul_unlocked;
+
+  return {
+    ...access,
+    virtual_world_unlocked,
+    progress_unlocked,
+    isUnlocked: (field) => field ? access[field] : true,
+  };
+}
+
 type ChildProfile = {
   id: string;
   name?: string | null;
@@ -936,6 +966,16 @@ function ParentDashboard({ userId }: { userId: string }) {
       }
 
       try {
+        const loadedProfile = profileData as DashboardProfile;
+        const access = getParentAccess(loadedProfile);
+
+        if (!access.flashcard_modul_unlocked) {
+          setReadingModules([]);
+          setReadingProgress([]);
+          setReadingLoading(false);
+          return;
+        }
+
         setReadingLoading(true);
 
         const { data: moduleData, error: moduleError } = await supabase
@@ -1030,27 +1070,25 @@ function ParentDashboard({ userId }: { userId: string }) {
     ? packageLabels[profile.package_type] || profile.package_type
     : "No Active Package";
 
-  const hasLearningHub = Boolean(profile?.learning_hub_unlocked);
-  const hasCustomWorksheet = Boolean(profile?.custom_worksheet_unlocked);
-  const hasMathActivity = Boolean(profile?.math_activity_unlocked);
-  const hasDrawLearn = Boolean(profile?.draw_learn_unlocked);
-  const hasSifirDeck = Boolean(profile?.sifir_deck_unlocked);
-  const hasFreebies = profile?.freebies_unlocked !== false;
-  const hasFlashcardLibrary = Boolean(profile?.flashcard_unlocked);
-  const hasReadingModules = Boolean(profile?.flashcard_modul_unlocked);
-  const hasHurufMembaca = Boolean(profile?.huruf_membaca_unlocked);
+  // SINGLE SOURCE OF TRUTH: every parent-facing feature uses this access state.
+  const parentAccess = getParentAccess(profile);
+  const {
+    learning_hub_unlocked: hasLearningHub,
+    custom_worksheet_unlocked: hasCustomWorksheet,
+    math_activity_unlocked: hasMathActivity,
+    draw_learn_unlocked: hasDrawLearn,
+    sifir_deck_unlocked: hasSifirDeck,
+    freebies_unlocked: hasFreebies,
+    flashcard_unlocked: hasFlashcardLibrary,
+    flashcard_modul_unlocked: hasReadingModules,
+    huruf_membaca_unlocked: hasHurufMembaca,
+    virtual_world_unlocked: hasVirtualWorld,
+    progress_unlocked: hasProgress,
+  } = parentAccess;
 
-  // Virtual World is available only for Learning Hub subscribers.
-  const hasVirtualWorld = hasLearningHub;
-
-  const unlockedCount = moduleCards.filter((card) => {
-    if (!card.field) return true;
-    if (card.field === "flashcard_unlocked") return hasFlashcardLibrary;
-    if (card.field === "flashcard_modul_unlocked") return hasReadingModules;
-    if (card.field === "huruf_membaca_unlocked") return hasHurufMembaca;
-    if (card.field === "freebies_unlocked") return hasFreebies;
-    return Boolean(profile?.[card.field]);
-  }).length;
+  const unlockedCount = moduleCards.filter((card) =>
+    parentAccess.isUnlocked(card.field)
+  ).length;
 
   const overallProgress = Math.max(
     35,
@@ -1226,13 +1264,10 @@ function ParentDashboard({ userId }: { userId: string }) {
       ? "Age not set"
       : "Parent Overview";
 
-  const dashboardModules = moduleCards.filter((card) => {
-    if (card.field === "flashcard_unlocked") return hasFlashcardLibrary;
-    if (card.field === "flashcard_modul_unlocked") return hasReadingModules;
-    if (card.field === "huruf_membaca_unlocked") return hasHurufMembaca;
-    if (card.field === "freebies_unlocked") return hasFreebies;
-    return card.field ? Boolean(profile?.[card.field]) : true;
-  });
+  // Dashboard cards use the exact same access state as the sidebar/mobile/progress UI.
+  const dashboardModules = moduleCards.filter((card) =>
+    parentAccess.isUnlocked(card.field)
+  );
 
   const visibleDashboardModules = dashboardModules.slice(0, 6);
   const levelNumber = (() => {
@@ -1402,63 +1437,63 @@ function ParentDashboard({ userId }: { userId: string }) {
     href="/learning-hub"
     icon={BookOpenCheck}
     label="Learning Hub"
-    show={hasLearningHub}
+    show={parentAccess.learning_hub_unlocked}
   />
 
   <GameSideLink
     href="/flashcard-library"
     icon={BookOpen}
     label="Flashcard Library"
-    show={hasFlashcardLibrary}
+    show={parentAccess.flashcard_unlocked}
   />
 
   <GameSideLink
     href="/flashcard-modules"
     icon={BookOpenCheck}
     label="Modul Membaca"
-    show={hasReadingModules}
+    show={parentAccess.flashcard_modul_unlocked}
   />
 
   <GameSideLink
     href="/huruf-membaca"
     icon={BookOpenCheck}
     label="Huruf & Membaca"
-    show={hasHurufMembaca}
+    show={parentAccess.huruf_membaca_unlocked}
   />
 
   <GameSideLink
     href="/math-activity"
     icon={Calculator}
     label="Math Activity"
-    show={hasMathActivity}
+    show={parentAccess.math_activity_unlocked}
   />
 
   <GameSideLink
     href="/sifir-deck"
     icon={Star}
     label="Sifir Deck"
-    show={hasSifirDeck}
+    show={parentAccess.sifir_deck_unlocked}
   />
 
   <GameSideLink
     href="/worksheet"
     icon={Palette}
     label="Draw & Learn"
-    show={hasDrawLearn}
+    show={parentAccess.draw_learn_unlocked}
   />
 
   <GameSideLink
     href="/custom-worksheet"
     icon={FileText}
     label="Custom Worksheet"
-    show={hasCustomWorksheet}
+    show={parentAccess.custom_worksheet_unlocked}
   />
 
   <GameSideLink
     href="/freebies"
     icon={Gift}
     label="Freebies"
-    show={hasFreebies}
+    show={parentAccess.freebies_unlocked}
   />
 
   {/* LEARNING HUB ONLY */}
@@ -1466,15 +1501,15 @@ function ParentDashboard({ userId }: { userId: string }) {
     href="/virtual-world"
     icon={Sparkles}
     label="Virtual World"
-    show={hasVirtualWorld}
+    show={parentAccess.virtual_world_unlocked}
   />
 
   {/* READING MODULE PROGRESS */}
   <GameSideLink
-    href="/flashcard-modules"
+    href="/flashcard-modules/progress"
     icon={BarChart3}
     label="Progress"
-    show={hasReadingModules}
+    show={hasProgress}
   />
 
   {/* ALWAYS AVAILABLE */}
@@ -1485,18 +1520,20 @@ function ParentDashboard({ userId }: { userId: string }) {
   />
 </nav>
 
-          <div className="mt-auto rounded-[22px] border border-violet-300/25 bg-gradient-to-br from-violet-600/35 to-fuchsia-500/15 p-4">
-            <div className="flex items-center gap-3">
-              <div className="text-4xl">🎁</div>
-              <div>
-                <p className="text-xs font-black">Daily Reward</p>
-                <p className="mt-1 text-[9px] font-semibold text-violet-100">Come back every day!</p>
+          {hasFreebies ? (
+            <div className="mt-auto rounded-[22px] border border-violet-300/25 bg-gradient-to-br from-violet-600/35 to-fuchsia-500/15 p-4">
+              <div className="flex items-center gap-3">
+                <div className="text-4xl">🎁</div>
+                <div>
+                  <p className="text-xs font-black">Daily Reward</p>
+                  <p className="mt-1 text-[9px] font-semibold text-violet-100">Come back every day!</p>
+                </div>
               </div>
+              <Link href="/freebies" className="mt-3 flex w-full items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black text-white transition hover:bg-white/15">
+                Open Rewards
+              </Link>
             </div>
-            <Link href="/freebies" className="mt-3 flex w-full items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black text-white transition hover:bg-white/15">
-              Open Rewards
-            </Link>
-          </div>
+          ) : null}
         </aside>
 
         {/* MAIN GAME DASHBOARD */}
@@ -1788,6 +1825,7 @@ function ParentDashboard({ userId }: { userId: string }) {
                   </section>
                   ) : null}
 
+                  {dashboardModules.length > 0 ? (
                   <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.08)]">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -1849,6 +1887,7 @@ function ParentDashboard({ userId }: { userId: string }) {
                       <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-xs font-semibold text-slate-500">No premium module unlocked yet. View plans to choose your learning package.</div>
                     ) : null}
                   </section>
+                  ) : null}
                 </div>
 
                 {/* ORIGINAL READING PROGRESS */}
@@ -2176,6 +2215,7 @@ function ParentDashboard({ userId }: { userId: string }) {
                   </section>
                 ) : null}
 
+                {hasFreebies ? (
                 <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_14px_40px_rgba(65,54,131,0.10)]">
                   <div className="flex items-center justify-between">
                     <div>
@@ -2191,16 +2231,25 @@ function ParentDashboard({ userId }: { userId: string }) {
                   </div>
                   <Link href="/freebies" className="mt-4 flex w-full items-center justify-center rounded-2xl bg-violet-100 px-4 py-3 text-xs font-black text-violet-700">Open Rewards</Link>
                 </section>
+                ) : null}
               </div>
             </div>
           </div>
 
           {/* MOBILE/TABLET BOTTOM NAV */}
-          <nav className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-[760px] items-center justify-around rounded-[24px] border border-white/15 bg-[#15183d]/95 p-2 text-white shadow-[0_20px_60px_rgba(13,10,48,0.35)] backdrop-blur-xl xl:hidden">
+          <nav className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-[980px] items-center gap-1 overflow-x-auto rounded-[24px] border border-white/15 bg-[#15183d]/95 p-2 text-white shadow-[0_20px_60px_rgba(13,10,48,0.35)] backdrop-blur-xl xl:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <BottomGameLink href="/dashboard" icon={Home} label="Home" active />
-            <BottomGameLink href="/learning-hub" icon={BookOpenCheck} label="Learning" show={hasLearningHub} />
-            <BottomGameLink href="/virtual-world" icon={Sparkles} label="Virtual World" show={hasVirtualWorld} />
-            <BottomGameLink href="/flashcard-modules" icon={BarChart3} label="Progress" show={hasReadingModules} />
+            <BottomGameLink href="/learning-hub" icon={BookOpenCheck} label="Learning" show={parentAccess.learning_hub_unlocked} />
+            <BottomGameLink href="/flashcard-library" icon={BookOpen} label="Flashcard" show={parentAccess.flashcard_unlocked} />
+            <BottomGameLink href="/flashcard-modules" icon={BookOpenCheck} label="Modul Membaca" show={parentAccess.flashcard_modul_unlocked} />
+            <BottomGameLink href="/huruf-membaca" icon={BookOpenCheck} label="Huruf & Membaca" show={parentAccess.huruf_membaca_unlocked} />
+            <BottomGameLink href="/math-activity" icon={Calculator} label="Math" show={parentAccess.math_activity_unlocked} />
+            <BottomGameLink href="/sifir-deck" icon={Star} label="Sifir" show={parentAccess.sifir_deck_unlocked} />
+            <BottomGameLink href="/worksheet" icon={Palette} label="Draw & Learn" show={parentAccess.draw_learn_unlocked} />
+            <BottomGameLink href="/custom-worksheet" icon={FileText} label="Worksheet" show={parentAccess.custom_worksheet_unlocked} />
+            <BottomGameLink href="/freebies" icon={Gift} label="Freebies" show={parentAccess.freebies_unlocked} />
+            <BottomGameLink href="/virtual-world" icon={Sparkles} label="Virtual World" show={parentAccess.virtual_world_unlocked} />
+            <BottomGameLink href="/flashcard-modules/progress" icon={BarChart3} label="Progress" show={parentAccess.flashcard_modul_unlocked} />
             <BottomGameLink href="/profile" icon={UserRound} label="Profile" />
           </nav>
         </div>
@@ -2268,31 +2317,26 @@ function LogoutGameButton() {
 function ParentSidebar({
   packageName,
   endDate,
-  hasLearningHub,
-  hasCustomWorksheet,
-  hasFlashcardLibrary,
-  hasReadingModules,
-  hasHurufMembaca,
+  access,
 }: {
   packageName: string;
   endDate: string;
-  hasLearningHub: boolean;
-  hasCustomWorksheet: boolean;
-  hasFlashcardLibrary: boolean;
-  hasReadingModules: boolean;
-  hasHurufMembaca: boolean;
+  access: ParentAccessState;
 }) {
   const links = [
     { title: "Dashboard", href: "/dashboard", icon: Home, show: true },
-    { title: "Learning Hub", href: "/learning-hub", icon: BookOpenCheck, show: hasLearningHub },
-    { title: "Flashcard Library", href: "/flashcard-library", icon: BookOpen, show: hasFlashcardLibrary },
-    { title: "Modul Membaca", href: "/flashcard-modules", icon: BookOpenCheck, show: hasReadingModules },
-    { title: "Huruf & Membaca", href: "/huruf-membaca", icon: BookOpenCheck, show: hasHurufMembaca },
-    { title: "Math Activity", href: "/math-activity", icon: Calculator, show: true },
-    { title: "Custom Worksheet", href: "/custom-worksheet", icon: FileText, show: hasCustomWorksheet },
-    { title: "Draw & Learn", href: "/worksheet", icon: Palette, show: true },
-    { title: "Sifir Deck", href: "/sifir-deck", icon: Star, show: true },
-    { title: "Freebies", href: "/freebies", icon: Gift, show: true },
+    { title: "Learning Hub", href: "/learning-hub", icon: BookOpenCheck, show: access.learning_hub_unlocked },
+    { title: "Flashcard Library", href: "/flashcard-library", icon: BookOpen, show: access.flashcard_unlocked },
+    { title: "Modul Membaca", href: "/flashcard-modules", icon: BookOpenCheck, show: access.flashcard_modul_unlocked },
+    { title: "Huruf & Membaca", href: "/huruf-membaca", icon: BookOpenCheck, show: access.huruf_membaca_unlocked },
+    { title: "Math Activity", href: "/math-activity", icon: Calculator, show: access.math_activity_unlocked },
+    { title: "Custom Worksheet", href: "/custom-worksheet", icon: FileText, show: access.custom_worksheet_unlocked },
+    { title: "Draw & Learn", href: "/worksheet", icon: Palette, show: access.draw_learn_unlocked },
+    { title: "Sifir Deck", href: "/sifir-deck", icon: Star, show: access.sifir_deck_unlocked },
+    { title: "Freebies", href: "/freebies", icon: Gift, show: access.freebies_unlocked },
+    { title: "Virtual World", href: "/virtual-world", icon: Sparkles, show: access.virtual_world_unlocked },
+    { title: "Progress", href: "/flashcard-modules/progress", icon: BarChart3, show: access.progress_unlocked },
+    { title: "Profile", href: "/profile", icon: UserRound, show: true },
   ].filter((item) => item.show);
 
   return (
@@ -3067,7 +3111,7 @@ function CompactPackageSection({
       description: "Open the interactive worksheet canvas.",
       href: "/worksheet",
       icon: Palette,
-      unlocked: hasDrawLearn || hasCustomWorksheet,
+      unlocked: hasDrawLearn,
     },
     {
       title: "Sifir Deck",
@@ -3382,30 +3426,14 @@ function DailyScheduleBar() {
 }
 
 function LearningResources({
-  profile,
-  hasFlashcardLibrary,
-  hasReadingModules,
-  hasFreebies,
+  access,
   onlyUnlocked,
 }: {
-  profile: DashboardProfile | null;
-  hasFlashcardLibrary: boolean;
-  hasReadingModules: boolean;
-  hasFreebies: boolean;
+  access: ParentAccessState;
   onlyUnlocked: boolean;
 }) {
   const cardsToShow = onlyUnlocked
-    ? moduleCards.filter((card) => {
-        if (!card.field) return true;
-        if (card.field === "flashcard_unlocked") {
-          return hasFlashcardLibrary;
-        }
-        if (card.field === "flashcard_modul_unlocked") {
-          return hasReadingModules;
-        }
-        if (card.field === "freebies_unlocked") return hasFreebies;
-        return Boolean(profile?.[card.field]);
-      })
+    ? moduleCards.filter((card) => access.isUnlocked(card.field))
     : moduleCards;
 
   return (
@@ -3414,16 +3442,7 @@ function LearningResources({
 
       <div className="mt-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
         {cardsToShow.map((card) => {
-          const unlocked =
-            card.field === "flashcard_unlocked"
-              ? hasFlashcardLibrary
-              : card.field === "flashcard_modul_unlocked"
-                ? hasReadingModules
-                : card.field === "freebies_unlocked"
-                  ? hasFreebies
-                  : card.field
-                    ? Boolean(profile?.[card.field])
-                    : true;
+          const unlocked = access.isUnlocked(card.field);
 
           const Icon = card.icon;
 
