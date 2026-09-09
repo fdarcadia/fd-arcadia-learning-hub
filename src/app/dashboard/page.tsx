@@ -1308,7 +1308,7 @@ function ParentDashboard({ userId }: { userId: string }) {
   }
 
   return (
-    <main className="min-h-screen bg-[#090d2c] text-slate-950 xl:h-screen xl:overflow-hidden">
+    <main className="min-h-screen overflow-x-hidden bg-[#f7f3ff] text-slate-950 xl:h-screen xl:overflow-hidden">
       <style>{`
         @keyframes fdAvatarIdle {
           0%, 100% { transform: translateY(0) scale(1); }
@@ -1368,7 +1368,7 @@ function ParentDashboard({ userId }: { userId: string }) {
           }
         }
       `}</style>
-      <div className="mx-auto min-h-screen w-full max-w-[1920px] xl:grid xl:h-screen xl:grid-cols-[230px_minmax(0,1fr)]">
+      <div className="mx-auto min-h-screen w-full max-w-[1920px] overflow-x-hidden xl:grid xl:h-screen xl:grid-cols-[230px_minmax(0,1fr)]">,1fr)]">
         {/* DESKTOP PLAYER SIDEBAR */}
         <aside className="hidden min-h-0 border-r border-white/10 bg-gradient-to-b from-[#0c1238] via-[#111744] to-[#0b1032] px-4 py-5 text-white xl:flex xl:flex-col">
           <Link href="/dashboard" className="flex items-center px-2">
