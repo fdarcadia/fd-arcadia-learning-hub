@@ -143,7 +143,7 @@ function UpdatePasswordContent() {
               <Link href="/" className="inline-flex items-center gap-3">
                 {/* Optional custom logo:
                 <img
-                  src="/fd-arcadia-logo.png"
+                  src="/fd-arcadia-logo1.png"
                   alt="FD Arcadia"
                   className="h-12 w-auto object-contain"
                 />

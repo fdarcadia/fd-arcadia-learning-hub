@@ -60,16 +60,16 @@ export default function LoginPage() {
               <Link href="/" className="inline-flex items-center gap-3">
                 {/* 
                   OPTIONAL CUSTOM LOGO:
-                  Put your logo file in /public, e.g. /public/fd-arcadia-logo.png
+                  Put your logo file in /public, e.g. /public/fd-arcadia-logo1.png
                   Then replace the div below with:
                   <img
-                    src="/fd-arcadia-logo.png"
+                    src="/fd-arcadia-logo1.png"
                     alt="FD Arcadia"
                     className="h-12 w-auto object-contain"
                   />
                 */}
                 <img
-  src="/fd-arcadia-logo.png"
+  src="/fd-arcadia-logo1.png"
   alt="FD Arcadia"
   className="h-12 w-auto object-contain"
 />

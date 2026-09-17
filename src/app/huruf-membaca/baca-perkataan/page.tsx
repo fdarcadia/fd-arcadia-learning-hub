@@ -305,9 +305,6 @@ function ReadingGame() {
       null
     );
 
-  const lastSoundIndexRef =
-    useRef(-1);
-
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordedUrlRef = useRef<string | null>(null);
@@ -344,6 +341,9 @@ function ReadingGame() {
 
   const [dragging, setDragging] =
     useState(false);
+
+  const lastSoundLetterRef =
+    useRef<number>(-1);
 
   const [
     tappedLetters,
@@ -557,18 +557,17 @@ function ReadingGame() {
   const word = (
     question?.word ||
     question?.answer ||
+    [
+      question?.syllable1,
+      question?.syllable2,
+      question?.syllable3,
+    ]
+      .filter(Boolean)
+      .join("") ||
     ""
   )
     .trim()
     .toLowerCase();
-
-  const letters = useMemo(
-    () =>
-      word
-        ? word.split("")
-        : [],
-    [word]
-  );
 
   const syllables = useMemo(
     () =>
@@ -584,6 +583,23 @@ function ReadingGame() {
       question?.syllable2,
       question?.syllable3,
     ]
+  );
+
+  /*
+   * Main cards show INDIVIDUAL LETTERS.
+   *
+   * Examples:
+   * KV     -> "b" | "a"
+   * KVKV   -> "b" | "a" | "j" | "u"
+   *
+   * Suku kata remains shown separately below.
+   */
+  const letters = useMemo(
+    () =>
+      word
+        ? word.split("")
+        : [],
+    [word]
   );
 
   /* =========================================================
@@ -731,16 +747,6 @@ function ReadingGame() {
         rate
       );
     }
-  }
-
-  function playLetter(
-    letter: string
-  ) {
-    playAudio(
-      `/audio/phonics/${letter.toLowerCase()}.mp3`,
-      letter,
-      0.5
-    );
   }
 
   function playSyllable(
@@ -952,22 +958,6 @@ function ReadingGame() {
         : -1;
 
     if (
-      index >= 0 &&
-      index !==
-        lastSoundIndexRef.current
-    ) {
-      lastSoundIndexRef.current =
-        index;
-
-      const letter =
-        letters[index];
-
-      if (letter) {
-        playLetter(letter);
-      }
-    }
-
-    if (
       nextProgress >= 96 &&
       !completed
     ) {
@@ -988,9 +978,48 @@ function ReadingGame() {
 
     setDragging(true);
 
+    lastSoundLetterRef.current = -1;
+
     calculateProgress(
       event.clientX
     );
+
+    if (soundEnabled && letters.length > 0) {
+      const rect =
+        trackRef.current?.getBoundingClientRect();
+
+      if (rect && rect.width > 0) {
+        const x =
+          Math.max(
+            0,
+            Math.min(
+              rect.width,
+              event.clientX - rect.left
+            )
+          );
+
+        const index =
+          Math.min(
+            letters.length - 1,
+            Math.floor(
+              (x / rect.width) * letters.length
+            )
+          );
+
+        lastSoundLetterRef.current = index;
+
+        const letter =
+          letters[index];
+
+        if (letter) {
+          playAudio(
+            `/audio/reading/${letter.toLowerCase()}.mp3`,
+            letter,
+            0.68
+          );
+        }
+      }
+    }
   }
 
   function handlePointerMove(
@@ -1006,6 +1035,52 @@ function ReadingGame() {
     calculateProgress(
       event.clientX
     );
+
+    if (!soundEnabled || letters.length === 0) {
+      return;
+    }
+
+    const rect =
+      trackRef.current?.getBoundingClientRect();
+
+    if (!rect || rect.width <= 0) {
+      return;
+    }
+
+    const x =
+      Math.max(
+        0,
+        Math.min(
+          rect.width,
+          event.clientX - rect.left
+        )
+      );
+
+    const index =
+      Math.min(
+        letters.length - 1,
+        Math.floor(
+          (x / rect.width) * letters.length
+        )
+      );
+
+    if (
+      index !==
+      lastSoundLetterRef.current
+    ) {
+      lastSoundLetterRef.current = index;
+
+      const letter =
+        letters[index];
+
+      if (letter) {
+        playAudio(
+          `/audio/reading/${letter.toLowerCase()}.mp3`,
+          letter,
+          0.68
+        );
+      }
+    }
   }
 
   function handlePointerUp(
@@ -1041,11 +1116,16 @@ function ReadingGame() {
           index,
         ]
       );
-    }
 
-    playLetter(
-      letters[index]
-    );
+      // Bunyi fonik setiap huruf bila ditekan.
+      if (soundEnabled && letters[index]) {
+        playAudio(
+          `/audio/reading/${letters[index].toLowerCase()}.mp3`,
+          letters[index],
+          0.68
+        );
+      }
+    }
 
     const count =
       alreadyActive
@@ -1130,6 +1210,8 @@ function ReadingGame() {
 
     setDragging(false);
 
+    lastSoundLetterRef.current = -1;
+
     setTappedLetters([]);
 
     setCompleted(false);
@@ -1139,9 +1221,6 @@ function ReadingGame() {
     setMessage(
       "Mari baca bersama!"
     );
-
-    lastSoundIndexRef.current =
-      -1;
   }
 
   function resetActivity() {
@@ -1329,10 +1408,20 @@ function ReadingGame() {
               <button
                 type="button"
                 onClick={toggleSound}
+                title={
+                  soundEnabled
+                    ? "Bunyi dihidupkan — tekan untuk mute"
+                    : "Bunyi dimatikan — tekan untuk hidupkan"
+                }
+                aria-label={
+                  soundEnabled
+                    ? "Mute bunyi"
+                    : "Hidupkan bunyi"
+                }
                 className={`grid h-11 w-11 place-items-center rounded-full border shadow-sm transition ${
                   soundEnabled
-                    ? "border-violet-100 bg-violet-50 text-violet-600"
-                    : "border-slate-200 bg-slate-100 text-slate-400"
+                    ? "border-violet-100 bg-violet-50 text-violet-600 hover:-translate-y-0.5 hover:shadow-md"
+                    : "border-slate-200 bg-slate-100 text-slate-400 hover:bg-slate-200"
                 }`}
               >
                 {soundEnabled ? (
@@ -1519,8 +1608,11 @@ function ReadingGame() {
                     "q",
                     "y",
                   ].includes(lower);
+                  const isJ = lower === "j";
 
                   const isWide = ["m", "w"].includes(lower);
+                  const isTall = ["b", "d", "f", "h", "k", "l", "t"].includes(lower);
+                  const isVeryWide = isWide || ["q", "o"].includes(lower);
 
                   const maxCircleSize =
                     letters.length <= 2
@@ -1552,26 +1644,26 @@ function ReadingGame() {
 
                   const fluidFontSize =
                     letters.length <= 2
-                      ? "10vw"
+                      ? isVeryWide ? "8vw" : "10vw"
                       : letters.length === 3
-                        ? "8.5vw"
+                        ? isVeryWide ? "6.8vw" : "8.5vw"
                         : letters.length === 4
-                          ? "7.2vw"
+                          ? isVeryWide ? "5.8vw" : "7.2vw"
                           : letters.length <= 6
-                            ? "5.8vw"
+                            ? isVeryWide ? "4.6vw" : "5.8vw"
                             : letters.length <= 8
-                              ? "4.7vw"
+                              ? "3.9vw"
                               : "3.7vw";
 
                   const maxFontSize =
                     letters.length <= 2
-                      ? 108
+                      ? isVeryWide ? 88 : 108
                       : letters.length === 3
-                        ? 92
+                        ? isVeryWide ? 76 : 92
                         : letters.length === 4
-                          ? 78
+                          ? isVeryWide ? 66 : 78
                           : letters.length <= 6
-                            ? 62
+                            ? isVeryWide ? 54 : 62
                             : letters.length <= 8
                               ? 48
                               : 40;
@@ -1589,16 +1681,18 @@ function ReadingGame() {
                           : "cursor-default"
                       }`}
                     >
-                      {/* BULATAN HURUF */}
+                      {/* KOTAK HURUF — rounded supaya huruf descender seperti j/g/q ada ruang */}
                       <div
-                        className={`ocean-letter-float relative flex aspect-square w-full shrink-0 items-center justify-center rounded-full border-[3px] bg-white/95 transition-all duration-300 ${
+                        className={`ocean-letter-float relative flex w-full shrink-0 items-center justify-center overflow-visible rounded-[16px] border-[3px] bg-white/95 transition-all duration-300 ${
                           isCurrent
                             ? "-translate-y-1 scale-[1.025]"
                             : "translate-y-0 scale-100"
                         }`}
                         style={{
+                          width: `min(100%, ${maxCircleSize}px)`,
+                          height: `${maxCircleSize}px`,
                           maxWidth: `${maxCircleSize}px`,
-                          maxHeight: `${maxCircleSize}px`,
+                          minHeight: `${maxCircleSize}px`,
                           borderColor: active
                             ? colour
                             : "#C7E1EE",
@@ -1614,19 +1708,26 @@ function ReadingGame() {
                       >
                         {/* HURUF — auto fit, termasuk g/j/p/q/y */}
                         <span
-                          className="flex h-full w-full select-none items-center justify-center overflow-visible text-center font-black lowercase transition-all duration-300"
+                          className="block w-full select-none overflow-visible text-center font-black lowercase transition-all duration-300"
                           style={{
                             fontFamily:
-                              '"Century Gothic", "Futura", "Avenir Next", Arial, sans-serif',
+                              '"Comic Sans MS", "Arial Rounded MT Bold", "Century Gothic", "Futura", "Avenir Next", Arial, sans-serif',
                             fontSize: `clamp(${minFontSize}px, ${fluidFontSize}, ${maxFontSize}px)`,
-                            lineHeight: isDescender ? 1.28 : 1.08,
-                            transform: isDescender
+                            lineHeight: isJ ? 0.98 : isDescender ? 1 : 0.98,
+                            letterSpacing: isVeryWide
+                              ? "-0.055em"
+                              : isWide
+                                ? "-0.04em"
+                                : "-0.015em",
+                            transform: isJ
                               ? "translateY(-2%)"
-                              : "translateY(0)",
-                            paddingTop: isDescender ? "3%" : "0",
-                            paddingBottom: isDescender ? "9%" : "0",
-                            paddingLeft: isWide ? "3%" : "0",
-                            paddingRight: isWide ? "3%" : "0",
+                              : isDescender
+                                ? "translateY(-1%)"
+                                : "translateY(0)",
+                            paddingTop: isTall ? "1%" : "0",
+                            paddingBottom: isDescender ? "2%" : "0",
+                            paddingLeft: isVeryWide ? "2%" : "0",
+                            paddingRight: isVeryWide ? "2%" : "0",
                             color: active
                               ? colour
                               : "#AEB6C5",
@@ -1795,6 +1896,8 @@ function ReadingGame() {
                         ? "pink"
                         : "teal"
                   }
+                  onClick={() => playSyllable(syllable)}
+                  showAudio
                 />
               ))
                 : null}

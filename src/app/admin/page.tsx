@@ -25,6 +25,7 @@ import {
   Star,
   UploadCloud,
   Users,
+  UserPlus,
   XCircle,
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
@@ -569,6 +570,14 @@ function AdminContent({ adminEmail }: { adminEmail: string }) {
               </button>
 
               <Link
+                href="/admin/teachers"
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:opacity-90"
+              >
+                <UserPlus size={15} />
+                Teacher Management
+              </Link>
+
+              <Link
                 href="/admin/flashcard-modules/progress"
                 className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-slate-800"
               >
@@ -767,6 +776,7 @@ function AdminSidebar({ adminEmail }: { adminEmail: string }) {
       <nav className="mt-8 space-y-1.5">
         <SidebarLink href="/dashboard" icon={Home} label="Dashboard" />
         <SidebarLink href="/admin" icon={Users} label="Parents" active />
+        <SidebarLink href="/admin/teachers" icon={UserPlus} label="Teacher Management" />
         <SidebarLink href="/admin/flashcard-modules/progress" icon={BookOpenCheck} label="Reading Progress" />
         <SidebarLink href="/children" icon={Users} label="Children" />
 
