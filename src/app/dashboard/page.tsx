@@ -1308,14 +1308,14 @@ function ParentDashboard({ userId }: { userId: string }) {
         let progressRows: LearningHubItemProgressRow[] = [];
 
         if (weekItems.length > 0) {
-        const { data: progressData, error: progressError } = await supabase
-  .from("learning_hub_item_progress")
-  .select("item_id,completed,downloaded")
-  .eq("parent_id", userId)
-  .in(
-    "item_id",
-    weekItems.map((item) => item.id)
-  );
+          const { data: progressData, error: progressError } = await supabase
+            .from("learning_hub_week_item_progress")
+            .select("item_id,completed,downloaded")
+            .eq("user_id", userId)
+            .in(
+              "item_id",
+              weekItems.map((item) => item.id)
+            );
 
           if (progressError) {
             throw progressError;
@@ -1334,17 +1334,11 @@ function ParentDashboard({ userId }: { userId: string }) {
         if (!cancelled) {
           setLearningHubDashboardProgress(built);
         }
-      } catch (progressError: unknown) {
-  console.error(
-    "Learning Hub dashboard progress error:",
-    progressError instanceof Error
-      ? progressError.message
-      : progressError
-  );
-
-  if (!cancelled) {
-    setLearningHubDashboardProgress(null);
-  }
+      } catch (progressError) {
+        console.error("Learning Hub dashboard progress error:", progressError);
+        if (!cancelled) {
+          setLearningHubDashboardProgress(null);
+        }
       } finally {
         if (!cancelled) {
           setLearningHubProgressLoading(false);
@@ -1690,6 +1684,17 @@ function ParentDashboard({ userId }: { userId: string }) {
           80% { transform: scale(0.98) translateY(0); }
         }
 
+        .fd-avatar-idle,
+        .fd-avatar-jump,
+        .fd-avatar-dance,
+        .fd-avatar-wave,
+        .fd-avatar-clap {
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
+        }
+
         .fd-avatar-idle { animation: fdAvatarIdle 2.8s ease-in-out infinite; }
         .fd-avatar-jump { animation: fdAvatarJump .95s ease-in-out both; }
         .fd-avatar-dance { animation: fdAvatarDance 1.7s ease-in-out both; }
@@ -1875,9 +1880,9 @@ function ParentDashboard({ userId }: { userId: string }) {
         </aside>
 
         {/* MAIN GAME DASHBOARD */}
-        <div className="min-w-0 bg-gradient-to-b from-[#f7f3ff] via-[#f9f7ff] to-[#eeeaff] xl:overflow-y-auto">
+        <div className="relative z-0 min-w-0 bg-gradient-to-b from-[#f7f3ff] via-[#f9f7ff] to-[#eeeaff] xl:overflow-y-auto">
           {/* TOP BAR */}
-          <header className="sticky top-0 z-40 border-b border-indigo-100/80 bg-[#f9f7ff]/90 px-3 py-3 backdrop-blur-xl sm:px-5 lg:px-6">
+          <header className="sticky top-0 z-40 border-b border-indigo-100/80 bg-[#f9f7ff] px-3 py-3 sm:px-5 lg:px-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white shadow-md xl:hidden">
@@ -1936,7 +1941,7 @@ function ParentDashboard({ userId }: { userId: string }) {
             <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="min-w-0 space-y-4">
                 {/* HOME HERO - SELECTED CHILD */}
-                <section className="relative isolate overflow-hidden rounded-[32px] border border-white/80 bg-gradient-to-br from-[#f8dfd4] via-[#e6dcfb] to-[#b9b8f4] p-5 shadow-[0_24px_80px_rgba(66,53,140,0.20)] sm:p-7 lg:p-8">
+                <section className="relative isolate z-0 overflow-hidden rounded-[32px] border border-white/80 bg-gradient-to-br from-[#f8dfd4] via-[#e6dcfb] to-[#b9b8f4] p-5 shadow-[0_24px_80px_rgba(66,53,140,0.20)] sm:p-7 lg:p-8">
                   <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/35 blur-3xl" />
                   <div className="absolute -bottom-24 left-[12%] h-64 w-64 rounded-full bg-violet-300/25 blur-3xl" />
                   <div className="absolute right-[35%] top-10 text-3xl opacity-70">⭐</div>
@@ -2066,10 +2071,13 @@ function ParentDashboard({ userId }: { userId: string }) {
                           <img
                             src={gameAvatarIdleImage}
                             alt={primaryChildName}
-                            className={`max-h-[245px] max-w-[82%] select-none object-contain drop-shadow-[0_22px_24px_rgba(43,40,92,0.24)] ${
+                            className={`block max-h-[245px] max-w-[82%] select-none object-contain ${
                               avatarAction === "idle" ? "fd-avatar-idle" : ""
                             } ${avatarAction !== "idle" ? `fd-avatar-${avatarAction}` : ""}`}
                             draggable={false}
+                            onError={(event) => {
+                              event.currentTarget.style.display = "none";
+                            }}
                           />
                         ) : parentAvatarUrl ? (
                           <div className="relative mb-3 grid h-40 w-40 place-items-center overflow-hidden rounded-full border-8 border-white/80 bg-gradient-to-br from-violet-200 to-indigo-300 shadow-[0_18px_45px_rgba(65,54,131,0.20)]">

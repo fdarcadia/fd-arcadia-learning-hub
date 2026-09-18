@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: "FD Arcadia Learning Hub",
   description:
     "A premium learning hub with worksheets, rewards, tuition resources, and parent progress tracking for young learners.",
+  icons: {
+    icon: "/fd-arcadia-icon.png",
+    apple: "/fd-arcadia-icon.png",
+  },
 };
 
 export default function RootLayout({
