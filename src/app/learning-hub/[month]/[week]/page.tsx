@@ -48,6 +48,14 @@ type WeekAtGlanceItem = {
   display_order: number | null;
   is_completed: boolean | null;
   is_active: boolean | null;
+  visibility?: "shared" | "parent" | null;
+};
+
+type LearningHubItemProgress = {
+  item_id: string;
+  downloaded: boolean | null;
+  completed: boolean | null;
+  completed_at: string | null;
 };
 
 type DayConfig = {
@@ -274,7 +282,7 @@ function getButtonMeta(type: string | null | undefined): ButtonMeta {
     return {
       icon: PlayCircle,
       label: "Play",
-      className: "bg-indigo-600 text-white hover:bg-indigo-700",
+      className: "bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-200 hover:bg-indigo-100",
     };
   }
 
@@ -311,36 +319,124 @@ export default function WeekPage() {
 
 function WeekAtGlanceContent() {
   const params = useParams();
-
   const monthNo = getRouteNumber(params.month as string, "month-");
   const weekNo = getRouteNumber(params.week as string, "week-");
   const monthParam = `month-${monthNo || 1}`;
 
   const [items, setItems] = useState<WeekAtGlanceItem[]>([]);
+  const [progressMap, setProgressMap] = useState<Record<string, LearningHubItemProgress>>({});
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [progressLoading, setProgressLoading] = useState(true);
+  const [savingItemId, setSavingItemId] = useState<string | null>(null);
   const [showDemoIfEmpty, setShowDemoIfEmpty] = useState(true);
+  const [progressError, setProgressError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadItems() {
       setLoading(true);
 
-      const { data, error } = await supabase
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setItems([]);
+        setLoading(false);
+        return;
+      }
+
+      // Shared content is visible to everyone who can access this week.
+      const {
+        data: sharedData,
+        error: sharedError,
+      } = await supabase
         .from("learning_hub_week_items")
         .select("*")
         .eq("month_no", monthNo)
         .eq("week_no", weekNo)
         .eq("is_active", true)
+        .eq("visibility", "shared")
         .order("day", { ascending: true })
         .order("column_no", { ascending: true })
         .order("display_order", { ascending: true });
 
-      if (error) {
-        console.log(error);
+      if (sharedError) {
+        console.error("Learning Hub shared items error:", sharedError);
+        setItems([]);
         setLoading(false);
         return;
       }
 
-      setItems((data || []) as WeekAtGlanceItem[]);
+      // Personalised items are only returned when explicitly assigned
+      // to the currently logged-in parent.
+      const {
+        data: assignmentData,
+        error: assignmentError,
+      } = await supabase
+        .from("learning_hub_item_assignments")
+        .select("item_id")
+        .eq("parent_id", user.id);
+
+      if (assignmentError) {
+        console.error(
+          "Learning Hub personalised assignment error:",
+          assignmentError,
+        );
+        setItems((sharedData || []) as WeekAtGlanceItem[]);
+        setLoading(false);
+        return;
+      }
+
+      const assignedItemIds = (assignmentData || [])
+        .map((row) => row.item_id)
+        .filter(Boolean);
+
+      let personalisedItems: WeekAtGlanceItem[] = [];
+
+      if (assignedItemIds.length > 0) {
+        const {
+          data: personalisedData,
+          error: personalisedError,
+        } = await supabase
+          .from("learning_hub_week_items")
+          .select("*")
+          .in("id", assignedItemIds)
+          .eq("month_no", monthNo)
+          .eq("week_no", weekNo)
+          .eq("is_active", true)
+          .eq("visibility", "parent");
+
+        if (personalisedError) {
+          console.error(
+            "Learning Hub personalised items error:",
+            personalisedError,
+          );
+        } else {
+          personalisedItems = (personalisedData || []) as WeekAtGlanceItem[];
+        }
+      }
+
+      const merged = [...(sharedData || []), ...personalisedItems];
+
+      const uniqueItems = Array.from(
+        new Map(merged.map((item) => [item.id, item])).values(),
+      ).sort((a, b) => {
+        const dayCompare = a.day.localeCompare(b.day);
+        if (dayCompare !== 0) return dayCompare;
+
+        const columnA = a.column_no ?? 999;
+        const columnB = b.column_no ?? 999;
+        if (columnA !== columnB) return columnA - columnB;
+
+        return (a.display_order ?? 0) - (b.display_order ?? 0);
+      });
+
+      if (cancelled) return;
+
+      setItems(uniqueItems);
       setLoading(false);
     }
 
@@ -349,9 +445,74 @@ function WeekAtGlanceContent() {
     } else {
       setLoading(false);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [monthNo, weekNo]);
 
-  const displayItems = items.length > 0 ? items : showDemoIfEmpty ? fallbackItems : [];
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProgress() {
+      setProgressLoading(true);
+      setProgressError("");
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (cancelled) return;
+
+      if (!user) {
+        setUserId(null);
+        setProgressMap({});
+        setProgressLoading(false);
+        return;
+      }
+
+      setUserId(user.id);
+
+      if (items.length === 0) {
+        setProgressMap({});
+        setProgressLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("learning_hub_item_progress")
+        .select("item_id,downloaded,completed,completed_at")
+        .eq("parent_id", user.id)
+        .in("item_id", items.map((item) => item.id));
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Learning Hub item progress error:", error);
+        setProgressMap({});
+        setProgressError(error.message);
+        setProgressLoading(false);
+        return;
+      }
+
+      const nextMap: Record<string, LearningHubItemProgress> = {};
+      ((data || []) as LearningHubItemProgress[]).forEach((row) => {
+        nextMap[row.item_id] = row;
+      });
+
+      setProgressMap(nextMap);
+      setProgressLoading(false);
+    }
+
+    loadProgress();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
+
+  const displayItems =
+    items.length > 0 ? items : showDemoIfEmpty ? fallbackItems : [];
 
   const itemsByCell = useMemo(() => {
     const map = new Map<string, WeekAtGlanceItem[]>();
@@ -360,7 +521,6 @@ function WeekAtGlanceContent() {
       const day = normalizeDay(item.day);
       const subject = normalizeSubject(item.subject);
       const key = `${day}__${subject}`;
-
       const current = map.get(key) || [];
       current.push(item);
       map.set(key, current);
@@ -369,22 +529,102 @@ function WeekAtGlanceContent() {
     return map;
   }, [displayItems]);
 
+  const completedCount = items.filter(
+    (item) => progressMap[item.id]?.completed === true
+  ).length;
+
+  const downloadedCount = items.filter(
+    (item) => progressMap[item.id]?.downloaded === true
+  ).length;
+
   const readyItems = displayItems.filter((item) => Boolean(item.link_url)).length;
-  const progress = displayItems.length ? Math.round((readyItems / displayItems.length) * 100) : 0;
+
+  // Only "Mark as Done" contributes to learning progress.
+  const progress = items.length
+    ? Math.round((completedCount / items.length) * 100)
+    : 0;
+
+  async function saveItemProgress(
+    itemId: string,
+    patch: Partial<LearningHubItemProgress>
+  ) {
+    if (!userId || !items.some((item) => item.id === itemId)) return false;
+
+    setSavingItemId(itemId);
+    setProgressError("");
+
+    const current = progressMap[itemId];
+
+    const payload = {
+      parent_id: userId,
+      item_id: itemId,
+      downloaded: Boolean(current?.downloaded) || Boolean(patch.downloaded),
+      completed: Boolean(current?.completed) || Boolean(patch.completed),
+      completed_at:
+        patch.completed === true
+          ? new Date().toISOString()
+          : current?.completed_at ?? null,
+    };
+
+    const { data, error } = await supabase
+      .from("learning_hub_item_progress")
+      .upsert(payload, { onConflict: "parent_id,item_id" })
+      .select("item_id,downloaded,completed,completed_at")
+      .single();
+
+    setSavingItemId(null);
+
+    if (error) {
+      console.error("Unable to save Learning Hub progress:", error);
+      setProgressError(error.message);
+      return false;
+    }
+
+    setProgressMap((currentMap) => ({
+      ...currentMap,
+      [itemId]: data as LearningHubItemProgress,
+    }));
+
+    return true;
+  }
+
+  async function handleResourceClick(item: WeekAtGlanceItem) {
+    if (!item.link_url || item.id.startsWith("fallback-")) return;
+    await saveItemProgress(item.id, { downloaded: true });
+  }
+
+  async function handleMarkDone(item: WeekAtGlanceItem) {
+    if (item.id.startsWith("fallback-")) return;
+    await saveItemProgress(item.id, { completed: true });
+  }
 
   return (
-    <main className="min-h-screen bg-[#f7f8fc] text-slate-950">
-      <div className="grid min-h-screen xl:grid-cols-[250px_minmax(0,1fr)]">
-        <ParentSidebar monthNo={monthNo} weekNo={weekNo} monthParam={monthParam} progress={items.length ? progress : 75} />
+    <main className="min-h-screen bg-[#f8f9fd] text-slate-900">
+      <section className="mx-auto w-full max-w-[1500px] min-w-0 px-3 py-4 sm:px-5 sm:py-6 lg:px-8 xl:px-10">
+          <TopHeader
+            monthNo={monthNo}
+            weekNo={weekNo}
+            monthParam={monthParam}
+          />
 
-        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
-          <TopHeader monthNo={monthNo} weekNo={weekNo} monthParam={monthParam} />
-
-          <section className="mb-5 grid gap-3 sm:grid-cols-3">
-            <SmallStat label="Activities" value={String(displayItems.length)} />
-            <SmallStat label="Ready Links" value={String(readyItems)} />
-            <SmallStat label={items.length ? "Progress" : "Demo Preview"} value={items.length ? `${progress}%` : "ON"} />
+          <section className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <SmallStat label="Activities" value={String(displayItems.length)} icon={<FileText size={22} />} />
+            <SmallStat label="Completed" value={items.length ? String(completedCount) : "—"} icon={<CheckCircle2 size={23} />} />
+            <SmallStat label="Progress" value={items.length ? `${progress}%` : "0%"} icon={<Trophy size={22} />} />
+            <div className="flex min-h-[82px] items-center gap-3 rounded-[1.25rem] border border-indigo-100 bg-white px-4 py-3 shadow-sm sm:px-5">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-2xl">🌱</div>
+              <div className="min-w-0">
+                <p className="text-sm font-black text-slate-900">Keep going!</p>
+                <p className="mt-0.5 text-xs leading-5 text-slate-500">Small steps make big progress.</p>
+              </div>
+            </div>
           </section>
+
+          {progressError ? (
+            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              Progress could not be saved or loaded. Please refresh and try again.
+            </div>
+          ) : null}
 
           {loading ? (
             <LoadingState />
@@ -393,25 +633,32 @@ function WeekAtGlanceContent() {
           ) : (
             <>
               {items.length === 0 ? (
-                <div className="mb-5 flex flex-col gap-3 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900 sm:flex-row sm:items-center sm:justify-between">
-                  Demo preview is showing because admin has not uploaded Week At A Glance items yet.
+                <div className="mb-4 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm font-bold text-yellow-900">
+                  Demo preview is showing because admin has not uploaded Week At
+                  A Glance items yet.
                   <button
                     type="button"
                     onClick={() => setShowDemoIfEmpty(false)}
-                    className="rounded-xl bg-white px-3 py-2 text-[10px] font-black text-amber-800 shadow-sm"
+                    className="ml-2 mt-2 rounded-xl bg-white px-3 py-2 font-black text-yellow-900 sm:mt-0"
                   >
                     Hide demo
                   </button>
                 </div>
               ) : null}
 
-              <WeekGrid itemsByCell={itemsByCell} />
+              <WeekGrid
+                itemsByCell={itemsByCell}
+                progressMap={progressMap}
+                savingItemId={savingItemId}
+                onResourceClick={handleResourceClick}
+                onMarkDone={handleMarkDone}
+                progressLoading={progressLoading}
+              />
             </>
           )}
 
           <BottomGuide />
-        </section>
-      </div>
+      </section>
     </main>
   );
 }
@@ -428,19 +675,14 @@ function ParentSidebar({
   progress: number;
 }) {
   return (
-    <aside className="hidden border-r border-indigo-950/10 bg-[#111735] px-4 py-6 text-white xl:flex xl:flex-col">
-      <Link href="/dashboard" className="flex items-center gap-3 px-2">
-        <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-indigo-950/30">
-          <Sparkles size={26} />
+    <aside className="hidden border-r border-indigo-100 bg-white p-5 xl:block">
+      <Link href="/dashboard" className="flex items-center gap-3">
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-indigo-600 text-yellow-200 shadow-lg">
+          <Sparkles size={24} />
         </div>
-
         <div>
-          <p className="text-sm font-black tracking-[0.08em] text-white">
-            FD ARCADIA
-          </p>
-          <p className="text-[9px] font-black tracking-[0.2em] text-violet-300">
-            LEARNING HUB
-          </p>
+          <p className="text-lg font-black tracking-[0.16em] text-slate-900">FD ARCADIA</p>
+          <p className="text-xs font-black tracking-[0.22em] text-indigo-600">LEARNING HUB</p>
         </div>
       </Link>
 
@@ -453,19 +695,19 @@ function ParentSidebar({
             <Link
               key={item.title}
               href={item.href}
-              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-black transition ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-black transition ${
                 active
-                  ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-950/20"
-                  : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
+                  ? "bg-indigo-50 text-indigo-700"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-indigo-700"
               }`}
             >
-              <Icon size={22} />
+              <Icon size={19} />
               {item.title}
             </Link>
           );
         })}
 
-        <p className="mb-2 mt-7 px-3 text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+        <p className="mb-1 mt-5 text-[10px] font-black tracking-[0.2em] text-slate-400">
           MONTH {monthNo || "-"}
         </p>
 
@@ -473,53 +715,53 @@ function ParentSidebar({
           <Link
             key={week}
             href={`/learning-hub/${monthParam}/week-${week}`}
-            className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-bold transition ${
+            className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-black transition ${
               week === weekNo
-                ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-950/20"
-                : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
+                ? "bg-indigo-50 text-indigo-700"
+                : "text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
             }`}
           >
             <span>Week {week}</span>
             {week === weekNo ? (
-              <span className="h-2.5 w-2.5 rounded-full bg-violet-400" />
+              <span className="h-2.5 w-2.5 rounded-full bg-indigo-600" />
             ) : week < weekNo ? (
-              <CheckCircle2 size={18} className="text-emerald-400" />
+              <CheckCircle2 size={17} className="text-emerald-600" />
             ) : (
-              <Clock3 size={18} className="text-slate-500" />
+              <Clock3 size={17} className="text-yellow-600" />
             )}
           </Link>
         ))}
       </nav>
 
-      <div className="mt-auto rounded-[18px] border border-white/10 bg-white/[0.05] p-4 text-white">
-        <Star className="text-yellow-300" size={17} />
-        <p className="mt-3 text-xs font-black">Learning Journey</p>
+      <div className="mt-7 rounded-[1.5rem] bg-gradient-to-br from-indigo-600 to-violet-700 p-5 text-white shadow-lg">
+        <Star className="text-yellow-200" size={25} />
+        <p className="mt-3 text-sm font-black">Learning Journey</p>
         <h3 className="mt-1 text-lg font-black">Keep going!</h3>
-        <p className="mt-1 text-[10px] leading-5 text-slate-400">
-          Week {weekNo || "-"} is {progress}% ready.
+        <p className="mt-1 text-xs text-indigo-100">
+          Week {weekNo || "-"} is {progress}% complete.
         </p>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white/20">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-violet-400 to-indigo-300"
+            className="h-full rounded-full bg-yellow-200 transition-all"
             style={{ width: `${progress}%` }}
           />
         </div>
         <Link
           href={`/learning-hub/${monthParam}`}
-          className="mt-3 inline-flex items-center text-[10px] font-black text-violet-300 transition hover:text-white"
+          className="mt-4 inline-flex rounded-lg bg-white px-4 py-2.5 text-sm font-black text-indigo-700"
         >
           Back Month
         </Link>
       </div>
 
-      <div className="mt-4 rounded-[18px] border border-white/10 bg-white/[0.04] p-4">
-        <h3 className="text-xs font-black text-white">Need Help?</h3>
-        <p className="mt-1 text-[10px] leading-5 text-slate-400">
+      <div className="mt-5 rounded-[1.5rem] bg-yellow-50 p-5 shadow-sm">
+        <h3 className="text-sm font-black text-slate-900">Need Help?</h3>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
           Contact FD Arcadia admin if any file link cannot open.
         </p>
         <Link
           href="/pricing"
-          className="mt-3 inline-flex text-[10px] font-black text-violet-300 transition hover:text-white"
+          className="mt-3 inline-flex rounded-lg bg-white px-4 py-2.5 text-sm font-black text-indigo-700"
         >
           Contact Us
         </Link>
@@ -538,53 +780,49 @@ function TopHeader({
   monthParam: string;
 }) {
   return (
-    <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-      <div>
+    <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0">
         <Link
           href={`/learning-hub/${monthParam}`}
-          className="inline-flex items-center gap-2 text-xs font-black text-indigo-600 transition hover:text-indigo-700"
+          className="inline-flex items-center gap-2 text-sm font-bold text-indigo-600 transition hover:text-indigo-800 sm:text-base"
         >
-          <ArrowLeft size={14} />
+          <ArrowLeft size={18} />
           Back to Month {monthNo || "-"}
         </Link>
 
-        <p className="mt-3 text-[9px] font-black uppercase tracking-[0.2em] text-indigo-500">
-          FD Arcadia Learning Hub
+        <p className="mt-4 text-[11px] font-black tracking-[0.16em] text-indigo-500 sm:text-xs">
+          FD ARCADIA LEARNING HUB
         </p>
-
-        <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+        <h1 className="mt-1 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
           Week {weekNo || "-"} at a Glance
         </h1>
-
-        <p className="mt-1 text-sm font-semibold text-slate-400">
+        <p className="mt-1 text-sm text-slate-500 sm:text-base">
           Month {monthNo || "-"} • Daily activities, files and learning resources.
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
-            Week Of
-          </p>
-          <div className="mt-1 flex items-center gap-2 text-xs font-black text-slate-700">
-            <CalendarDays size={14} className="text-indigo-500" />
+      <div className="flex flex-wrap items-center gap-2 lg:pt-8">
+        <div className="rounded-2xl border border-indigo-100 bg-white px-4 py-3 shadow-sm">
+          <p className="text-[9px] font-black tracking-[0.16em] text-indigo-400">WEEK OF</p>
+          <div className="mt-1 flex items-center gap-2 text-sm font-black text-slate-800">
+            <CalendarDays size={16} className="text-indigo-500" />
             Set in Admin
           </div>
         </div>
 
         <Link
           href={`/learning-hub/${monthParam}`}
-          className="inline-flex h-11 items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-4 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
+          className="inline-flex min-h-14 items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 text-sm font-black text-indigo-600 shadow-sm transition hover:bg-indigo-100"
         >
-          <LayoutList size={15} />
+          <LayoutList size={18} />
           Month View
         </Link>
 
         <Link
           href="/dashboard"
-          className="inline-flex h-11 items-center gap-2 rounded-xl bg-slate-950 px-4 text-xs font-black text-white transition hover:bg-slate-800"
+          className="inline-flex min-h-14 items-center gap-2 rounded-2xl bg-slate-950 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
         >
-          <Home size={15} />
+          <Home size={18} />
           Dashboard
         </Link>
       </div>
@@ -594,86 +832,278 @@ function TopHeader({
 
 function WeekGrid({
   itemsByCell,
+  progressMap,
+  savingItemId,
+  onResourceClick,
+  onMarkDone,
+  progressLoading,
 }: {
   itemsByCell: Map<string, WeekAtGlanceItem[]>;
+  progressMap: Record<string, LearningHubItemProgress>;
+  savingItemId: string | null;
+  onResourceClick: (item: WeekAtGlanceItem) => void;
+  onMarkDone: (item: WeekAtGlanceItem) => void;
+  progressLoading: boolean;
+}) {
+  const cardProps = {
+    progressMap,
+    savingItemId,
+    onResourceClick,
+    onMarkDone,
+    progressLoading,
+  };
+
+  return (
+    <>
+      {/* Desktop / large laptop: compact timetable. */}
+      <section className="hidden xl:block">
+        <div className="overflow-x-auto rounded-[1.5rem] border border-indigo-100 bg-white p-2 shadow-sm">
+          <div className="min-w-[1080px]">
+            <div className="grid grid-cols-[58px_repeat(5,minmax(145px,1fr))_52px_minmax(220px,1.3fr)] gap-1.5">
+              <div />
+              {subjectConfigs.slice(0, 5).map((subject) => (
+                <SubjectHeader key={subject.key} subject={subject} />
+              ))}
+              <div className="grid min-h-20 place-items-center rounded-xl bg-yellow-100 px-1 text-center font-black text-slate-900">
+                <span className="[writing-mode:vertical-rl] rotate-180 text-[10px]">
+                  LUNCH & REST
+                </span>
+              </div>
+              <SubjectHeader subject={subjectConfigs[5]} />
+            </div>
+
+            <div className="mt-1.5 space-y-1.5">
+              {dayConfigs.map((day) => (
+                <DesktopRowForDay
+                  key={day.key}
+                  day={day}
+                  itemsByCell={itemsByCell}
+                  {...cardProps}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Tablet / iPad: two-column cards, no forced horizontal timetable. */}
+      <section className="hidden md:block xl:hidden">
+        <div className="space-y-4">
+          {dayConfigs.map((day) => (
+            <TabletDaySection
+              key={day.key}
+              day={day}
+              itemsByCell={itemsByCell}
+              {...cardProps}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Phone: one-column, large touch targets. */}
+      <section className="md:hidden">
+        <div className="space-y-4">
+          {dayConfigs.map((day) => (
+            <MobileDaySection
+              key={day.key}
+              day={day}
+              itemsByCell={itemsByCell}
+              {...cardProps}
+            />
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function DesktopRowForDay({
+  day,
+  itemsByCell,
+  progressMap,
+  savingItemId,
+  onResourceClick,
+  onMarkDone,
+  progressLoading,
+}: {
+  day: DayConfig;
+  itemsByCell: Map<string, WeekAtGlanceItem[]>;
+  progressMap: Record<string, LearningHubItemProgress>;
+  savingItemId: string | null;
+  onResourceClick: (item: WeekAtGlanceItem) => void;
+  onMarkDone: (item: WeekAtGlanceItem) => void;
+  progressLoading: boolean;
 }) {
   return (
-    <section className="overflow-x-auto pb-2">
-      <div className="min-w-[1320px] rounded-[22px] border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="grid grid-cols-[80px_130px_180px_180px_180px_180px_70px_340px] gap-2">
-          <div className="rounded-2xl bg-white" />
+    <div className="grid grid-cols-[58px_repeat(5,minmax(145px,1fr))_52px_minmax(220px,1.3fr)] gap-1.5">
+      <div className={`grid min-h-[132px] place-items-center rounded-xl px-2 py-3 text-center font-black ${day.color}`}>
+        <span className="[writing-mode:vertical-rl] rotate-180 text-sm">{day.full}</span>
+      </div>
 
-          {subjectConfigs.slice(0, 5).map((subject) => (
-            <SubjectHeader key={subject.key} subject={subject} />
-          ))}
+      {subjectConfigs.slice(0, 5).map((subject) => (
+        <ActivityCell
+          key={`${day.key}-${subject.key}`}
+          items={itemsByCell.get(`${day.key}__${subject.key}`) || []}
+          subject={subject}
+          day={day}
+          progressMap={progressMap}
+          savingItemId={savingItemId}
+          onResourceClick={onResourceClick}
+          onMarkDone={onMarkDone}
+          progressLoading={progressLoading}
+        />
+      ))}
 
-          <div className="grid place-items-center rounded-[16px] bg-amber-100 px-2 py-4 text-center text-xs font-black tracking-wide text-amber-900 [writing-mode:vertical-rl] rotate-180">
-            LUNCH & REST
-            <span className="mt-2 text-xs font-bold">1:15 - 2:30pm</span>
-          </div>
+      <div className="min-h-[132px] rounded-xl bg-yellow-50" />
 
-          <SubjectHeader subject={subjectConfigs[5]} />
-        </div>
+      <LanguageCell
+        day={day}
+        itemsByCell={itemsByCell}
+        progressMap={progressMap}
+        savingItemId={savingItemId}
+        onResourceClick={onResourceClick}
+        onMarkDone={onMarkDone}
+        progressLoading={progressLoading}
+      />
+    </div>
+  );
+}
 
-        <div className="mt-2 grid grid-cols-[80px_130px_180px_180px_180px_180px_70px_340px] gap-2">
-          {dayConfigs.map((day) => (
-            <RowForDay key={day.key} day={day} itemsByCell={itemsByCell} />
-          ))}
-        </div>
+function TabletDaySection({
+  day,
+  itemsByCell,
+  progressMap,
+  savingItemId,
+  onResourceClick,
+  onMarkDone,
+  progressLoading,
+}: {
+  day: DayConfig;
+  itemsByCell: Map<string, WeekAtGlanceItem[]>;
+  progressMap: Record<string, LearningHubItemProgress>;
+  savingItemId: string | null;
+  onResourceClick: (item: WeekAtGlanceItem) => void;
+  onMarkDone: (item: WeekAtGlanceItem) => void;
+  progressLoading: boolean;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm">
+      <div className={`flex items-center justify-between px-4 py-3 ${day.color}`}>
+        <h2 className="font-black">{day.full}</h2>
+        <span className="text-[10px] font-black uppercase tracking-wider opacity-70">
+          Daily Learning
+        </span>
+      </div>
+
+      <div className="grid gap-3 p-3 sm:grid-cols-2">
+        {subjectConfigs.map((subject) => {
+          const cellItems = itemsByCell.get(`${day.key}__${subject.key}`) || [];
+          if (!cellItems.length) return null;
+
+          return (
+            <div
+              key={subject.key}
+              className={subject.key === "LANGUAGE & LITERACY" ? "sm:col-span-2" : ""}
+            >
+              <SubjectMobileHeading subject={subject} />
+              <div className="space-y-2">
+                {cellItems.map((item) => (
+                  <ActivityCard
+                    key={item.id}
+                    item={item}
+                    progress={progressMap[item.id]}
+                    saving={savingItemId === item.id}
+                    onResourceClick={onResourceClick}
+                    onMarkDone={onMarkDone}
+                    progressLoading={progressLoading}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-function RowForDay({
+function MobileDaySection({
   day,
   itemsByCell,
+  progressMap,
+  savingItemId,
+  onResourceClick,
+  onMarkDone,
+  progressLoading,
 }: {
   day: DayConfig;
   itemsByCell: Map<string, WeekAtGlanceItem[]>;
+  progressMap: Record<string, LearningHubItemProgress>;
+  savingItemId: string | null;
+  onResourceClick: (item: WeekAtGlanceItem) => void;
+  onMarkDone: (item: WeekAtGlanceItem) => void;
+  progressLoading: boolean;
 }) {
   return (
-    <>
-      <div
-        className={`grid min-h-[142px] place-items-center rounded-[16px] px-3 py-4 text-center font-black ${day.color}`}
-      >
-        <span className="[writing-mode:vertical-rl] rotate-180 text-sm tracking-[0.1em]">
-          {day.label}
+    <section className="overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm">
+      <div className={`flex items-center justify-between px-4 py-3 ${day.color}`}>
+        <h2 className="font-black">{day.full}</h2>
+        <span className="rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider">
+          Daily Learning
         </span>
       </div>
 
-      {subjectConfigs.slice(0, 5).map((subject) => {
-        const cellItems = itemsByCell.get(`${day.key}__${subject.key}`) || [];
+      <div className="divide-y divide-indigo-50">
+        {subjectConfigs.map((subject) => {
+          const cellItems = itemsByCell.get(`${day.key}__${subject.key}`) || [];
+          if (!cellItems.length) return null;
 
-        return (
-          <ActivityCell
-            key={`${day.key}-${subject.key}`}
-            items={cellItems}
-            subject={subject}
-            day={day}
-          />
-        );
-      })}
-
-      <div className="min-h-[142px] rounded-[16px] bg-amber-50" />
-
-      <LanguageCell day={day} itemsByCell={itemsByCell} />
-    </>
+          return (
+            <div key={subject.key} className="p-3.5">
+              <SubjectMobileHeading subject={subject} />
+              <div className="mt-2 space-y-3">
+                {cellItems.map((item) => (
+                  <ActivityCard
+                    key={item.id}
+                    item={item}
+                    progress={progressMap[item.id]}
+                    saving={savingItemId === item.id}
+                    onResourceClick={onResourceClick}
+                    onMarkDone={onMarkDone}
+                    progressLoading={progressLoading}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
 function LanguageCell({
   day,
   itemsByCell,
+  progressMap,
+  savingItemId,
+  onResourceClick,
+  onMarkDone,
+  progressLoading,
 }: {
   day: DayConfig;
   itemsByCell: Map<string, WeekAtGlanceItem[]>;
+  progressMap: Record<string, LearningHubItemProgress>;
+  savingItemId: string | null;
+  onResourceClick: (item: WeekAtGlanceItem) => void;
+  onMarkDone: (item: WeekAtGlanceItem) => void;
+  progressLoading: boolean;
 }) {
   const languageItems = itemsByCell.get(`${day.key}__LANGUAGE & LITERACY`) || [];
 
-  if (languageItems.length === 0) {
+  if (!languageItems.length) {
     return (
-      <div className="grid min-h-[150px] grid-cols-2 gap-2">
+      <div className="grid min-h-[132px] grid-cols-2 gap-1.5">
         <EmptyMiniCell label="Language" />
         <EmptyMiniCell label="Literacy" />
       </div>
@@ -681,28 +1111,47 @@ function LanguageCell({
   }
 
   return (
-    <div className="grid min-h-[150px] grid-cols-2 gap-2">
+    <div className="grid min-h-[132px] grid-cols-2 gap-1.5">
       {languageItems.slice(0, 4).map((item) => (
-        <ActivityMiniCard key={item.id} item={item} compact />
+        <ActivityMiniCard
+          key={item.id}
+          item={item}
+          progress={progressMap[item.id]}
+          saving={savingItemId === item.id}
+          onResourceClick={onResourceClick}
+          onMarkDone={onMarkDone}
+          progressLoading={progressLoading}
+          compact
+        />
       ))}
-
-      {languageItems.length === 1 ? <EmptyMiniCell label="Extra Activity" /> : null}
     </div>
   );
 }
 
 function SubjectHeader({ subject }: { subject: SubjectConfig }) {
   return (
-    <div
-      className={`rounded-[16px] border border-slate-200 px-3 py-3 text-center ${subject.headerClass}`}
-    >
+    <div className={`rounded-xl border border-indigo-100 px-2 py-3 text-center shadow-sm ${subject.headerClass}`}>
       <div className="text-2xl">{subject.icon}</div>
-      <h3 className="mt-1 text-sm font-black text-slate-900">
-        {subject.label}
-      </h3>
+      <h3 className="mt-0.5 text-sm font-black text-slate-950">{subject.label}</h3>
       {subject.time ? (
-        <p className="mt-1 text-[9px] font-bold text-slate-400">{subject.time}</p>
+        <p className="mt-0.5 text-[9px] font-bold text-slate-500">{subject.time}</p>
       ) : null}
+    </div>
+  );
+}
+
+function SubjectMobileHeading({ subject }: { subject: SubjectConfig }) {
+  return (
+    <div className="mb-2 flex items-center gap-2">
+      <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-50 text-lg">
+        {subject.icon}
+      </span>
+      <div className="min-w-0">
+        <h3 className="truncate text-sm font-black text-indigo-700">{subject.label}</h3>
+        {subject.time ? (
+          <p className="text-[10px] font-bold text-slate-400">{subject.time}</p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -711,19 +1160,37 @@ function ActivityCell({
   items,
   subject,
   day,
+  progressMap,
+  savingItemId,
+  onResourceClick,
+  onMarkDone,
+  progressLoading,
 }: {
   items: WeekAtGlanceItem[];
   subject: SubjectConfig;
   day: DayConfig;
+  progressMap: Record<string, LearningHubItemProgress>;
+  savingItemId: string | null;
+  onResourceClick: (item: WeekAtGlanceItem) => void;
+  onMarkDone: (item: WeekAtGlanceItem) => void;
+  progressLoading: boolean;
 }) {
-  if (items.length === 0) {
+  if (!items.length) {
     return <EmptyMiniCell label={subject.key === "NOTES" ? "Notes" : "No activity"} />;
   }
 
   return (
-    <div className="grid min-h-[150px] gap-2">
+    <div className="grid min-h-[132px] gap-1.5">
       {items.map((item) => (
-        <ActivityMiniCard key={`${day.key}-${subject.key}-${item.id}`} item={item} />
+        <ActivityMiniCard
+          key={`${day.key}-${subject.key}-${item.id}`}
+          item={item}
+          progress={progressMap[item.id]}
+          saving={savingItemId === item.id}
+          onResourceClick={onResourceClick}
+          onMarkDone={onMarkDone}
+          progressLoading={progressLoading}
+        />
       ))}
     </div>
   );
@@ -731,100 +1198,243 @@ function ActivityCell({
 
 function EmptyMiniCell({ label }: { label: string }) {
   return (
-    <div className="grid min-h-[142px] place-items-center rounded-[16px] border border-dashed border-slate-200 bg-slate-50 p-3">
+    <div className="grid min-h-[132px] place-items-center rounded-xl border border-dashed border-indigo-100 bg-slate-50 p-2">
       <div className="text-center">
-        <p className="text-xs font-bold text-slate-300">{label}</p>
-        <div className="mx-auto mt-3 grid h-8 w-8 place-items-center rounded-full border border-slate-200 bg-white text-slate-300">
-          <Plus size={16} />
+        <p className="text-[10px] font-bold text-slate-300">{label}</p>
+        <div className="mx-auto mt-2 grid h-7 w-7 place-items-center rounded-full border border-indigo-100 bg-white text-indigo-400">
+          <Plus size={14} />
         </div>
       </div>
     </div>
   );
 }
 
+function ActivityCard({
+  item,
+  progress,
+  saving,
+  onResourceClick,
+  onMarkDone,
+  progressLoading,
+}: {
+  item: WeekAtGlanceItem;
+  progress?: LearningHubItemProgress;
+  saving: boolean;
+  onResourceClick: (item: WeekAtGlanceItem) => void;
+  onMarkDone: (item: WeekAtGlanceItem) => void;
+  progressLoading: boolean;
+}) {
+  const button = getButtonMeta(item.button_type);
+  const ButtonIcon = button.icon;
+  const completed = progress?.completed === true;
+  const downloaded = progress?.downloaded === true;
+  const hasLink = Boolean(item.link_url);
+  const isDemo = item.id.startsWith("fallback-");
+
+  return (
+    <article
+      className={`rounded-2xl border p-3.5 shadow-sm ${
+        completed ? "border-emerald-200 bg-emerald-50/40" : "border-indigo-100 bg-white"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="shrink-0">
+          {item.thumbnail_url ? (
+            item.thumbnail_url.length <= 4 ? (
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-indigo-50 text-2xl">
+                {item.thumbnail_url}
+              </div>
+            ) : (
+              <img src={item.thumbnail_url} alt="" className="h-12 w-14 rounded-xl object-cover" />
+            )
+          ) : (
+            <div className="grid h-12 w-12 place-items-center rounded-xl bg-indigo-50 text-2xl">
+              {getSubjectEmoji(item.subject)}
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="line-clamp-2 text-sm font-black leading-5 text-slate-950">
+              {item.title || "Untitled"}
+            </h4>
+            {completed ? (
+              <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-black text-emerald-700">
+                DONE
+              </span>
+            ) : null}
+          </div>
+
+          {item.description ? (
+            <p className="mt-1 line-clamp-2 text-xs leading-4 text-slate-500">{item.description}</p>
+          ) : null}
+
+          <ActivityMeta item={item} />
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {hasLink ? (
+              <a
+                href={item.link_url || "#"}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => onResourceClick(item)}
+                className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-black shadow-sm transition ${button.className}`}
+              >
+                <ButtonIcon size={16} />
+                {item.button_text || button.label}
+              </a>
+            ) : (
+              <div className="flex min-h-11 items-center justify-center rounded-xl bg-slate-100 px-3 text-xs font-black text-slate-400">
+                No link
+              </div>
+            )}
+
+            {!isDemo ? (
+              <button
+                type="button"
+                onClick={() => onMarkDone(item)}
+                disabled={completed || saving || progressLoading}
+                className={`flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-[11px] font-black transition ${
+                  completed
+                    ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50"
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                <CheckCircle2 size={16} />
+                {saving ? "Saving..." : completed ? "Completed" : "Mark as Done"}
+              </button>
+            ) : (
+              <div className="flex min-h-11 items-center justify-center rounded-xl bg-slate-100 px-3 text-xs font-black text-slate-400">
+                Demo
+              </div>
+            )}
+          </div>
+
+          {downloaded && !completed ? (
+            <p className="mt-2 text-center text-[10px] font-bold text-indigo-500">
+              Resource opened/downloaded • Mark as Done after completing it.
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function ActivityMiniCard({
+  item,
+  progress,
+  saving,
+  onResourceClick,
+  onMarkDone,
+  progressLoading,
+}: {
+  item: WeekAtGlanceItem;
+  progress?: LearningHubItemProgress;
+  saving: boolean;
+  onResourceClick: (item: WeekAtGlanceItem) => void;
+  onMarkDone: (item: WeekAtGlanceItem) => void;
+  progressLoading: boolean;
+  compact?: boolean;
+}) {
+  const button = getButtonMeta(item.button_type);
+  const ButtonIcon = button.icon;
+  const completed = progress?.completed === true;
+  const hasLink = Boolean(item.link_url);
+  const isDemo = item.id.startsWith("fallback-");
+
+  return (
+    <article
+      className={`relative rounded-xl border p-2.5 text-center shadow-sm ${
+        completed ? "border-emerald-200 bg-emerald-50/50" : "border-indigo-100 bg-white"
+      }`}
+    >
+      {item.thumbnail_url ? (
+        item.thumbnail_url.length <= 4 ? (
+          <div className="mx-auto grid h-10 w-12 place-items-center rounded-lg bg-indigo-50 text-2xl">
+            {item.thumbnail_url}
+          </div>
+        ) : (
+          <img src={item.thumbnail_url} alt="" className="mx-auto h-10 w-14 rounded-lg object-cover" />
+        )
+      ) : (
+        <div className="mx-auto grid h-10 w-12 place-items-center rounded-lg bg-indigo-50 text-2xl">
+          {getSubjectEmoji(item.subject)}
+        </div>
+      )}
+
+      <h4 className="mt-1.5 line-clamp-2 text-[11px] font-black leading-4 text-slate-950">
+        {item.title || "Untitled"}
+      </h4>
+
+      <ActivityMeta item={item} compact />
+
+      <div className="mt-2 grid grid-cols-2 gap-1">
+        {hasLink ? (
+          <a
+            href={item.link_url || "#"}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => onResourceClick(item)}
+            className={`flex min-h-9 items-center justify-center gap-1 rounded-lg px-1.5 text-[10px] font-black ${button.className}`}
+          >
+            <ButtonIcon size={13} />
+            {item.button_text || button.label}
+          </a>
+        ) : (
+          <div className="flex min-h-9 items-center justify-center rounded-lg bg-slate-100 px-1.5 text-[10px] font-black text-slate-400">
+            No link
+          </div>
+        )}
+
+        {!isDemo ? (
+          <button
+            type="button"
+            onClick={() => onMarkDone(item)}
+            disabled={completed || saving || progressLoading}
+            className={`flex min-h-9 items-center justify-center gap-1 rounded-lg px-1.5 text-[10px] font-black ${
+              completed ? "border border-emerald-200 bg-emerald-50 text-emerald-700" : "border border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50"
+            } disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            <CheckCircle2 size={13} />
+            {saving ? "..." : "Done"}
+          </button>
+        ) : (
+          <div className="flex min-h-9 items-center justify-center rounded-lg bg-slate-100 px-1.5 text-[10px] font-black text-slate-400">
+            Demo
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function ActivityMeta({
   item,
   compact,
 }: {
   item: WeekAtGlanceItem;
   compact?: boolean;
 }) {
-  const button = getButtonMeta(item.button_type);
-  const ButtonIcon = button.icon;
-  const hasLink = Boolean(item.link_url);
-  const isEmojiThumb = item.thumbnail_url && item.thumbnail_url.length <= 4;
-
   return (
-    <article
-      className={`relative rounded-[16px] border border-slate-200 bg-white p-3 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${
-        compact ? "min-h-[150px]" : "min-h-[150px]"
-      }`}
-    >
-      {item.thumbnail_url ? (
-        isEmojiThumb ? (
-          <div className="mx-auto grid h-12 w-14 place-items-center rounded-xl bg-indigo-50 text-3xl">
-            {item.thumbnail_url}
-          </div>
-        ) : (
-          <img
-            src={item.thumbnail_url}
-            alt=""
-            className="mx-auto h-12 w-16 rounded-xl object-cover"
-          />
-        )
-      ) : (
-        <div className="mx-auto grid h-12 w-14 place-items-center rounded-xl bg-indigo-50 text-3xl">
-          {getSubjectEmoji(item.subject)}
-        </div>
-      )}
-
-      <h4 className="mt-2 line-clamp-2 text-xs font-black leading-4 text-slate-900">
-        {item.title || "Untitled"}
-      </h4>
-
-      {item.description ? (
-        <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-500">
-          {item.description}
-        </p>
+    <div className={`mt-2 flex flex-wrap gap-1 ${compact ? "justify-center" : ""}`}>
+      {item.time_start || item.time_end ? (
+        <span className="rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-black text-indigo-700">
+          {item.time_start || ""} {item.time_end ? `- ${item.time_end}` : ""}
+        </span>
       ) : null}
-
-      <div className="mt-2 flex flex-wrap justify-center gap-1">
-        {item.time_start || item.time_end ? (
-          <span className="rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-black text-indigo-700">
-            {item.time_start || ""} {item.time_end ? `- ${item.time_end}` : ""}
-          </span>
-        ) : null}
-
-        {item.difficulty ? (
-          <span className="rounded-full bg-amber-50 px-2 py-1 text-[9px] font-black text-amber-700">
-            {item.difficulty}
-          </span>
-        ) : null}
-
-        {item.estimated_minutes ? (
-          <span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-700">
-            {item.estimated_minutes} min
-          </span>
-        ) : null}
-      </div>
-
-      {hasLink ? (
-        <a
-          href={item.link_url || "#"}
-          target="_blank"
-          rel="noreferrer"
-          className={`mx-auto mt-3 inline-flex h-8 items-center justify-center gap-1 rounded-xl px-3 text-[10px] font-black shadow-sm transition ${button.className}`}
-        >
-          <ButtonIcon size={15} />
-          {item.button_text || button.label}
-        </a>
-      ) : (
-        <div className="mx-auto mt-3 inline-flex h-8 items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 text-[10px] font-black text-slate-400">
-          <ButtonIcon size={15} />
-          {item.button_text || button.label}
-        </div>
-      )}
-    </article>
+      {item.difficulty ? (
+        <span className="rounded-full bg-yellow-100 px-2 py-1 text-[9px] font-black text-yellow-800">
+          {item.difficulty}
+        </span>
+      ) : null}
+      {item.estimated_minutes ? (
+        <span className="rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-black text-emerald-700">
+          {item.estimated_minutes} min
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -839,20 +1449,25 @@ function getSubjectEmoji(subject: string | null | undefined) {
   return "📌";
 }
 
-function SmallStat({ label, value }: { label: string; value: string }) {
+function SmallStat({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) {
   return (
-    <div className="rounded-[18px] border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
-        {label.toUpperCase()}
-      </p>
-      <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
+    <div className="flex min-h-[82px] items-center gap-3 rounded-[1.25rem] border border-indigo-100 bg-white px-4 py-3 shadow-sm sm:px-5">
+      {icon ? (
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-500">
+          {icon}
+        </div>
+      ) : null}
+      <div>
+        <p className="text-[10px] font-black tracking-[0.16em] text-indigo-400">{label.toUpperCase()}</p>
+        <p className="mt-0.5 text-2xl font-black text-slate-950 sm:text-3xl">{value}</p>
+      </div>
     </div>
   );
 }
 
 function LoadingState() {
   return (
-    <div className="rounded-[22px] border border-slate-200 bg-white p-10 text-center shadow-sm">
+    <div className="rounded-[2rem] bg-white p-12 text-center shadow-sm">
       <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
       <p className="mt-4 font-bold text-slate-500">Loading week content...</p>
     </div>
@@ -867,7 +1482,7 @@ function EmptyState({
   weekNo: number;
 }) {
   return (
-    <div className="rounded-[22px] border border-slate-200 bg-white p-10 text-center shadow-sm">
+    <div className="rounded-[2rem] bg-white p-12 text-center shadow-sm">
       <FileText className="mx-auto text-slate-400" size={44} />
 
       <h2 className="mt-3 text-2xl font-black text-slate-600">
@@ -884,15 +1499,15 @@ function EmptyState({
 
 function BottomGuide() {
   return (
-    <section className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.7fr]">
-      <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.55fr]">
+      <div className="rounded-[1.7rem] border border-indigo-100 bg-white p-5 shadow-sm">
         <div className="flex items-start gap-4">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-50 text-indigo-600">
             <Sparkles size={24} />
           </div>
           <div>
-            <h3 className="text-sm font-black text-slate-900">How to use?</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
+            <h3 className="font-black text-indigo-700">How to use?</h3>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
               Click the button in each box to open the activity, worksheet, video
               or learning resource.
             </p>
@@ -900,8 +1515,8 @@ function BottomGuide() {
         </div>
       </div>
 
-      <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 text-[10px] font-black text-slate-500">
+      <div className="rounded-[1.7rem] border border-indigo-100 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm font-black text-slate-600">
           <span className="inline-flex items-center gap-2">
             <PlayCircle size={18} className="text-indigo-600" />
             Play Video

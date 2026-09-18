@@ -1107,7 +1107,7 @@ function VirtualWorld({ userId }: { userId: string }) {
 
                     {todayCompletedCount === todayTasks.length ? (
                       <div className="mt-3 rounded-2xl bg-emerald-50 px-3 py-2 text-[10px] font-black text-emerald-700">
-                        ✨ Today&apos;s streak secured!
+                        ✨ Today's streak secured!
                       </div>
                     ) : (
                       <div className="mt-3 rounded-2xl bg-white px-3 py-2 text-[10px] font-black text-orange-600 shadow-sm">

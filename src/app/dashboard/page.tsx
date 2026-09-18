@@ -208,6 +208,204 @@ const subjectTabs = [
   { title: "Membaca", icon: "📚", progress: 65 },
 ];
 
+/* =========================================================
+   LEARNING HUB DASHBOARD PROGRESS
+   This is separate from the other dashboard progress panels.
+   The existing subjectTabs above are intentionally unchanged.
+========================================================= */
+
+type LearningHubAccessRow = {
+  parent_id: string;
+  month_no: number;
+  week_no: number | null;
+  unlocked: boolean;
+};
+
+type LearningHubDashboardItem = {
+  id: string;
+  month_no: number;
+  week_no: number;
+  subject: string | null;
+  is_active: boolean | null;
+};
+
+type LearningHubItemProgressRow = {
+  item_id: string;
+  completed: boolean | null;
+  downloaded: boolean | null;
+};
+
+type LearningHubDashboardSubject = {
+  title: string;
+  icon: string;
+  progress: number;
+  completed: number;
+  total: number;
+};
+
+type LearningHubDashboardProgress = {
+  monthNo: number;
+  weekNo: number;
+  overallProgress: number;
+  completedItems: number;
+  totalItems: number;
+  subjects: LearningHubDashboardSubject[];
+};
+
+const learningHubDashboardSubjects = [
+  { title: "Warm Up", icon: "☀️" },
+  { title: "Math", icon: "🔢" },
+  { title: "Science", icon: "🧪" },
+  { title: "Reading", icon: "📖" },
+  { title: "Membaca", icon: "📚" },
+] as const;
+
+function normalizeLearningHubSubject(value: string | null | undefined) {
+  const key = String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " ");
+
+  if (key.includes("WARM")) return "Warm Up";
+  if (key.includes("MATH")) return "Math";
+  if (key.includes("SCIENCE")) return "Science";
+  if (key.includes("MEMBACA") || key === "BM" || key.includes("BAHASA")) {
+    return "Membaca";
+  }
+  if (key.includes("READING") || key.includes("LANGUAGE") || key.includes("LITERACY")) {
+    return "Reading";
+  }
+
+  return null;
+}
+
+function isLearningHubWeekUnlockedForDashboard(
+  packageType: string | null | undefined,
+  accessRows: LearningHubAccessRow[],
+  monthNo: number,
+  weekNo: number
+) {
+  const exact = accessRows.find(
+    (row) =>
+      row.month_no === monthNo &&
+      row.week_no === weekNo
+  );
+
+  if (exact) return Boolean(exact.unlocked);
+
+  const monthAccess = accessRows.find(
+    (row) =>
+      row.month_no === monthNo &&
+      row.week_no === null
+  );
+
+  if (monthAccess) return Boolean(monthAccess.unlocked);
+
+  // Weekly package starts with Week 1 of Month 1.
+  if (packageType === "learning_hub_weekly") {
+    return monthNo === 1 && weekNo === 1;
+  }
+
+  // Monthly / premium packages are controlled by admin unlocks.
+  return false;
+}
+
+function buildLearningHubDashboardProgress(
+  profile: DashboardProfile,
+  accessRows: LearningHubAccessRow[],
+  items: LearningHubDashboardItem[],
+  progressRows: LearningHubItemProgressRow[]
+): LearningHubDashboardProgress | null {
+  if (!profile.learning_hub_unlocked) return null;
+
+  const availableWeeks = new Map<string, { monthNo: number; weekNo: number }>();
+
+  items.forEach((item) => {
+    if (!item.is_active) return;
+
+    if (
+      !isLearningHubWeekUnlockedForDashboard(
+        profile.package_type,
+        accessRows,
+        item.month_no,
+        item.week_no
+      )
+    ) {
+      return;
+    }
+
+    const key = `${item.month_no}-${item.week_no}`;
+    availableWeeks.set(key, {
+      monthNo: item.month_no,
+      weekNo: item.week_no,
+    });
+  });
+
+  // A weekly package always has a dashboard week even before content exists.
+  if (
+    availableWeeks.size === 0 &&
+    profile.package_type === "learning_hub_weekly"
+  ) {
+    availableWeeks.set("1-1", { monthNo: 1, weekNo: 1 });
+  }
+
+  const currentWeek = Array.from(availableWeeks.values()).sort((a, b) => {
+    if (a.monthNo !== b.monthNo) return b.monthNo - a.monthNo;
+    return b.weekNo - a.weekNo;
+  })[0];
+
+  if (!currentWeek) return null;
+
+  const weekItems = items.filter(
+    (item) =>
+      item.is_active &&
+      item.month_no === currentWeek.monthNo &&
+      item.week_no === currentWeek.weekNo &&
+      normalizeLearningHubSubject(item.subject) !== null
+  );
+
+  const progressMap = new Map(
+    progressRows.map((row) => [row.item_id, row])
+  );
+
+  const subjects = learningHubDashboardSubjects.map((subject) => {
+    const subjectItems = weekItems.filter(
+      (item) => normalizeLearningHubSubject(item.subject) === subject.title
+    );
+
+    const completed = subjectItems.filter((item) => {
+      const saved = progressMap.get(item.id);
+      return Boolean(saved?.completed || saved?.downloaded);
+    }).length;
+
+    return {
+      title: subject.title,
+      icon: subject.icon,
+      progress: subjectItems.length
+        ? Math.round((completed / subjectItems.length) * 100)
+        : 0,
+      completed,
+      total: subjectItems.length,
+    };
+  });
+
+  const completedItems = weekItems.filter((item) => {
+    const saved = progressMap.get(item.id);
+    return Boolean(saved?.completed || saved?.downloaded);
+  }).length;
+
+  return {
+    monthNo: currentWeek.monthNo,
+    weekNo: currentWeek.weekNo,
+    overallProgress: weekItems.length
+      ? Math.round((completedItems / weekItems.length) * 100)
+      : 0,
+    completedItems,
+    totalItems: weekItems.length,
+    subjects,
+  };
+}
+
 const weeklyTopics = [
   {
     week: "Week 1",
@@ -919,6 +1117,10 @@ function ParentDashboard({ userId }: { userId: string }) {
   const [planReady, setPlanReady] = useState(false);
   const [editingDailyPlan, setEditingDailyPlan] = useState(false);
   const [editingReminder, setEditingReminder] = useState(false);
+  const [learningHubDashboardProgress, setLearningHubDashboardProgress] =
+    useState<LearningHubDashboardProgress | null>(null);
+  const [learningHubProgressLoading, setLearningHubProgressLoading] =
+    useState(false);
 
   useEffect(() => {
     async function loadDashboardData() {
@@ -1020,6 +1222,142 @@ function ParentDashboard({ userId }: { userId: string }) {
 
     loadDashboardData();
   }, [userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLearningHubDashboardProgress() {
+      if (!profile?.learning_hub_unlocked) {
+        setLearningHubDashboardProgress(null);
+        setLearningHubProgressLoading(false);
+        return;
+      }
+
+      setLearningHubProgressLoading(true);
+
+      try {
+        const [accessResult, itemsResult] = await Promise.all([
+          supabase
+            .from("learning_hub_access")
+            .select("parent_id,month_no,week_no,unlocked")
+            .eq("parent_id", userId),
+          supabase
+            .from("learning_hub_week_items")
+            .select("id,month_no,week_no,subject,is_active")
+            .eq("is_active", true),
+        ]);
+
+        if (accessResult.error) {
+          throw accessResult.error;
+        }
+
+        if (itemsResult.error) {
+          throw itemsResult.error;
+        }
+
+        const accessRows = (accessResult.data || []) as LearningHubAccessRow[];
+        const items = (itemsResult.data || []) as LearningHubDashboardItem[];
+
+        const candidateWeeks = new Map<string, { monthNo: number; weekNo: number }>();
+
+        items.forEach((item) => {
+          if (!item.is_active) return;
+
+          if (
+            !isLearningHubWeekUnlockedForDashboard(
+              profile.package_type,
+              accessRows,
+              item.month_no,
+              item.week_no
+            )
+          ) {
+            return;
+          }
+
+          candidateWeeks.set(`${item.month_no}-${item.week_no}`, {
+            monthNo: item.month_no,
+            weekNo: item.week_no,
+          });
+        });
+
+        if (
+          candidateWeeks.size === 0 &&
+          profile.package_type === "learning_hub_weekly"
+        ) {
+          candidateWeeks.set("1-1", { monthNo: 1, weekNo: 1 });
+        }
+
+        const currentWeek = Array.from(candidateWeeks.values()).sort((a, b) => {
+          if (a.monthNo !== b.monthNo) return b.monthNo - a.monthNo;
+          return b.weekNo - a.weekNo;
+        })[0];
+
+        if (!currentWeek) {
+          if (!cancelled) setLearningHubDashboardProgress(null);
+          return;
+        }
+
+        const weekItems = items.filter(
+          (item) =>
+            item.is_active &&
+            item.month_no === currentWeek.monthNo &&
+            item.week_no === currentWeek.weekNo &&
+            normalizeLearningHubSubject(item.subject) !== null
+        );
+
+        let progressRows: LearningHubItemProgressRow[] = [];
+
+        if (weekItems.length > 0) {
+        const { data: progressData, error: progressError } = await supabase
+  .from("learning_hub_item_progress")
+  .select("item_id,completed,downloaded")
+  .eq("parent_id", userId)
+  .in(
+    "item_id",
+    weekItems.map((item) => item.id)
+  );
+
+          if (progressError) {
+            throw progressError;
+          }
+
+          progressRows = (progressData || []) as LearningHubItemProgressRow[];
+        }
+
+        const built = buildLearningHubDashboardProgress(
+          profile,
+          accessRows,
+          items,
+          progressRows
+        );
+
+        if (!cancelled) {
+          setLearningHubDashboardProgress(built);
+        }
+      } catch (progressError: unknown) {
+  console.error(
+    "Learning Hub dashboard progress error:",
+    progressError instanceof Error
+      ? progressError.message
+      : progressError
+  );
+
+  if (!cancelled) {
+    setLearningHubDashboardProgress(null);
+  }
+      } finally {
+        if (!cancelled) {
+          setLearningHubProgressLoading(false);
+        }
+      }
+    }
+
+    loadLearningHubDashboardProgress();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.learning_hub_unlocked, profile?.package_type, userId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1615,7 +1953,7 @@ function ParentDashboard({ userId }: { userId: string }) {
                       </h2>
                       <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-slate-600 sm:text-base">
                         {primaryChild
-                          ? "Here&apos;s your little learner&apos;s progress, activities and learning journey for today."
+                          ? "See your little learner's progress, activities, and joyful learning journey today."
                           : "Your learning space is ready. Add a child profile to unlock their personalised learning journey."}
                       </p>
 
@@ -2192,26 +2530,70 @@ function ParentDashboard({ userId }: { userId: string }) {
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">This Week</p>
                         <h2 className="mt-1 text-lg font-black text-[#312e68]">Weekly Progress</h2>
+                        {learningHubDashboardProgress ? (
+                          <p className="mt-0.5 text-[9px] font-bold text-slate-400">
+                            Month {learningHubDashboardProgress.monthNo} • Week {learningHubDashboardProgress.weekNo}
+                          </p>
+                        ) : null}
                       </div>
                       <span className="text-4xl">🏆</span>
                     </div>
-                    <p className="mt-4 text-2xl font-black text-[#312e68]">{Math.round(subjectTabs.reduce((sum, item) => sum + item.progress, 0) / subjectTabs.length)}%</p>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-violet-100">
-                      <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-violet-500" style={{ width: `${Math.round(subjectTabs.reduce((sum, item) => sum + item.progress, 0) / subjectTabs.length)}%` }} />
-                    </div>
-                    <div className="mt-5 space-y-3">
-                      {subjectTabs.map((subject) => (
-                        <div key={subject.title}>
-                          <div className="mb-1 flex items-center justify-between text-[10px] font-black">
-                            <span className="text-slate-700">{subject.icon} {subject.title}</span>
-                            <span className="text-slate-400">{subject.progress}%</span>
+
+                    {learningHubProgressLoading ? (
+                      <div className="mt-5 space-y-4">
+                        <div className="h-8 w-20 animate-pulse rounded-lg bg-slate-100" />
+                        {learningHubDashboardSubjects.map((subject) => (
+                          <div key={subject.title}>
+                            <div className="mb-2 h-3 w-full animate-pulse rounded-full bg-slate-100" />
+                            <div className="h-1.5 w-full animate-pulse rounded-full bg-slate-100" />
                           </div>
-                          <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${subject.progress}%` }} />
-                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="mt-4 text-2xl font-black text-[#312e68]">
+                          {learningHubDashboardProgress?.overallProgress ?? 0}%
+                        </p>
+
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-violet-100">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-violet-500 transition-all duration-500"
+                            style={{
+                              width: `${learningHubDashboardProgress?.overallProgress ?? 0}%`,
+                            }}
+                          />
                         </div>
-                      ))}
-                    </div>
+
+                        <p className="mt-2 text-[9px] font-bold text-slate-400">
+                          {learningHubDashboardProgress
+                            ? `${learningHubDashboardProgress.completedItems}/${learningHubDashboardProgress.totalItems} activities completed`
+                            : "No learning activity recorded yet"}
+                        </p>
+
+                        <div className="mt-5 space-y-3">
+                          {(learningHubDashboardProgress?.subjects || learningHubDashboardSubjects.map((subject) => ({
+                            title: subject.title,
+                            icon: subject.icon,
+                            progress: 0,
+                            completed: 0,
+                            total: 0,
+                          }))).map((subject) => (
+                            <div key={subject.title}>
+                              <div className="mb-1 flex items-center justify-between text-[10px] font-black">
+                                <span className="text-slate-700">{subject.icon} {subject.title}</span>
+                                <span className="text-slate-400">{subject.progress}%</span>
+                              </div>
+                              <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all duration-500"
+                                  style={{ width: `${subject.progress}%` }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </section>
                 ) : null}
 
@@ -2416,7 +2798,7 @@ function TopHeader({
           Good morning, {displayName}! 👋
         </h1>
         <p className="mt-1 text-sm font-semibold text-slate-400">
-          Here&apos;s your learning overview for today.
+          Your learning overview for today.
         </p>
       </div>
 

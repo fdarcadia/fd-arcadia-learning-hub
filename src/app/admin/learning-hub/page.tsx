@@ -54,6 +54,7 @@ type WeekItem = {
   display_order: number | null;
   is_completed: boolean | null;
   is_active: boolean | null;
+  visibility: "shared" | "parent" | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -77,6 +78,29 @@ type FormState = {
   estimated_minutes: string;
   display_order: string;
   is_active: boolean;
+  visibility: "shared" | "parent";
+  assigned_parent_ids: string[];
+};
+
+type ParentProfile = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  user_type: string | null;
+  package_type: string | null;
+  learning_hub_unlocked: boolean | null;
+  subscription_start: string | null;
+  subscription_end: string | null;
+};
+
+type LearningHubAccessRow = {
+  id: string;
+  parent_id: string;
+  month_no: number;
+  week_no: number | null;
+  unlocked: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
 const emptyForm: FormState = {
@@ -98,6 +122,8 @@ const emptyForm: FormState = {
   estimated_minutes: "",
   display_order: "0",
   is_active: true,
+  visibility: "shared",
+  assigned_parent_ids: [],
 };
 
 const days = [
@@ -167,19 +193,50 @@ function AccessDenied() {
 function AdminLearningHubContent({ email }: { email: string }) {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [items, setItems] = useState<WeekItem[]>([]);
+  const [selectedDay, setSelectedDay] = useState("MON");
+  const [selectedParentFilter, setSelectedParentFilter] = useState("all");
   const [loadingItems, setLoadingItems] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  // Subscription / Learning Hub access management
+  const [parents, setParents] = useState<ParentProfile[]>([]);
+  const [accessRows, setAccessRows] = useState<LearningHubAccessRow[]>([]);
+  const [selectedParentId, setSelectedParentId] = useState("");
+  const [accessMonth, setAccessMonth] = useState("1");
+  const [loadingAccess, setLoadingAccess] = useState(false);
+  const [savingAccess, setSavingAccess] = useState(false);
+  const [accessMessage, setAccessMessage] = useState("");
+  const [accessError, setAccessError] = useState("");
+
+  // Personalised worksheet/link assignment
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+  const [itemAssignments, setItemAssignments] = useState<Record<string, string>>({});
+
   const selectedMonth = Number(form.month_no);
   const selectedWeek = Number(form.week_no);
 
   useEffect(() => {
+    setSelectedDay("MON");
+    setSelectedParentFilter("all");
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMonth, selectedWeek]);
+
+  useEffect(() => {
+    loadParentsForAccess();
+  }, []);
+
+  useEffect(() => {
+    if (selectedParentId) {
+      loadParentAccess(selectedParentId, Number(accessMonth));
+    } else {
+      setAccessRows([]);
+    }
+  }, [selectedParentId, accessMonth]);
 
   async function loadItems() {
     setLoadingItems(true);
@@ -204,6 +261,291 @@ function AdminLearningHubContent({ email }: { email: string }) {
     setLoadingItems(false);
   }
 
+  useEffect(() => {
+    loadItemAssignmentsForWeek(selectedMonth, selectedWeek);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMonth, selectedWeek, items.length]);
+
+
+
+  async function loadParentsForAccess() {
+    setLoadingAccess(true);
+    setAccessError("");
+
+    const { data, error: parentError } = await supabase
+      .from("profiles")
+      .select(
+        `
+          id,
+          email,
+          full_name,
+          user_type,
+          package_type,
+          learning_hub_unlocked,
+          subscription_start,
+          subscription_end
+        `,
+      )
+      .in("package_type", [
+        "learning_hub_weekly",
+        "learning_hub_monthly",
+        "learning_hub_6month",
+        "full_package",
+      ])
+      .order("full_name", { ascending: true });
+
+    if (parentError) {
+      setAccessError(parentError.message);
+      setParents([]);
+      setLoadingAccess(false);
+      return;
+    }
+
+    setParents((data || []) as ParentProfile[]);
+    setLoadingAccess(false);
+  }
+
+  async function loadParentAccess(parentId: string, monthNo: number) {
+    setLoadingAccess(true);
+    setAccessError("");
+    setAccessMessage("");
+
+    const { data, error: accessLoadError } = await supabase
+      .from("learning_hub_access")
+      .select(
+        `
+          id,
+          parent_id,
+          month_no,
+          week_no,
+          unlocked,
+          created_at,
+          updated_at
+        `,
+      )
+      .eq("parent_id", parentId)
+      .eq("month_no", monthNo);
+
+    if (accessLoadError) {
+      setAccessError(accessLoadError.message);
+      setAccessRows([]);
+      setLoadingAccess(false);
+      return;
+    }
+
+    setAccessRows((data || []) as LearningHubAccessRow[]);
+    setLoadingAccess(false);
+  }
+
+  function getAccessRow(monthNo: number, weekNo: number | null) {
+    return accessRows.find(
+      (row) =>
+        row.month_no === monthNo &&
+        (weekNo === null ? row.week_no === null : row.week_no === weekNo),
+    );
+  }
+
+  function getAccessState(monthNo: number, weekNo: number) {
+    const exact = getAccessRow(monthNo, weekNo);
+    if (exact) return Boolean(exact.unlocked);
+
+    const monthRow = getAccessRow(monthNo, null);
+    if (monthRow) return Boolean(monthRow.unlocked);
+
+    const selectedParent = parents.find((parent) => parent.id === selectedParentId);
+
+    // Keep the existing parent-side default:
+    // Weekly package gets Month 1 / Week 1 automatically when no override exists.
+    return (
+      selectedParent?.package_type === "learning_hub_weekly" &&
+      monthNo === 1 &&
+      weekNo === 1
+    );
+  }
+
+  async function saveAccessOverride(
+    monthNo: number,
+    weekNo: number | null,
+    unlocked: boolean,
+  ) {
+    if (!selectedParentId) {
+      setAccessError("Please select a parent first.");
+      return;
+    }
+
+    setSavingAccess(true);
+    setAccessError("");
+    setAccessMessage("");
+
+    const existing = getAccessRow(monthNo, weekNo);
+
+    let saveError: { message: string } | null = null;
+
+    if (existing) {
+      const { error: updateError } = await supabase
+        .from("learning_hub_access")
+        .update({
+          unlocked,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+
+      saveError = updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from("learning_hub_access")
+        .insert({
+          parent_id: selectedParentId,
+          month_no: monthNo,
+          week_no: weekNo,
+          unlocked,
+        });
+
+      saveError = insertError;
+    }
+
+    if (saveError) {
+      setAccessError(saveError.message);
+      setSavingAccess(false);
+      return;
+    }
+
+    await loadParentAccess(selectedParentId, monthNo);
+    setAccessMessage(
+      weekNo === null
+        ? `Month ${monthNo} access ${unlocked ? "unlocked" : "locked"}.`
+        : `Month ${monthNo} · Week ${weekNo} ${unlocked ? "unlocked" : "locked"}.`,
+    );
+    setSavingAccess(false);
+  }
+
+  async function toggleWeekAccess(weekNo: number) {
+    const current = getAccessState(Number(accessMonth), weekNo);
+    await saveAccessOverride(Number(accessMonth), weekNo, !current);
+  }
+
+  async function toggleMonthAccess() {
+    const monthNo = Number(accessMonth);
+    const monthRow = getAccessRow(monthNo, null);
+
+    // Month-level control reflects the current effective state.
+    // Saving false creates an explicit lock, preventing an accidental open-all.
+    const currentlyOpen = [1, 2, 3, 4].some((week) =>
+      getAccessState(monthNo, week),
+    );
+
+    await saveAccessOverride(monthNo, null, !currentlyOpen);
+  }
+
+
+
+  async function loadItemAssignmentsForWeek(monthNo: number, weekNo: number) {
+    const { data: weekItems, error: itemsError } = await supabase
+      .from("learning_hub_week_items")
+      .select("id")
+      .eq("month_no", monthNo)
+      .eq("week_no", weekNo);
+
+    if (itemsError || !weekItems?.length) {
+      setItemAssignments({});
+      return;
+    }
+
+    const itemIds = weekItems.map((item) => item.id);
+
+    const { data: assignments, error: assignmentError } = await supabase
+      .from("learning_hub_item_assignments")
+      .select("item_id,parent_id")
+      .in("item_id", itemIds);
+
+    if (assignmentError) {
+      console.error("Learning Hub item assignment load error:", assignmentError);
+      setItemAssignments({});
+      return;
+    }
+
+    const map: Record<string, string> = {};
+    for (const row of assignments || []) {
+      if (row.item_id && row.parent_id) {
+        const ids = map[row.item_id]
+          ? map[row.item_id].split(",").filter(Boolean)
+          : [];
+
+        if (!ids.includes(row.parent_id)) ids.push(row.parent_id);
+        map[row.item_id] = ids.join(",");
+      }
+    }
+
+    setItemAssignments(map);
+  }
+
+  async function loadItemAssignment(itemId: string) {
+    setAssignmentLoading(true);
+
+    const { data, error: assignmentError } = await supabase
+      .from("learning_hub_item_assignments")
+      .select("parent_id")
+      .eq("item_id", itemId);
+
+    if (assignmentError) {
+      setError(assignmentError.message);
+      setAssignmentLoading(false);
+      return;
+    }
+
+    const assignedParentIds = (data || [])
+      .map((row) => row.parent_id)
+      .filter(Boolean);
+
+    setForm((current) => ({
+      ...current,
+      visibility: assignedParentIds.length ? "parent" : "shared",
+      assigned_parent_ids: assignedParentIds,
+    }));
+
+    setAssignmentLoading(false);
+  }
+  async function saveItemAssignment(itemId: string) {
+    setAssignmentSaving(true);
+
+    const { error: deleteError } = await supabase
+      .from("learning_hub_item_assignments")
+      .delete()
+      .eq("item_id", itemId);
+
+    if (deleteError) {
+      setAssignmentSaving(false);
+      throw deleteError;
+    }
+
+    if (form.visibility === "shared") {
+      setAssignmentSaving(false);
+      return;
+    }
+
+    if (!form.assigned_parent_ids.length) {
+      setAssignmentSaving(false);
+      throw new Error(
+        "Please select at least one parent for this personalised worksheet/link.",
+      );
+    }
+
+    const rows = form.assigned_parent_ids.map((parentId) => ({
+      item_id: itemId,
+      parent_id: parentId,
+    }));
+
+    const { error: insertError } = await supabase
+      .from("learning_hub_item_assignments")
+      .insert(rows);
+
+    if (insertError) {
+      setAssignmentSaving(false);
+      throw insertError;
+    }
+
+    setAssignmentSaving(false);
+  }
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({
       ...current,
@@ -221,7 +563,7 @@ function AdminLearningHubContent({ email }: { email: string }) {
     setError("");
   }
 
-  function editItem(item: WeekItem) {
+  async function editItem(item: WeekItem) {
     setForm({
       id: item.id,
       month_no: String(item.month_no),
@@ -241,7 +583,12 @@ function AdminLearningHubContent({ email }: { email: string }) {
       estimated_minutes: item.estimated_minutes ? String(item.estimated_minutes) : "",
       display_order: item.display_order ? String(item.display_order) : "0",
       is_active: item.is_active ?? true,
+      visibility: item.visibility === "parent" ? "parent" : "shared",
+      assigned_parent_ids: [],
     });
+
+    // Load the selected parent assignment when editing a personalised item.
+    await loadItemAssignment(item.id);
 
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -277,6 +624,7 @@ function AdminLearningHubContent({ email }: { email: string }) {
       estimated_minutes: form.estimated_minutes ? Number(form.estimated_minutes) : null,
       display_order: Number(form.display_order || 0),
       is_active: form.is_active,
+      visibility: form.visibility,
     };
 
     if (form.id) {
@@ -292,24 +640,64 @@ function AdminLearningHubContent({ email }: { email: string }) {
         return;
       }
 
-      setMessage("Week At A Glance item updated successfully.");
+      try {
+        await saveItemAssignment(form.id);
+      } catch (assignmentError) {
+        setSaving(false);
+        setError(
+          assignmentError instanceof Error
+            ? assignmentError.message
+            : "Unable to save parent assignment.",
+        );
+        return;
+      }
+
+      setMessage(
+        form.visibility === "parent"
+          ? "Personalised worksheet updated for the selected parent."
+          : "Week At A Glance item updated successfully.",
+      );
       resetForm();
       await loadItems();
       return;
     }
 
-    const { error: insertError } = await supabase
+    const { data: insertedItem, error: insertError } = await supabase
       .from("learning_hub_week_items")
-      .insert(payload);
+      .insert(payload)
+      .select("id")
+      .single();
 
-    setSaving(false);
-
-    if (insertError) {
-      setError(insertError.message);
+    if (insertError || !insertedItem) {
+      setSaving(false);
+      setError(insertError?.message || "Unable to save activity.");
       return;
     }
 
-    setMessage("Week At A Glance item saved successfully.");
+    try {
+      await saveItemAssignment(insertedItem.id);
+    } catch (assignmentError) {
+      // Roll back the item if the parent assignment could not be saved.
+      await supabase
+        .from("learning_hub_week_items")
+        .delete()
+        .eq("id", insertedItem.id);
+
+      setSaving(false);
+      setError(
+        assignmentError instanceof Error
+          ? assignmentError.message
+          : "Unable to save parent assignment.",
+      );
+      return;
+    }
+
+    setSaving(false);
+    setMessage(
+      form.visibility === "parent"
+        ? "Personalised worksheet saved for the selected parent only."
+        : "Week At A Glance item saved successfully.",
+    );
     resetForm();
     await loadItems();
   }
@@ -321,6 +709,17 @@ function AdminLearningHubContent({ email }: { email: string }) {
     setDeletingId(id);
     setError("");
     setMessage("");
+
+    const { error: deleteAssignmentError } = await supabase
+      .from("learning_hub_item_assignments")
+      .delete()
+      .eq("item_id", id);
+
+    if (deleteAssignmentError) {
+      setDeletingId("");
+      setError(deleteAssignmentError.message);
+      return;
+    }
 
     const { error: deleteError } = await supabase
       .from("learning_hub_week_items")
@@ -415,6 +814,291 @@ function AdminLearningHubContent({ email }: { email: string }) {
             <StatCard label="Active" value={String(stats.active)} />
             <StatCard label="With Link" value={String(stats.links)} />
             <StatCard label="Video / Play" value={String(stats.videos)} />
+          </section>
+
+
+          {/* =====================================================
+              SUBSCRIPTION / ACCESS CONTROL
+              This section only manages learning_hub_access.
+              Existing Week At A Glance editor below is unchanged.
+          ====================================================== */}
+          <section className="mt-6 rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+              <div>
+                <p className="text-sm font-black tracking-[0.2em] text-indigo-500">
+                  SUBSCRIPTION ACCESS
+                </p>
+                <h2 className="mt-1 text-3xl font-black text-indigo-700">
+                  Parent Week Unlock
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                  Unlock or lock individual weeks for a parent. Monthly,
+                  6-month and full packages stay locked until admin activates
+                  them. Weekly package keeps its existing Month 1 · Week 1
+                  default unless an override is saved.
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700">
+                Access is controlled per parent
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
+              <label className="block">
+                <span className="text-sm font-black text-slate-600">
+                  Parent / Student
+                </span>
+                <select
+                  value={selectedParentId}
+                  onChange={(event) => setSelectedParentId(event.target.value)}
+                  disabled={loadingAccess || savingAccess}
+                  className="mt-2 w-full rounded-2xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                >
+                  <option value="">
+                    {loadingAccess ? "Loading parents..." : "Select parent"}
+                  </option>
+                  {parents.map((parent) => (
+                    <option key={parent.id} value={parent.id}>
+                      {parent.full_name || parent.email || "Unnamed parent"}{" "}
+                      {parent.package_type
+                        ? `— ${parent.package_type.replaceAll("_", " ")}`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-black text-slate-600">
+                  Month
+                </span>
+                <select
+                  value={accessMonth}
+                  onChange={(event) => setAccessMonth(event.target.value)}
+                  disabled={!selectedParentId || loadingAccess || savingAccess}
+                  className="mt-2 w-full rounded-2xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                >
+                  {[1, 2, 3, 4, 5, 6].map((month) => (
+                    <option key={month} value={String(month)}>
+                      Month {month}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {selectedParentId ? (
+              <>
+                {(() => {
+                  const selectedParent = parents.find(
+                    (parent) => parent.id === selectedParentId,
+                  );
+
+                  if (!selectedParent) return null;
+
+                  const subscriptionActive = (() => {
+                    if (!selectedParent.learning_hub_unlocked) return false;
+
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+
+                    const start = selectedParent.subscription_start
+                      ? new Date(
+                          `${selectedParent.subscription_start.slice(0, 10)}T00:00:00`,
+                        )
+                      : null;
+
+                    const end = selectedParent.subscription_end
+                      ? new Date(
+                          `${selectedParent.subscription_end.slice(0, 10)}T00:00:00`,
+                        )
+                      : null;
+
+                    if (start && today < start) return false;
+                    if (end && today > end) return false;
+
+                    return true;
+                  })();
+
+                  const effectiveWeeks = [1, 2, 3, 4].map((week) => ({
+                    week,
+                    unlocked: getAccessState(Number(accessMonth), week),
+                  }));
+
+                  const unlockedCount = effectiveWeeks.filter(
+                    (item) => item.unlocked,
+                  ).length;
+
+                  return (
+                    <div className="mt-6">
+                      <div className="grid gap-3 md:grid-cols-4">
+                        <div className="rounded-2xl bg-slate-50 p-4">
+                          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                            Package
+                          </p>
+                          <p className="mt-1 font-black text-slate-700">
+                            {selectedParent.package_type
+                              ?.replaceAll("_", " ") || "None"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-slate-50 p-4">
+                          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                            Subscription
+                          </p>
+                          <p
+                            className={`mt-1 font-black ${
+                              subscriptionActive
+                                ? "text-emerald-600"
+                                : "text-red-500"
+                            }`}
+                          >
+                            {subscriptionActive ? "Active" : "Inactive"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-slate-50 p-4">
+                          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                            Month
+                          </p>
+                          <p className="mt-1 font-black text-slate-700">
+                            Month {accessMonth}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-slate-50 p-4">
+                          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                            Available
+                          </p>
+                          <p className="mt-1 font-black text-indigo-600">
+                            {unlockedCount}/4 weeks
+                          </p>
+                        </div>
+                      </div>
+
+                      {!subscriptionActive ? (
+                        <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                          This subscription is inactive. Parent-side access
+                          remains locked even if an access row exists.
+                        </div>
+                      ) : null}
+
+                      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        {effectiveWeeks.map(({ week, unlocked }) => (
+                          <div
+                            key={week}
+                            className={`rounded-[1.5rem] border p-4 ${
+                              unlocked
+                                ? "border-emerald-100 bg-emerald-50"
+                                : "border-slate-100 bg-slate-50"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                  Week
+                                </p>
+                                <h3 className="mt-1 text-xl font-black text-slate-800">
+                                  Week {week}
+                                </h3>
+                              </div>
+
+                              {unlocked ? (
+                                <CheckCircle2
+                                  className="text-emerald-500"
+                                  size={24}
+                                />
+                              ) : (
+                                <LockKeyhole
+                                  className="text-slate-400"
+                                  size={24}
+                                />
+                              )}
+                            </div>
+
+                            <p
+                              className={`mt-3 text-sm font-bold ${
+                                unlocked
+                                  ? "text-emerald-700"
+                                  : "text-slate-500"
+                              }`}
+                            >
+                              {unlocked ? "Unlocked" : "Locked"}
+                            </p>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleWeekAccess(week)}
+                              disabled={savingAccess || !subscriptionActive}
+                              className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 font-black text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                                unlocked
+                                  ? "bg-slate-700 hover:bg-slate-800"
+                                  : "bg-indigo-600 hover:bg-indigo-700"
+                              }`}
+                            >
+                              {savingAccess ? (
+                                <Loader2 className="animate-spin" size={17} />
+                              ) : unlocked ? (
+                                <LockKeyhole size={17} />
+                              ) : (
+                                <CheckCircle2 size={17} />
+                              )}
+                              {unlocked ? "Lock Week" : "Unlock Week"}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-5 flex flex-col gap-3 rounded-[1.5rem] border border-indigo-100 bg-indigo-50/60 p-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <p className="font-black text-indigo-700">
+                            Month {accessMonth} access
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            Unlocking the month creates a month-level access
+                            row for all four weeks. You can still override an
+                            individual week afterwards.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={toggleMonthAccess}
+                          disabled={savingAccess || !subscriptionActive}
+                          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {savingAccess ? (
+                            <Loader2 className="animate-spin" size={18} />
+                          ) : (
+                            <CalendarDays size={18} />
+                          )}
+                          {unlockedCount === 4
+                            ? "Lock Month"
+                            : "Unlock Month"}
+                        </button>
+                      </div>
+
+                      {accessError ? (
+                        <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 font-bold text-red-700">
+                          {accessError}
+                        </div>
+                      ) : null}
+
+                      {accessMessage ? (
+                        <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 font-bold text-emerald-700">
+                          {accessMessage}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+              </>
+            ) : (
+              <div className="mt-5 rounded-2xl bg-slate-50 p-6 text-center text-sm font-bold text-slate-500">
+                Select a parent to manage Learning Hub access.
+              </div>
+            )}
           </section>
 
           <section className="mt-6 grid gap-6 2xl:grid-cols-[0.95fr_1.05fr]">
@@ -584,6 +1268,128 @@ function AdminLearningHubContent({ email }: { email: string }) {
                   />
                 </div>
 
+
+                <div className="md:col-span-2 rounded-[1.5rem] border border-indigo-100 bg-indigo-50/60 p-4">
+                  <p className="text-sm font-black tracking-[0.14em] text-indigo-500">
+                    CONTENT VISIBILITY
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Choose whether this worksheet/link is shared with all
+                    parents who can access the week, or only one selected parent.
+                  </p>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateForm("visibility", "shared");
+                        updateForm("assigned_parent_ids", []);
+                      }}
+                      className={`rounded-2xl border p-4 text-left transition ${
+                        form.visibility === "shared"
+                          ? "border-indigo-300 bg-white shadow-sm"
+                          : "border-white bg-white/60"
+                      }`}
+                    >
+                      <p className="font-black text-slate-800">Shared Content</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        All parents with access to this week can see it.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateForm("visibility", "parent")}
+                      className={`rounded-2xl border p-4 text-left transition ${
+                        form.visibility === "parent"
+                          ? "border-indigo-300 bg-white shadow-sm"
+                          : "border-white bg-white/60"
+                      }`}
+                    >
+                      <p className="font-black text-indigo-700">
+                        Selected Parent Only
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        Only the selected parent will see this worksheet/link.
+                      </p>
+                    </button>
+                  </div>
+
+                  {form.visibility === "parent" ? (
+                    <div className="mt-4">
+                      <p className="mb-2 text-sm font-black text-slate-700">
+                        Select Parent(s)
+                      </p>
+
+                      <div className="max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-indigo-100 bg-white p-2">
+                        {parents.map((parent) => {
+                          const checked = form.assigned_parent_ids.includes(parent.id);
+
+                          return (
+                            <label
+                              key={parent.id}
+                              className={`flex cursor-pointer items-center gap-3 rounded-xl px-4 py-3 transition ${
+                                checked
+                                  ? "bg-indigo-50 text-indigo-700"
+                                  : "text-slate-700 hover:bg-slate-50"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={assignmentLoading || assignmentSaving}
+                                onChange={(event) => {
+                                  const next = event.target.checked
+                                    ? [...form.assigned_parent_ids, parent.id]
+                                    : form.assigned_parent_ids.filter(
+                                        (id) => id !== parent.id,
+                                      );
+
+                                  updateForm("assigned_parent_ids", next);
+                                }}
+                                className="h-5 w-5 rounded border-indigo-200 text-indigo-600 focus:ring-indigo-500"
+                              />
+                              <div className="min-w-0">
+                                <p className="font-bold">
+                                  {parent.full_name || parent.email || "Unnamed parent"}
+                                </p>
+                                {parent.full_name && parent.email ? (
+                                  <p className="truncate text-xs text-slate-400">
+                                    {parent.email}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </label>
+                          );
+                        })}
+
+                        {!parents.length ? (
+                          <p className="p-4 text-sm font-bold text-red-500">
+                            No Learning Hub subscriber found.
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700">
+                          {form.assigned_parent_ids.length} parent
+                          {form.assigned_parent_ids.length === 1 ? "" : "s"} selected
+                        </span>
+
+                        {form.assigned_parent_ids.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => updateForm("assigned_parent_ids", [])}
+                            className="text-xs font-black text-slate-400 hover:text-red-500"
+                          >
+                            Clear selection
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
                 <label className="flex items-center gap-3 rounded-2xl bg-indigo-50 px-4 py-4 font-black text-indigo-700 md:col-span-2">
                   <input
                     type="checkbox"
@@ -652,16 +1458,152 @@ function AdminLearningHubContent({ email }: { email: string }) {
               ) : items.length === 0 ? (
                 <EmptyItems />
               ) : (
-                <div className="space-y-4">
-                  {items.map((item) => (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      deleting={deletingId === item.id}
-                      onEdit={() => editItem(item)}
-                      onDelete={() => deleteItem(item.id)}
-                    />
-                  ))}
+                <div>
+                  <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                    {days.map((day) => {
+                      const dayItems = items.filter((item) => {
+                        if (item.day !== day.value) return false;
+                        if (selectedParentFilter === "all") return true;
+                        if (selectedParentFilter === "shared") {
+                          return !itemAssignments[item.id];
+                        }
+                        return itemAssignments[item.id]?.split(",").includes(selectedParentFilter);
+                      });
+                      const active = selectedDay === day.value;
+
+                      return (
+                        <button
+                          key={day.value}
+                          type="button"
+                          onClick={() => setSelectedDay(day.value)}
+                          className={`rounded-2xl border px-3 py-3 text-left transition ${
+                            active
+                              ? "border-indigo-200 bg-indigo-50 shadow-sm"
+                              : "border-slate-100 bg-slate-50 hover:border-indigo-100 hover:bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`text-xs font-black tracking-[0.14em] ${
+                                active ? "text-indigo-700" : "text-slate-500"
+                              }`}
+                            >
+                              {day.short}
+                            </span>
+                            <span
+                              className={`grid h-6 min-w-6 place-items-center rounded-full px-1 text-xs font-black ${
+                                active
+                                  ? "bg-indigo-600 text-white"
+                                  : "bg-white text-slate-500"
+                              }`}
+                            >
+                              {dayItems.length}
+                            </span>
+                          </div>
+                          <p
+                            className={`mt-1 text-sm font-bold ${
+                              active ? "text-indigo-700" : "text-slate-600"
+                            }`}
+                          >
+                            {day.label}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mb-5 rounded-[1.5rem] border border-indigo-100 bg-white/80 p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-xs font-black tracking-[0.18em] text-indigo-400">
+                          FILTER BY PARENT
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Check which worksheets are shared and which are assigned to a specific parent.
+                        </p>
+                      </div>
+
+                      <select
+                        value={selectedParentFilter}
+                        onChange={(event) => setSelectedParentFilter(event.target.value)}
+                        className="min-w-[260px] rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-sm font-bold text-indigo-700 outline-none focus:border-indigo-300"
+                      >
+                        <option value="all">All parents / all content</option>
+                        <option value="shared">Shared — everyone</option>
+                        {parents.map((parent) => (
+                          <option key={parent.id} value={parent.id}>
+                            {parent.full_name || parent.email || "Unnamed parent"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const currentDay = days.find((day) => day.value === selectedDay);
+                    const dayItems = items.filter((item) => {
+                      if (item.day !== selectedDay) return false;
+                      if (selectedParentFilter === "all") return true;
+                      if (selectedParentFilter === "shared") {
+                        return !itemAssignments[item.id];
+                      }
+                      return itemAssignments[item.id]?.split(",").includes(selectedParentFilter);
+                    });
+
+                    return (
+                      <div>
+                        <div className="mb-4 flex items-end justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-black tracking-[0.18em] text-slate-400">
+                              {currentDay?.short || selectedDay}
+                            </p>
+                            <h3 className="mt-1 text-2xl font-black text-indigo-700">
+                              {currentDay?.label || selectedDay} Activities
+                            </h3>
+                          </div>
+                          <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700">
+                            {dayItems.length} {dayItems.length === 1 ? "activity" : "activities"}
+                          </span>
+                        </div>
+
+                        {dayItems.length === 0 ? (
+                          <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+                            <CalendarDays className="mx-auto text-slate-300" size={34} />
+                            <p className="mt-3 font-black text-slate-500">
+                              No activities for {currentDay?.label || selectedDay}.
+                            </p>
+                            <p className="mt-1 text-sm text-slate-400">
+                              Add an activity using the form on the left.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {dayItems.map((item) => (
+                              <ItemRow
+                                key={item.id}
+                                item={item}
+                                deleting={deletingId === item.id}
+                                onEdit={() => editItem(item)}
+                                onDelete={() => deleteItem(item.id)}
+                                assignedParentName={
+                                  itemAssignments[item.id]
+                                    ? itemAssignments[item.id]
+                                        .split(",")
+                                        .map((parentId) => {
+                                          const parent = parents.find((p) => p.id === parentId);
+                                          return parent?.full_name || parent?.email || "";
+                                        })
+                                        .filter(Boolean)
+                                        .join(", ")
+                                    : ""
+                                }
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </section>
@@ -727,11 +1669,13 @@ function ItemRow({
   deleting,
   onEdit,
   onDelete,
+  assignedParentName,
 }: {
   item: WeekItem;
   deleting: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  assignedParentName?: string;
 }) {
   const subject = subjects.find((entry) => entry.value === item.subject);
   const button = buttonTypes.find((entry) => entry.value === item.button_type);
@@ -757,6 +1701,18 @@ function ItemRow({
                 <Badge text="Active" green />
               ) : (
                 <Badge text="Hidden" gray />
+              )}
+              {item.visibility === "parent" ? (
+                <Badge text="Personalised" />
+              ) : null}
+              {item.visibility === "parent" && assignedParentName ? (
+                <span className="inline-flex max-w-[260px] items-center rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+                  👤 {assignedParentName}
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-500">
+                  Shared · All Parents
+                </span>
               )}
             </div>
 
@@ -838,17 +1794,20 @@ function SelectField({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string;
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="block">
       <span className="text-sm font-black text-slate-600">{label}</span>
       <select
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         className="mt-2 w-full rounded-2xl border border-indigo-100 bg-white px-4 py-3 font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
       >
