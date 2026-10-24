@@ -421,7 +421,7 @@ function WeekAtGlanceContent() {
   const [loading, setLoading] = useState(true);
   const [progressLoading, setProgressLoading] = useState(true);
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
-  const [showDemoIfEmpty, setShowDemoIfEmpty] = useState(true);
+  const [showDemoIfEmpty, setShowDemoIfEmpty] = useState(false);
   const [progressError, setProgressError] = useState("");
 
   useEffect(() => {
@@ -981,6 +981,14 @@ function WeekGrid({
     progressLoading,
   };
 
+  // Parent view only shows days with activities configured by the admin.
+  const visibleDays = dayConfigs.filter((day) =>
+    Array.from(itemsByCell.entries()).some(
+      ([cellKey, cellItems]) =>
+        cellKey.startsWith(`${day.key}__`) && cellItems.length > 0,
+    ),
+  );
+
   return (
     <>
       {/* Desktop / large laptop: compact timetable. */}
@@ -1001,7 +1009,7 @@ function WeekGrid({
             </div>
 
             <div className="mt-2.5 space-y-2">
-              {dayConfigs.map((day) => (
+              {visibleDays.map((day) => (
                 <DesktopRowForDay
                   key={day.key}
                   day={day}
@@ -1017,7 +1025,7 @@ function WeekGrid({
       {/* Tablet / iPad: two-column cards, no forced horizontal timetable. */}
       <section className="hidden md:block xl:hidden">
         <div className="space-y-4">
-          {dayConfigs.map((day) => (
+          {visibleDays.map((day) => (
             <TabletDaySection
               key={day.key}
               day={day}
@@ -1031,7 +1039,7 @@ function WeekGrid({
       {/* Phone: one-column, large touch targets. */}
       <section className="md:hidden">
         <div className="space-y-4">
-          {dayConfigs.map((day) => (
+          {visibleDays.map((day) => (
             <MobileDaySection
               key={day.key}
               day={day}
