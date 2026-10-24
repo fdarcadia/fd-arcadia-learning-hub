@@ -116,6 +116,20 @@ const dayConfigs: DayConfig[] = [
     color: "bg-blue-100 text-blue-950",
     accent: "border-blue-300",
   },
+  {
+    key: "SAT",
+    label: "SAT",
+    full: "Saturday",
+    color: "bg-orange-200 text-orange-950",
+    accent: "border-orange-300",
+  },
+  {
+    key: "SUN",
+    label: "SUN",
+    full: "Sunday",
+    color: "bg-fuchsia-200 text-fuchsia-950",
+    accent: "border-fuchsia-300",
+  },
 ];
 
 const subjectConfigs: SubjectConfig[] = [
@@ -131,35 +145,35 @@ const subjectConfigs: SubjectConfig[] = [
     label: "WARM-UP",
     time: "9:00 - 10:30am",
     icon: "☀️",
-    headerClass: "bg-yellow-50",
+    headerClass: "bg-amber-200",
   },
   {
     key: "SCIENCE",
     label: "SCIENCE",
     time: "10:30 - 11:00am",
     icon: "🧪",
-    headerClass: "bg-sky-50",
+    headerClass: "bg-cyan-200",
   },
   {
     key: "MATH",
     label: "MATH",
     time: "11:15 - 12:30am",
     icon: "🔢",
-    headerClass: "bg-indigo-50",
+    headerClass: "bg-indigo-200",
   },
   {
     key: "MEMBACA",
     label: "MEMBACA",
     time: "12:30 - 1:15pm",
     icon: "📖",
-    headerClass: "bg-purple-50",
+    headerClass: "bg-violet-200",
   },
   {
     key: "LANGUAGE & LITERACY",
     label: "LANGUAGE & LITERACY",
     time: "2:30 - 3:30pm",
     icon: "✏️",
-    headerClass: "bg-pink-50",
+    headerClass: "bg-pink-200",
   },
 ];
 
@@ -261,6 +275,8 @@ function normalizeDay(value: string | null | undefined) {
   if (key.startsWith("WED")) return "WED";
   if (key.startsWith("THU")) return "THU";
   if (key.startsWith("FRI")) return "FRI";
+  if (key.startsWith("SAT")) return "SAT";
+  if (key.startsWith("SUN")) return "SUN";
   return key || "MON";
 }
 
@@ -273,6 +289,82 @@ function normalizeSubject(value: string | null | undefined) {
   if (key.includes("LANGUAGE") || key.includes("LITERACY")) return "LANGUAGE & LITERACY";
   if (key.includes("NOTE")) return "NOTES";
   return key || "NOTES";
+}
+
+function parseTimeToMinutes(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function formatScheduleTime(value: string | null | undefined): string {
+  const minutes = parseTimeToMinutes(value);
+  if (minutes === null) return value?.trim() || "";
+  const hour24 = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const suffix = hour24 >= 12 ? "pm" : "am";
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${String(minute).padStart(2, "0")}${suffix}`;
+}
+
+function getSubjectTime(
+  subjectKey: string,
+  itemsByCell: Map<string, WeekAtGlanceItem[]>,
+): string {
+  const matchingItems = Array.from(itemsByCell.values())
+    .flat()
+    .filter((item) => normalizeSubject(item.subject) === subjectKey);
+
+  const timedItems = matchingItems
+    .map((item) => ({
+      start: item.time_start,
+      end: item.time_end,
+      startMinutes: parseTimeToMinutes(item.time_start),
+      endMinutes: parseTimeToMinutes(item.time_end),
+    }))
+    .filter((item) => item.startMinutes !== null || item.endMinutes !== null);
+
+  if (timedItems.length === 0) return "";
+
+  const starts = timedItems.filter(
+    (item): item is typeof item & { startMinutes: number } => item.startMinutes !== null,
+  );
+  const ends = timedItems.filter(
+    (item): item is typeof item & { endMinutes: number } => item.endMinutes !== null,
+  );
+
+  const earliestStart = starts.length
+    ? starts.reduce((earliest, item) =>
+        item.startMinutes < earliest.startMinutes ? item : earliest,
+      )
+    : null;
+  const latestEnd = ends.length
+    ? ends.reduce((latest, item) =>
+        item.endMinutes > latest.endMinutes ? item : latest,
+      )
+    : null;
+
+  const startText = earliestStart
+    ? formatScheduleTime(earliestStart.start)
+    : "";
+  const endText = latestEnd ? formatScheduleTime(latestEnd.end) : "";
+
+  if (!startText) return endText;
+  if (!endText) return startText;
+
+  // Keep the AM/PM suffix on the final time when both times share a period.
+  const startMinutes = earliestStart?.startMinutes ?? 0;
+  const endMinutes = latestEnd?.endMinutes ?? 0;
+  const samePeriod = (startMinutes < 720) === (endMinutes < 720);
+  if (samePeriod) {
+    const startWithoutSuffix = startText.replace(/(am|pm)$/i, "");
+    return `${startWithoutSuffix} - ${endText}`;
+  }
+  return `${startText} - ${endText}`;
 }
 
 function getButtonMeta(type: string | null | undefined): ButtonMeta {
@@ -434,9 +526,45 @@ function WeekAtGlanceContent() {
         return (a.display_order ?? 0) - (b.display_order ?? 0);
       });
 
+      // Load schedule overrides for this logged-in parent.
+      // Shared activity times remain unchanged for every other parent.
+      let itemsWithParentSchedule = uniqueItems;
+
+      if (uniqueItems.length > 0) {
+        const { data: scheduleOverrides, error: scheduleOverrideError } = await supabase
+          .from("learning_hub_item_schedule_overrides")
+          .select("item_id,time_start,time_end")
+          .eq("parent_id", user.id)
+          .in("item_id", uniqueItems.map((item) => item.id));
+
+        if (scheduleOverrideError) {
+          // Keep the page usable with the original shared times if overrides
+          // cannot be loaded; do not block the existing activity list.
+          console.error(
+            "Learning Hub parent schedule overrides error:",
+            scheduleOverrideError,
+          );
+        } else if (scheduleOverrides?.length) {
+          const overrideByItemId = new Map(
+            scheduleOverrides.map((override) => [override.item_id, override]),
+          );
+
+          itemsWithParentSchedule = uniqueItems.map((item) => {
+            const override = overrideByItemId.get(item.id);
+            if (!override) return item;
+
+            return {
+              ...item,
+              time_start: override.time_start ?? item.time_start,
+              time_end: override.time_end ?? item.time_end,
+            };
+          });
+        }
+      }
+
       if (cancelled) return;
 
-      setItems(uniqueItems);
+      setItems(itemsWithParentSchedule);
       setLoading(false);
     }
 
@@ -599,19 +727,19 @@ function WeekAtGlanceContent() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f8f9fd] text-slate-900">
-      <section className="mx-auto w-full max-w-[1500px] min-w-0 px-3 py-4 sm:px-5 sm:py-6 lg:px-8 xl:px-10">
+    <main className="min-h-screen bg-[radial-gradient(ellipse_at_top_left,_rgba(224,231,255,0.72),_transparent_42%),linear-gradient(180deg,#f8faff_0%,#f5f3ff_48%,#fbfcff_100%)] text-slate-900">
+      <section className="mx-auto w-full max-w-[1680px] min-w-0 px-3 py-5 sm:px-6 sm:py-7 lg:px-9 xl:px-10">
           <TopHeader
             monthNo={monthNo}
             weekNo={weekNo}
             monthParam={monthParam}
           />
 
-          <section className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <section className="mb-6 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
             <SmallStat label="Activities" value={String(displayItems.length)} icon={<FileText size={22} />} />
             <SmallStat label="Completed" value={items.length ? String(completedCount) : "—"} icon={<CheckCircle2 size={23} />} />
             <SmallStat label="Progress" value={items.length ? `${progress}%` : "0%"} icon={<Trophy size={22} />} />
-            <div className="flex min-h-[82px] items-center gap-3 rounded-[1.25rem] border border-indigo-100 bg-white px-4 py-3 shadow-sm sm:px-5">
+            <div className="group flex min-h-[92px] items-center gap-3.5 rounded-[1.5rem] border border-white/80 bg-white/90 px-4 py-4 shadow-[0_10px_30px_rgba(57,65,130,0.07)] ring-1 ring-indigo-100/70 backdrop-blur transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(57,65,130,0.12)] sm:px-5">
               <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-2xl">🌱</div>
               <div className="min-w-0">
                 <p className="text-sm font-black text-slate-900">Keep going!</p>
@@ -733,7 +861,7 @@ function ParentSidebar({
         ))}
       </nav>
 
-      <div className="mt-7 rounded-[1.5rem] bg-gradient-to-br from-indigo-600 to-violet-700 p-5 text-white shadow-lg">
+      <div className="mt-7 rounded-[1.75rem] bg-gradient-to-br from-indigo-600 via-violet-700 to-purple-800 p-5 text-white shadow-[0_18px_38px_rgba(79,70,229,0.25)] ring-1 ring-white/20">
         <Star className="text-yellow-200" size={25} />
         <p className="mt-3 text-sm font-black">Learning Journey</p>
         <h3 className="mt-1 text-lg font-black">Keep going!</h3>
@@ -754,7 +882,7 @@ function ParentSidebar({
         </Link>
       </div>
 
-      <div className="mt-5 rounded-[1.5rem] bg-yellow-50 p-5 shadow-sm">
+      <div className="mt-5 rounded-[1.75rem] border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-5 shadow-[0_12px_28px_rgba(180,130,40,0.08)]">
         <h3 className="text-sm font-black text-slate-900">Need Help?</h3>
         <p className="mt-1 text-xs leading-5 text-slate-600">
           Contact FD Arcadia admin if any file link cannot open.
@@ -780,7 +908,7 @@ function TopHeader({
   monthParam: string;
 }) {
   return (
-    <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <header className="mb-6 flex flex-col gap-5 rounded-[1.75rem] border border-white/90 bg-white/75 p-4 shadow-[0_12px_40px_rgba(57,65,130,0.06)] ring-1 ring-indigo-100/70 backdrop-blur sm:p-6 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0">
         <Link
           href={`/learning-hub/${monthParam}`}
@@ -793,7 +921,7 @@ function TopHeader({
         <p className="mt-4 text-[11px] font-black tracking-[0.16em] text-indigo-500 sm:text-xs">
           FD ARCADIA LEARNING HUB
         </p>
-        <h1 className="mt-1 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+        <h1 className="mt-1 text-4xl font-black tracking-[-0.045em] text-slate-950 sm:text-5xl lg:text-6xl">
           Week {weekNo || "-"} at a Glance
         </h1>
         <p className="mt-1 text-sm text-slate-500 sm:text-base">
@@ -802,7 +930,7 @@ function TopHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 lg:pt-8">
-        <div className="rounded-2xl border border-indigo-100 bg-white px-4 py-3 shadow-sm">
+        <div className="rounded-2xl border border-white bg-white/90 px-4 py-3 shadow-[0_8px_24px_rgba(57,65,130,0.07)] ring-1 ring-indigo-100/80">
           <p className="text-[9px] font-black tracking-[0.16em] text-indigo-400">WEEK OF</p>
           <div className="mt-1 flex items-center gap-2 text-sm font-black text-slate-800">
             <CalendarDays size={16} className="text-indigo-500" />
@@ -812,7 +940,7 @@ function TopHeader({
 
         <Link
           href={`/learning-hub/${monthParam}`}
-          className="inline-flex min-h-14 items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 text-sm font-black text-indigo-600 shadow-sm transition hover:bg-indigo-100"
+          className="inline-flex min-h-14 items-center gap-2 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 px-4 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
         >
           <LayoutList size={18} />
           Month View
@@ -820,7 +948,7 @@ function TopHeader({
 
         <Link
           href="/dashboard"
-          className="inline-flex min-h-14 items-center gap-2 rounded-2xl bg-slate-950 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
+          className="inline-flex min-h-14 items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 px-4 text-sm font-black text-white shadow-[0_10px_24px_rgba(79,70,229,0.25)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(79,70,229,0.32)]"
         >
           <Home size={18} />
           Dashboard
@@ -857,22 +985,22 @@ function WeekGrid({
     <>
       {/* Desktop / large laptop: compact timetable. */}
       <section className="hidden xl:block">
-        <div className="overflow-x-auto rounded-[1.5rem] border border-indigo-100 bg-white p-2 shadow-sm">
+        <div className="overflow-x-auto rounded-[1.75rem] border border-white bg-white/90 p-3 shadow-[0_18px_55px_rgba(45,55,120,0.10)] ring-1 ring-indigo-100/80 backdrop-blur sm:p-4">
           <div className="min-w-[1080px]">
-            <div className="grid grid-cols-[58px_repeat(5,minmax(145px,1fr))_52px_minmax(220px,1.3fr)] gap-1.5">
+            <div className="grid grid-cols-[62px_repeat(5,minmax(155px,1fr))_54px_minmax(230px,1.3fr)] gap-2">
               <div />
               {subjectConfigs.slice(0, 5).map((subject) => (
-                <SubjectHeader key={subject.key} subject={subject} />
+                <SubjectHeader key={subject.key} subject={subject} time={getSubjectTime(subject.key, itemsByCell)} />
               ))}
-              <div className="grid min-h-20 place-items-center rounded-xl bg-yellow-100 px-1 text-center font-black text-slate-900">
+              <div className="grid min-h-20 place-items-center rounded-2xl border border-amber-100 bg-gradient-to-b from-amber-100 to-yellow-50 px-1 text-center font-black text-amber-950 shadow-sm">
                 <span className="[writing-mode:vertical-rl] rotate-180 text-[10px]">
                   LUNCH & REST
                 </span>
               </div>
-              <SubjectHeader subject={subjectConfigs[5]} />
+              <SubjectHeader subject={subjectConfigs[5]} time={getSubjectTime(subjectConfigs[5].key, itemsByCell)} />
             </div>
 
-            <div className="mt-1.5 space-y-1.5">
+            <div className="mt-2.5 space-y-2">
               {dayConfigs.map((day) => (
                 <DesktopRowForDay
                   key={day.key}
@@ -935,8 +1063,8 @@ function DesktopRowForDay({
   progressLoading: boolean;
 }) {
   return (
-    <div className="grid grid-cols-[58px_repeat(5,minmax(145px,1fr))_52px_minmax(220px,1.3fr)] gap-1.5">
-      <div className={`grid min-h-[132px] place-items-center rounded-xl px-2 py-3 text-center font-black ${day.color}`}>
+    <div className="grid grid-cols-[62px_repeat(5,minmax(155px,1fr))_54px_minmax(230px,1.3fr)] gap-2">
+      <div className={`grid min-h-[76px] place-items-center rounded-2xl px-2 py-3 text-center font-black shadow-sm ring-1 ring-white/70 ${day.color}`}>
         <span className="[writing-mode:vertical-rl] rotate-180 text-sm">{day.full}</span>
       </div>
 
@@ -954,7 +1082,7 @@ function DesktopRowForDay({
         />
       ))}
 
-      <div className="min-h-[132px] rounded-xl bg-yellow-50" />
+      <div className="min-h-[76px] rounded-2xl border border-amber-200 bg-amber-100/80" />
 
       <LanguageCell
         day={day}
@@ -987,7 +1115,7 @@ function TabletDaySection({
   progressLoading: boolean;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-[1.5rem] border border-white bg-white/95 shadow-[0_12px_35px_rgba(57,65,130,0.08)] ring-1 ring-indigo-100/80">
       <div className={`flex items-center justify-between px-4 py-3 ${day.color}`}>
         <h2 className="font-black">{day.full}</h2>
         <span className="text-[10px] font-black uppercase tracking-wider opacity-70">
@@ -1005,7 +1133,7 @@ function TabletDaySection({
               key={subject.key}
               className={subject.key === "LANGUAGE & LITERACY" ? "sm:col-span-2" : ""}
             >
-              <SubjectMobileHeading subject={subject} />
+              <SubjectMobileHeading subject={subject} time={getSubjectTime(subject.key, itemsByCell)} />
               <div className="space-y-2">
                 {cellItems.map((item) => (
                   <ActivityCard
@@ -1045,7 +1173,7 @@ function MobileDaySection({
   progressLoading: boolean;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-[1.5rem] border border-white bg-white/95 shadow-[0_12px_35px_rgba(57,65,130,0.08)] ring-1 ring-indigo-100/80">
       <div className={`flex items-center justify-between px-4 py-3 ${day.color}`}>
         <h2 className="font-black">{day.full}</h2>
         <span className="rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider">
@@ -1053,14 +1181,14 @@ function MobileDaySection({
         </span>
       </div>
 
-      <div className="divide-y divide-indigo-50">
+      <div className="divide-y divide-indigo-100/70">
         {subjectConfigs.map((subject) => {
           const cellItems = itemsByCell.get(`${day.key}__${subject.key}`) || [];
           if (!cellItems.length) return null;
 
           return (
             <div key={subject.key} className="p-3.5">
-              <SubjectMobileHeading subject={subject} />
+              <SubjectMobileHeading subject={subject} time={getSubjectTime(subject.key, itemsByCell)} />
               <div className="mt-2 space-y-3">
                 {cellItems.map((item) => (
                   <ActivityCard
@@ -1103,7 +1231,7 @@ function LanguageCell({
 
   if (!languageItems.length) {
     return (
-      <div className="grid min-h-[132px] grid-cols-2 gap-1.5">
+      <div className="grid content-start self-start grid-cols-2 gap-2">
         <EmptyMiniCell label="Language" />
         <EmptyMiniCell label="Literacy" />
       </div>
@@ -1111,7 +1239,7 @@ function LanguageCell({
   }
 
   return (
-    <div className="grid min-h-[132px] grid-cols-2 gap-1.5">
+    <div className="grid content-start self-start grid-cols-2 gap-2">
       {languageItems.slice(0, 4).map((item) => (
         <ActivityMiniCard
           key={item.id}
@@ -1128,19 +1256,31 @@ function LanguageCell({
   );
 }
 
-function SubjectHeader({ subject }: { subject: SubjectConfig }) {
+function SubjectHeader({
+  subject,
+  time,
+}: {
+  subject: SubjectConfig;
+  time?: string;
+}) {
   return (
-    <div className={`rounded-xl border border-indigo-100 px-2 py-3 text-center shadow-sm ${subject.headerClass}`}>
+    <div className={`rounded-2xl border border-white px-2 py-3.5 text-center shadow-[0_6px_18px_rgba(57,65,130,0.10)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:shadow-md ${subject.headerClass}`}>
       <div className="text-2xl">{subject.icon}</div>
       <h3 className="mt-0.5 text-sm font-black text-slate-950">{subject.label}</h3>
-      {subject.time ? (
-        <p className="mt-0.5 text-[9px] font-bold text-slate-500">{subject.time}</p>
+      {time ? (
+        <p className="mt-0.5 text-[9px] font-bold text-slate-500">{time}</p>
       ) : null}
     </div>
   );
 }
 
-function SubjectMobileHeading({ subject }: { subject: SubjectConfig }) {
+function SubjectMobileHeading({
+  subject,
+  time,
+}: {
+  subject: SubjectConfig;
+  time?: string;
+}) {
   return (
     <div className="mb-2 flex items-center gap-2">
       <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-50 text-lg">
@@ -1148,8 +1288,8 @@ function SubjectMobileHeading({ subject }: { subject: SubjectConfig }) {
       </span>
       <div className="min-w-0">
         <h3 className="truncate text-sm font-black text-indigo-700">{subject.label}</h3>
-        {subject.time ? (
-          <p className="text-[10px] font-bold text-slate-400">{subject.time}</p>
+        {time ? (
+          <p className="text-[10px] font-bold text-slate-400">{time}</p>
         ) : null}
       </div>
     </div>
@@ -1180,7 +1320,7 @@ function ActivityCell({
   }
 
   return (
-    <div className="grid min-h-[132px] gap-1.5">
+    <div className="grid content-start self-start gap-2">
       {items.map((item) => (
         <ActivityMiniCard
           key={`${day.key}-${subject.key}-${item.id}`}
@@ -1198,7 +1338,7 @@ function ActivityCell({
 
 function EmptyMiniCell({ label }: { label: string }) {
   return (
-    <div className="grid min-h-[132px] place-items-center rounded-xl border border-dashed border-indigo-100 bg-slate-50 p-2">
+    <div className="grid min-h-[76px] place-items-center self-start rounded-2xl border border-dashed border-indigo-200 bg-slate-50 p-2">
       <div className="text-center">
         <p className="text-[10px] font-bold text-slate-300">{label}</p>
         <div className="mx-auto mt-2 grid h-7 w-7 place-items-center rounded-full border border-indigo-100 bg-white text-indigo-400">
@@ -1233,7 +1373,7 @@ function ActivityCard({
 
   return (
     <article
-      className={`rounded-2xl border p-3.5 shadow-sm ${
+      className={`rounded-2xl border p-4 shadow-[0_8px_22px_rgba(57,65,130,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(57,65,130,0.10)] ${
         completed ? "border-emerald-200 bg-emerald-50/40" : "border-indigo-100 bg-white"
       }`}
     >
@@ -1272,7 +1412,7 @@ function ActivityCard({
 
           <ActivityMeta item={item} />
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
             {hasLink ? (
               <a
                 href={item.link_url || "#"}
@@ -1346,25 +1486,25 @@ function ActivityMiniCard({
 
   return (
     <article
-      className={`relative rounded-xl border p-2.5 text-center shadow-sm ${
+      className={`relative h-fit rounded-2xl border p-2.5 text-center shadow-[0_6px_18px_rgba(57,65,130,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(57,65,130,0.12)] ${
         completed ? "border-emerald-200 bg-emerald-50/50" : "border-indigo-100 bg-white"
       }`}
     >
       {item.thumbnail_url ? (
         item.thumbnail_url.length <= 4 ? (
-          <div className="mx-auto grid h-10 w-12 place-items-center rounded-lg bg-indigo-50 text-2xl">
+          <div className="mx-auto grid h-9 w-10 place-items-center rounded-lg bg-indigo-50 text-xl">
             {item.thumbnail_url}
           </div>
         ) : (
-          <img src={item.thumbnail_url} alt="" className="mx-auto h-10 w-14 rounded-lg object-cover" />
+          <img src={item.thumbnail_url} alt="" className="mx-auto h-9 w-12 rounded-lg object-cover" />
         )
       ) : (
-        <div className="mx-auto grid h-10 w-12 place-items-center rounded-lg bg-indigo-50 text-2xl">
+        <div className="mx-auto grid h-9 w-10 place-items-center rounded-lg bg-indigo-50 text-xl">
           {getSubjectEmoji(item.subject)}
         </div>
       )}
 
-      <h4 className="mt-1.5 line-clamp-2 text-[11px] font-black leading-4 text-slate-950">
+      <h4 className="mt-1.5 line-clamp-2 text-xs font-black leading-4 text-slate-950">
         {item.title || "Untitled"}
       </h4>
 
@@ -1419,11 +1559,6 @@ function ActivityMeta({
 }) {
   return (
     <div className={`mt-2 flex flex-wrap gap-1 ${compact ? "justify-center" : ""}`}>
-      {item.time_start || item.time_end ? (
-        <span className="rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-black text-indigo-700">
-          {item.time_start || ""} {item.time_end ? `- ${item.time_end}` : ""}
-        </span>
-      ) : null}
       {item.difficulty ? (
         <span className="rounded-full bg-yellow-100 px-2 py-1 text-[9px] font-black text-yellow-800">
           {item.difficulty}
@@ -1451,7 +1586,7 @@ function getSubjectEmoji(subject: string | null | undefined) {
 
 function SmallStat({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) {
   return (
-    <div className="flex min-h-[82px] items-center gap-3 rounded-[1.25rem] border border-indigo-100 bg-white px-4 py-3 shadow-sm sm:px-5">
+    <div className="group flex min-h-[92px] items-center gap-3.5 rounded-[1.5rem] border border-white/80 bg-white/90 px-4 py-4 shadow-[0_10px_30px_rgba(57,65,130,0.07)] ring-1 ring-indigo-100/70 backdrop-blur transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(57,65,130,0.12)] sm:px-5">
       {icon ? (
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-500">
           {icon}

@@ -1309,9 +1309,9 @@ function ParentDashboard({ userId }: { userId: string }) {
 
         if (weekItems.length > 0) {
           const { data: progressData, error: progressError } = await supabase
-            .from("learning_hub_week_item_progress")
+            .from("learning_hub_item_progress")
             .select("item_id,completed,downloaded")
-            .eq("user_id", userId)
+            .eq("parent_id", userId)
             .in(
               "item_id",
               weekItems.map((item) => item.id)
@@ -1335,7 +1335,12 @@ function ParentDashboard({ userId }: { userId: string }) {
           setLearningHubDashboardProgress(built);
         }
       } catch (progressError) {
-        console.error("Learning Hub dashboard progress error:", progressError);
+        console.error(
+          "Learning Hub dashboard progress error:",
+          progressError instanceof Error
+            ? progressError.message
+            : JSON.stringify(progressError, null, 2)
+        );
         if (!cancelled) {
           setLearningHubDashboardProgress(null);
         }

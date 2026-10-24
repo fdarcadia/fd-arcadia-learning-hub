@@ -93,6 +93,14 @@ type ParentProfile = {
   subscription_end: string | null;
 };
 
+type ScheduleOverrideRow = {
+  item_id: string;
+  parent_id: string;
+  time_start: string | null;
+  time_end: string | null;
+  updated_at?: string;
+};
+
 type LearningHubAccessRow = {
   id: string;
   parent_id: string;
@@ -132,6 +140,8 @@ const days = [
   { value: "WED", label: "Wednesday", short: "WED", color: "bg-pink-100 text-pink-900" },
   { value: "THU", label: "Thursday", short: "THU", color: "bg-orange-100 text-orange-900" },
   { value: "FRI", label: "Friday", short: "FRI", color: "bg-blue-100 text-blue-900" },
+  { value: "SAT", label: "Saturday", short: "SAT", color: "bg-violet-100 text-violet-900" },
+  { value: "SUN", label: "Sunday", short: "SUN", color: "bg-rose-100 text-rose-900" },
 ];
 
 const subjects = [
@@ -216,6 +226,25 @@ function AdminLearningHubContent({ email }: { email: string }) {
   const [assignmentSaving, setAssignmentSaving] = useState(false);
   const [itemAssignments, setItemAssignments] = useState<Record<string, string>>({});
 
+  // Parent-specific schedule overrides are stored separately from the default activity time.
+  const [scheduleMessage, setScheduleMessage] = useState("");
+  const [scheduleError, setScheduleError] = useState("");
+  const [scheduleOverrides, setScheduleOverrides] = useState<Record<string, { time_start: string; time_end: string }>>({});
+  const [scheduleRowSaving, setScheduleRowSaving] = useState("");
+  const [previewParentId, setPreviewParentId] = useState("");
+
+  // Parent-specific column header settings (stored separately from worksheet items).
+  const [columnParentId, setColumnParentId] = useState("");
+  const [columnDay, setColumnDay] = useState("MON");
+  const [columnSubject, setColumnSubject] = useState("WARM-UP");
+  const [columnSubjectName, setColumnSubjectName] = useState("Warm-Up");
+  const [columnStartTime, setColumnStartTime] = useState("09:00");
+  const [columnEndTime, setColumnEndTime] = useState("09:30");
+  const [columnSettingsLoading, setColumnSettingsLoading] = useState(false);
+  const [columnSettingsSaving, setColumnSettingsSaving] = useState(false);
+  const [columnSettingsMessage, setColumnSettingsMessage] = useState("");
+  const [columnSettingsError, setColumnSettingsError] = useState("");
+
   const selectedMonth = Number(form.month_no);
   const selectedWeek = Number(form.week_no);
 
@@ -237,6 +266,176 @@ function AdminLearningHubContent({ email }: { email: string }) {
       setAccessRows([]);
     }
   }, [selectedParentId, accessMonth]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadAllScheduleOverrides() {
+      if (!form.id) {
+        setScheduleOverrides({});
+        return;
+      }
+      const { data, error: overrideError } = await supabase
+        .from("learning_hub_item_schedule_overrides")
+        .select("item_id,parent_id,time_start,time_end,updated_at")
+        .eq("item_id", form.id);
+      if (cancelled) return;
+      if (overrideError) {
+        setScheduleError(overrideError.message);
+        setScheduleOverrides({});
+        return;
+      }
+      const next: Record<string, { time_start: string; time_end: string }> = {};
+      for (const row of (data || []) as ScheduleOverrideRow[]) {
+        next[row.parent_id] = {
+          time_start: row.time_start || "",
+          time_end: row.time_end || "",
+        };
+      }
+      setScheduleOverrides(next);
+    }
+    loadAllScheduleOverrides();
+    return () => { cancelled = true; };
+  }, [form.id]);
+
+  useEffect(() => {
+    if (!previewParentId && parents.length) setPreviewParentId(parents[0].id);
+    if (!columnParentId && parents.length) setColumnParentId(parents[0].id);
+  }, [parents, previewParentId, columnParentId]);
+
+  // Load the selected parent's column header settings for this Month / Week / Day / Subject.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadColumnSettings() {
+      if (!columnParentId) return;
+      setColumnSettingsLoading(true);
+      setColumnSettingsError("");
+      setColumnSettingsMessage("");
+      const { data, error: loadError } = await supabase
+        .from("learning_hub_parent_column_settings")
+        .select("subject_name,time_start,time_end")
+        .eq("parent_id", columnParentId)
+        .eq("month_no", selectedMonth)
+        .eq("week_no", selectedWeek)
+        .eq("day", columnDay)
+        .eq("current_subject", columnSubject)
+        .maybeSingle();
+      if (cancelled) return;
+      if (loadError) {
+        setColumnSettingsError(loadError.message);
+        setColumnSubjectName(subjects.find((s) => s.value === columnSubject)?.label || columnSubject);
+        setColumnStartTime("");
+        setColumnEndTime("");
+      } else if (data) {
+        setColumnSubjectName(data.subject_name || subjects.find((s) => s.value === columnSubject)?.label || columnSubject);
+        setColumnStartTime(data.time_start || "");
+        setColumnEndTime(data.time_end || "");
+      } else {
+        setColumnSubjectName(subjects.find((s) => s.value === columnSubject)?.label || columnSubject);
+        setColumnStartTime("");
+        setColumnEndTime("");
+      }
+      setColumnSettingsLoading(false);
+    }
+    loadColumnSettings();
+    return () => { cancelled = true; };
+  }, [columnParentId, selectedMonth, selectedWeek, columnDay, columnSubject]);
+
+  async function saveColumnSettings() {
+    if (!columnParentId) {
+      setColumnSettingsError("Please select a parent first.");
+      return;
+    }
+    if (!columnSubjectName.trim()) {
+      setColumnSettingsError("Please enter a subject name.");
+      return;
+    }
+    setColumnSettingsSaving(true);
+    setColumnSettingsError("");
+    setColumnSettingsMessage("");
+    const { error: saveError } = await supabase
+      .from("learning_hub_parent_column_settings")
+      .upsert({
+        parent_id: columnParentId,
+        month_no: selectedMonth,
+        week_no: selectedWeek,
+        day: columnDay,
+        current_subject: columnSubject,
+        subject_name: columnSubjectName.trim(),
+        time_start: columnStartTime.trim() || null,
+        time_end: columnEndTime.trim() || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "parent_id,month_no,week_no,day,current_subject" });
+    setColumnSettingsSaving(false);
+    if (saveError) {
+      setColumnSettingsError(saveError.message);
+      return;
+    }
+    setColumnSettingsMessage("Column settings saved for this parent only.");
+  }
+
+  function updateScheduleDraft(parentId: string, field: "time_start" | "time_end", value: string) {
+    setScheduleOverrides((current) => ({
+      ...current,
+      [parentId]: {
+        time_start: current[parentId]?.time_start || "",
+        time_end: current[parentId]?.time_end || "",
+        [field]: value,
+      },
+    }));
+  }
+
+  async function saveScheduleRow(parentId: string) {
+    if (!form.id) {
+      setScheduleError("Save the activity first, then edit parent schedules.");
+      return;
+    }
+    const draft = scheduleOverrides[parentId] || { time_start: "", time_end: "" };
+    if (!draft.time_start.trim() && !draft.time_end.trim()) {
+      setScheduleError("Enter a custom start/end time, or use Reset to Default.");
+      return;
+    }
+    setScheduleRowSaving(parentId);
+    setScheduleError("");
+    setScheduleMessage("");
+    const { error: saveError } = await supabase
+      .from("learning_hub_item_schedule_overrides")
+      .upsert({
+        item_id: form.id,
+        parent_id: parentId,
+        time_start: draft.time_start.trim() || null,
+        time_end: draft.time_end.trim() || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "item_id,parent_id" });
+    setScheduleRowSaving("");
+    if (saveError) {
+      setScheduleError(saveError.message);
+      return;
+    }
+    setScheduleMessage("Custom schedule saved. Other parents remain unchanged.");
+  }
+
+  async function resetScheduleRow(parentId: string) {
+    if (!form.id) return;
+    setScheduleRowSaving(parentId);
+    setScheduleError("");
+    setScheduleMessage("");
+    const { error: deleteError } = await supabase
+      .from("learning_hub_item_schedule_overrides")
+      .delete()
+      .eq("item_id", form.id)
+      .eq("parent_id", parentId);
+    setScheduleRowSaving("");
+    if (deleteError) {
+      setScheduleError(deleteError.message);
+      return;
+    }
+    setScheduleOverrides((current) => {
+      const next = { ...current };
+      delete next[parentId];
+      return next;
+    });
+    setScheduleMessage("Custom schedule removed. This parent now uses the default time.");
+  }
 
   async function loadItems() {
     setLoadingItems(true);
@@ -559,11 +758,17 @@ function AdminLearningHubContent({ email }: { email: string }) {
       month_no: current.month_no,
       week_no: current.week_no,
     }));
+    setScheduleOverrides({});
+    setScheduleMessage("");
+    setScheduleError("");
     setMessage("");
     setError("");
   }
 
   async function editItem(item: WeekItem) {
+    setScheduleOverrides({});
+    setScheduleMessage("");
+    setScheduleError("");
     setForm({
       id: item.id,
       month_no: String(item.month_no),
@@ -1101,6 +1306,76 @@ function AdminLearningHubContent({ email }: { email: string }) {
             )}
           </section>
 
+          <section className="mt-6 rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-black tracking-[0.18em] text-indigo-500">EDIT SUBJECT / COLUMN</p>
+                <h2 className="mt-1 text-3xl font-black text-indigo-700">Weekly Column Settings</h2>
+                <p className="mt-2 max-w-4xl text-slate-500">Change the subject name and header time for a selected parent, month, week and day. The time is intended for the column header, not each worksheet card.</p>
+              </div>
+              <span className="rounded-full bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-600">Monday – Sunday</span>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <SelectField
+                label="Parent / Student"
+                value={columnParentId}
+                onChange={setColumnParentId}
+                options={parents.map((parent) => ({ value: parent.id, label: parent.full_name || parent.email || parent.id }))}
+              />
+              <SelectField
+                label="Day"
+                value={columnDay}
+                onChange={setColumnDay}
+                options={days.map((day) => ({ value: day.value, label: day.label }))}
+              />
+              <SelectField
+                label="Current Subject"
+                value={columnSubject}
+                onChange={setColumnSubject}
+                options={subjects.map((subject) => ({ value: subject.value, label: `${subject.icon} ${subject.label}` }))}
+              />
+              <InputField
+                label="Subject Name"
+                value={columnSubjectName}
+                onChange={setColumnSubjectName}
+                placeholder="e.g. Warm-Up"
+              />
+              <InputField
+                label="Start Time"
+                value={columnStartTime}
+                onChange={setColumnStartTime}
+                placeholder="09:00"
+              />
+              <InputField
+                label="End Time"
+                value={columnEndTime}
+                onChange={setColumnEndTime}
+                placeholder="09:30"
+              />
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-indigo-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm leading-6 text-slate-500">Applies only to the selected parent, Month {selectedMonth}, Week {selectedWeek}, {days.find((d) => d.value === columnDay)?.label}, and current subject.</p>
+              <button type="button" onClick={saveColumnSettings} disabled={columnSettingsSaving || columnSettingsLoading || !columnParentId} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">
+                {columnSettingsSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                {columnSettingsSaving ? "Saving..." : "Save Column"}
+              </button>
+            </div>
+            {columnSettingsLoading ? <p className="mt-3 text-sm font-semibold text-slate-500">Loading saved column settings...</p> : null}
+            {columnSettingsError ? <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{columnSettingsError}</p> : null}
+            {columnSettingsMessage ? <p className="mt-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{columnSettingsMessage}</p> : null}
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-black uppercase tracking-wider text-amber-700">Parent Preview</p>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <span className="rounded-full bg-white px-3 py-2 text-sm font-bold text-slate-700">{parents.find((p) => p.id === columnParentId)?.full_name || "Selected parent"}</span>
+                <span className="text-lg font-black text-indigo-700">{columnSubjectName || subjects.find((s) => s.value === columnSubject)?.label || columnSubject}</span>
+                <span className="rounded-full bg-pink-100 px-3 py-2 text-sm font-black text-pink-700">{columnStartTime || "--:--"} – {columnEndTime || "--:--"}</span>
+                <span className="text-sm text-slate-500">{days.find((d) => d.value === columnDay)?.label} · Month {selectedMonth} · Week {selectedWeek}</span>
+              </div>
+            </div>
+          </section>
+
           <section className="mt-6 grid gap-6 2xl:grid-cols-[0.95fr_1.05fr]">
             <form
               onSubmit={handleSubmit}
@@ -1388,6 +1663,128 @@ function AdminLearningHubContent({ email }: { email: string }) {
                       </div>
                     </div>
                   ) : null}
+                </div>
+
+                <div className="md:col-span-2 rounded-[1.5rem] border border-pink-100 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-pink-100 text-xl font-black text-pink-600">4</span>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-xl font-black text-indigo-950">Parent-Specific Schedule</h3>
+                          <span className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-black text-white">NEW</span>
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">Set a different time for each parent. Custom times override the default schedule without changing other parents.</p>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white">
+                      <Plus size={16} /> Per-parent schedule
+                    </span>
+                  </div>
+
+                  {!form.id ? (
+                    <p className="mt-4 rounded-xl bg-violet-50 px-4 py-3 text-sm font-bold text-violet-700">
+                      Save the activity first. Then click Edit on its activity card to customise schedules for individual parents.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-100">
+                        <table className="w-full min-w-[850px] border-collapse text-left text-sm">
+                          <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-600">
+                            <tr>
+                              <th className="px-4 py-3">Parent</th>
+                              <th className="px-4 py-3">Default Time</th>
+                              <th className="px-4 py-3">Custom Time</th>
+                              <th className="px-4 py-3">Status</th>
+                              <th className="px-4 py-3 text-center">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 bg-white">
+                            {parents.map((parent, index) => {
+                              const draft = scheduleOverrides[parent.id] || { time_start: "", time_end: "" };
+                              const hasOverride = Boolean(draft.time_start || draft.time_end);
+                              return (
+                                <tr key={parent.id} className="hover:bg-violet-50/40">
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-3">
+                                      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-black ${["bg-indigo-100 text-indigo-700","bg-pink-100 text-pink-700","bg-sky-100 text-sky-700","bg-amber-100 text-amber-700"][index % 4]}`}>
+                                        {(parent.full_name || parent.email || "P").split(/\s+/).map((part) => part[0]).slice(0,2).join("").toUpperCase()}
+                                      </span>
+                                      <div className="min-w-0">
+                                        <p className="font-black text-slate-800">{parent.full_name || "Unnamed parent"}</p>
+                                        <p className="max-w-[200px] truncate text-xs text-slate-400">{parent.email || "No email"}</p>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">
+                                    {form.time_start || "—"}{form.time_end ? ` – ${form.time_end}` : ""}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <input aria-label={`${parent.full_name || "Parent"} custom start time`} value={draft.time_start} onChange={(event) => updateScheduleDraft(parent.id, "time_start", event.target.value)} placeholder="09:00 AM" className="w-[118px] rounded-xl border border-slate-200 px-3 py-2 font-semibold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                                      <span className="text-slate-400">–</span>
+                                      <input aria-label={`${parent.full_name || "Parent"} custom end time`} value={draft.time_end} onChange={(event) => updateScheduleDraft(parent.id, "time_end", event.target.value)} placeholder="09:30 AM" className="w-[118px] rounded-xl border border-slate-200 px-3 py-2 font-semibold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-black ${hasOverride ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
+                                      {hasOverride ? "Custom Time" : "Default Time"}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex justify-center gap-2">
+                                      <button type="button" title="Save this parent's schedule" onClick={() => saveScheduleRow(parent.id)} disabled={scheduleRowSaving === parent.id} className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 disabled:opacity-50">
+                                        {scheduleRowSaving === parent.id ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                      </button>
+                                      <button type="button" title="Reset to default time" onClick={() => resetScheduleRow(parent.id)} disabled={!hasOverride || scheduleRowSaving === parent.id} className="grid h-9 w-9 place-items-center rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 disabled:opacity-40">
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            {!parents.length ? <tr><td colSpan={5} className="px-4 py-8 text-center font-semibold text-slate-400">No Learning Hub parents found.</td></tr> : null}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {scheduleError ? <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{scheduleError}</p> : null}
+                      {scheduleMessage ? <p className="mt-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{scheduleMessage}</p> : null}
+
+                      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                        <div className="flex items-center gap-2 font-black text-slate-800"><span className="text-lg">👁</span> Parent Preview</div>
+                        <div className="mt-3 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+                          <label className="block">
+                            <span className="text-sm font-black text-slate-600">Preview for selected parent</span>
+                            <select value={previewParentId} onChange={(event) => setPreviewParentId(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 font-semibold text-slate-700">
+                              {parents.map((parent) => <option key={parent.id} value={parent.id}>{parent.full_name || parent.email || "Unnamed parent"}</option>)}
+                            </select>
+                          </label>
+                          <div className="rounded-2xl border border-amber-100 bg-white p-4 shadow-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">{form.subject}</span>
+                              <span className="rounded-full bg-pink-100 px-3 py-1 text-sm font-black text-pink-700">
+                                <Clock3 className="mr-1 inline" size={14} />
+                                {(scheduleOverrides[previewParentId]?.time_start || form.time_start || "Time not set")} – {(scheduleOverrides[previewParentId]?.time_end || form.time_end || "Time not set")}
+                              </span>
+                            </div>
+                            <div className="mt-3 flex items-center gap-3">
+                              <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-pink-50 text-2xl">
+                                {form.thumbnail_url?.startsWith("http") ? <img src={form.thumbnail_url} alt="" className="h-full w-full object-cover" /> : form.thumbnail_url || "📚"}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-black text-indigo-950">{form.title || "Activity title preview"}</p>
+                                <p className="mt-1 text-sm text-slate-500">{form.description || "Activity description preview."}</p>
+                                <p className="mt-2 text-xs font-bold text-indigo-600">Visible according to the activity's existing visibility setting.</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="mt-3 text-xs leading-5 text-slate-500">This is a visual preview. The parent page uses the saved activity and override data; save changes before checking the live page.</p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <label className="flex items-center gap-3 rounded-2xl bg-indigo-50 px-4 py-4 font-black text-indigo-700 md:col-span-2">
@@ -1829,6 +2226,7 @@ function InputField({
   required,
   type = "text",
   icon,
+  disabled = false,
 }: {
   label: string;
   value: string;
@@ -1837,6 +2235,7 @@ function InputField({
   required?: boolean;
   type?: string;
   icon?: React.ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <label className="block">
@@ -1848,6 +2247,7 @@ function InputField({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           required={required}
+          disabled={disabled}
           type={type}
           className="w-full bg-transparent font-bold text-slate-800 outline-none placeholder:text-slate-400"
         />
