@@ -40,6 +40,10 @@ type WeekItem = {
   week_no: number;
   day: string;
   column_no: number | null;
+  row_span: number | null;
+  column_span: number | null;
+  merge_enabled: boolean | null;
+  repeat_mode: "span_once" | "daily_copy" | null;
   subject: string;
   title: string;
   description: string | null;
@@ -66,6 +70,10 @@ type FormState = {
   day: string;
   subject: string;
   column_no: string;
+  row_span: string;
+  column_span: string;
+  merge_enabled: boolean;
+  repeat_mode: "span_once" | "daily_copy";
   title: string;
   description: string;
   time_start: string;
@@ -118,6 +126,10 @@ const emptyForm: FormState = {
   day: "MON",
   subject: "WARM-UP",
   column_no: "1",
+  row_span: "1",
+  column_span: "1",
+  merge_enabled: false,
+  repeat_mode: "daily_copy",
   title: "",
   description: "",
   time_start: "",
@@ -776,6 +788,10 @@ function AdminLearningHubContent({ email }: { email: string }) {
       day: item.day || "MON",
       subject: item.subject || "WARM-UP",
       column_no: String(item.column_no || 1),
+      row_span: String(item.row_span || 1),
+      column_span: String(item.column_span || 1),
+      merge_enabled: item.merge_enabled ?? false,
+      repeat_mode: item.repeat_mode === "span_once" ? "span_once" : "daily_copy",
       title: item.title || "",
       description: item.description || "",
       time_start: item.time_start || "",
@@ -811,12 +827,35 @@ function AdminLearningHubContent({ email }: { email: string }) {
       return;
     }
 
+    const selectedDayIndex = days.findIndex((day) => day.value === form.day);
+    const requestedRowSpan = form.repeat_mode === "span_once" && form.merge_enabled
+      ? Math.max(1, Number(form.row_span || 1))
+      : 1;
+    const requestedColumnSpan = form.repeat_mode === "span_once" && form.merge_enabled
+      ? Math.max(1, Number(form.column_span || 1))
+      : 1;
+
+    if (
+      !Number.isInteger(requestedRowSpan) ||
+      !Number.isInteger(requestedColumnSpan) ||
+      selectedDayIndex < 0 ||
+      selectedDayIndex + requestedRowSpan > days.length
+    ) {
+      setSaving(false);
+      setError("Invalid merge size. Check Row Span and make sure the activity fits within the selected days.");
+      return;
+    }
+
     const payload = {
       month_no: Number(form.month_no),
       week_no: Number(form.week_no),
       day: form.day,
       subject: form.subject,
       column_no: Number(form.column_no || 1),
+      row_span: requestedRowSpan,
+      column_span: requestedColumnSpan,
+      merge_enabled: form.repeat_mode === "span_once" && form.merge_enabled,
+      repeat_mode: form.repeat_mode,
       title: form.title.trim(),
       description: form.description.trim() || null,
       time_start: form.time_start.trim() || null,
@@ -1459,6 +1498,76 @@ function AdminLearningHubContent({ email }: { email: string }) {
                   type="number"
                 />
 
+                {/* Merged-cell settings: additive fields; existing activity fields remain unchanged. */}
+                <div className="md:col-span-2 rounded-[1.5rem] border border-violet-100 bg-violet-50/60 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black tracking-[0.14em] text-violet-600">TIMETABLE CELL LAYOUT</p>
+                      <p className="mt-1 text-sm text-slate-500">Control whether this activity appears once across multiple cells or separately on each day.</p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-violet-700">Optional</span>
+                  </div>
+
+                  <div className="mt-4">
+                    <SelectField
+                      label="Repeat Mode"
+                      value={form.repeat_mode}
+                      onChange={(value) => {
+                        const mode = value as FormState["repeat_mode"];
+                        updateForm("repeat_mode", mode);
+                        if (mode === "daily_copy") {
+                          updateForm("merge_enabled", false);
+                          updateForm("row_span", "1");
+                          updateForm("column_span", "1");
+                        }
+                      }}
+                      options={[
+                        { value: "daily_copy", label: "Individual daily activities" },
+                        { value: "span_once", label: "Single activity across cells" },
+                      ]}
+                    />
+                  </div>
+
+                  {form.repeat_mode === "span_once" ? (
+                    <>
+                      <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-2xl border border-violet-100 bg-white p-4">
+                        <input
+                          type="checkbox"
+                          checked={form.merge_enabled}
+                          onChange={(event) => updateForm("merge_enabled", event.target.checked)}
+                          className="h-5 w-5 rounded border-violet-300 text-violet-600 focus:ring-violet-500"
+                        />
+                        <span>
+                          <span className="block font-black text-slate-800">Enable merged cells</span>
+                          <span className="mt-1 block text-xs text-slate-500">One activity card occupies the selected number of rows and columns.</span>
+                        </span>
+                      </label>
+
+                      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                        <InputField
+                          label="Row Span (days)"
+                          value={form.row_span}
+                          onChange={(value) => updateForm("row_span", value)}
+                          placeholder="1"
+                          type="number"
+                          disabled={!form.merge_enabled}
+                        />
+                        <InputField
+                          label="Column Span"
+                          value={form.column_span}
+                          onChange={(value) => updateForm("column_span", value)}
+                          placeholder="1"
+                          type="number"
+                          disabled={!form.merge_enabled}
+                        />
+                      </div>
+                      <p className="mt-3 text-xs leading-5 text-slate-500">The selected Day is the starting day. Row Span extends down the timetable day rows; Column Span extends across adjacent timetable columns. The activity must fit inside the selected week.</p>
+                    </>
+                  ) : (
+                    <p className="mt-3 rounded-xl bg-white px-4 py-3 text-xs leading-5 text-slate-500">Daily mode keeps each activity as an individual cell. To show the same activity on several days, create or copy one activity for each day using the existing activity workflow.</p>
+                  )}
+                </div>
+
                 <InputField
                   label="Title"
                   value={form.title}
@@ -1835,7 +1944,7 @@ function AdminLearningHubContent({ email }: { email: string }) {
             </form>
 
             <section className="rounded-[2rem] border border-indigo-100 bg-white p-6 shadow-sm">
-              <div className="mb-5 flex items-center justify-between">
+              <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-sm font-black tracking-[0.2em] text-yellow-600">
                     WEEK ITEMS
@@ -1843,8 +1952,36 @@ function AdminLearningHubContent({ email }: { email: string }) {
                   <h2 className="mt-1 text-3xl font-black text-indigo-700">
                     Month {form.month_no} - Week {form.week_no}
                   </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Select a week to view and manage its activities.
+                  </p>
                 </div>
                 <BookOpenCheck className="text-indigo-600" size={34} />
+              </div>
+
+              <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[1, 2, 3, 4].map((week) => {
+                  const active = Number(form.week_no) === week;
+                  return (
+                    <button
+                      key={week}
+                      type="button"
+                      onClick={() => {
+                        updateForm("week_no", String(week));
+                        setMessage("");
+                        setError("");
+                      }}
+                      aria-pressed={active}
+                      className={`rounded-2xl border px-4 py-3 text-sm font-black transition focus:outline-none focus:ring-4 focus:ring-indigo-100 ${
+                        active
+                          ? "border-indigo-300 bg-indigo-600 text-white shadow-md"
+                          : "border-indigo-100 bg-slate-50 text-indigo-700 hover:border-indigo-200 hover:bg-indigo-50"
+                      }`}
+                    >
+                      Week {week}
+                    </button>
+                  );
+                })}
               </div>
 
               {loadingItems ? (

@@ -16,6 +16,7 @@ import {
   FileText,
   Gift,
   Home,
+  Info,
   LayoutList,
   LockKeyhole,
   PlayCircle,
@@ -49,6 +50,10 @@ type WeekAtGlanceItem = {
   is_completed: boolean | null;
   is_active: boolean | null;
   visibility?: "shared" | "parent" | null;
+  merge_enabled?: boolean | null;
+  repeat_mode?: "span_once" | "daily_copy" | null;
+  row_span?: number | null;
+  column_span?: number | null;
 };
 
 type LearningHubItemProgress = {
@@ -289,6 +294,13 @@ function normalizeSubject(value: string | null | undefined) {
   if (key.includes("LANGUAGE") || key.includes("LITERACY")) return "LANGUAGE & LITERACY";
   if (key.includes("NOTE")) return "NOTES";
   return key || "NOTES";
+}
+
+// A merged card is stored once on its starting day. Legacy rows with
+// merge_enabled=true remain supported even if repeat_mode is null.
+function isSpanMergedItem(item: WeekAtGlanceItem) {
+  return item.merge_enabled === true &&
+    (item.repeat_mode == null || item.repeat_mode === "span_once");
 }
 
 function parseTimeToMinutes(value: string | null | undefined): number | null {
@@ -982,12 +994,24 @@ function WeekGrid({
   };
 
   // Parent view only shows days with activities configured by the admin.
-  const visibleDays = dayConfigs.filter((day) =>
-    Array.from(itemsByCell.entries()).some(
+  const visibleDays = dayConfigs.filter((day) => {
+    const currentIndex = dayConfigs.findIndex((candidate) => candidate.key === day.key);
+    const hasDirectItems = Array.from(itemsByCell.entries()).some(
       ([cellKey, cellItems]) =>
         cellKey.startsWith(`${day.key}__`) && cellItems.length > 0,
-    ),
-  );
+    );
+    const coveredByMergedItem = Array.from(itemsByCell.entries()).some(
+      ([cellKey, cellItems]) => {
+        const anchorDay = cellKey.split("__")[0];
+        const anchorIndex = dayConfigs.findIndex((candidate) => candidate.key === anchorDay);
+        return cellItems.some((item) => {
+          const span = isSpanMergedItem(item) ? Math.max(1, Number(item.row_span || 1)) : 1;
+          return anchorIndex >= 0 && anchorIndex <= currentIndex && anchorIndex + span > currentIndex;
+        });
+      },
+    );
+    return hasDirectItems || coveredByMergedItem;
+  });
 
   return (
     <>
@@ -1008,16 +1032,11 @@ function WeekGrid({
               <SubjectHeader subject={subjectConfigs[5]} time={getSubjectTime(subjectConfigs[5].key, itemsByCell)} />
             </div>
 
-            <div className="mt-2.5 space-y-2">
-              {visibleDays.map((day) => (
-                <DesktopRowForDay
-                  key={day.key}
-                  day={day}
-                  itemsByCell={itemsByCell}
-                  {...cardProps}
-                />
-              ))}
-            </div>
+            <DesktopMergedGrid
+              visibleDays={visibleDays}
+              itemsByCell={itemsByCell}
+              {...cardProps}
+            />
           </div>
         </div>
       </section>
@@ -1050,6 +1069,152 @@ function WeekGrid({
         </div>
       </section>
     </>
+  );
+}
+
+function DesktopMergedGrid({
+  visibleDays,
+  itemsByCell,
+  progressMap,
+  savingItemId,
+  onResourceClick,
+  onMarkDone,
+  progressLoading,
+}: {
+  visibleDays: DayConfig[];
+  itemsByCell: Map<string, WeekAtGlanceItem[]>;
+  progressMap: Record<string, LearningHubItemProgress>;
+  savingItemId: string | null;
+  onResourceClick: (item: WeekAtGlanceItem) => void;
+  onMarkDone: (item: WeekAtGlanceItem) => void;
+  progressLoading: boolean;
+}) {
+  const dayIndex = new Map(visibleDays.map((day, index) => [day.key, index]));
+  const subjectColumn = new Map<string, number>([
+    ["NOTES", 2],
+    ["WARM-UP", 3],
+    ["SCIENCE", 4],
+    ["MATH", 5],
+    ["MEMBACA", 6],
+    ["LANGUAGE & LITERACY", 8],
+  ]);
+
+  // Build merge coverage first. A span-once activity owns every covered
+  // timetable cell; covered cells must not render a second card on top of it.
+  const mergeCoverage = new Set<string>();
+  const mergedAnchors = Array.from(itemsByCell.entries()).flatMap(([key, cellItems]) => {
+    const [dayKey, subjectKey] = key.split("__");
+    const row = dayIndex.get(dayKey);
+    const col = subjectColumn.get(subjectKey);
+    if (row === undefined || col === undefined) return [];
+    return cellItems
+      .filter(isSpanMergedItem)
+      .map((item) => ({
+        key, dayKey, subjectKey, row, col,
+        rowSpan: Math.max(1, Number(item.row_span || 1)),
+        columnSpan: Math.max(1, Number(item.column_span || 1)),
+        item,
+      }));
+  });
+
+  mergedAnchors.forEach((anchor) => {
+    for (let rowOffset = 0; rowOffset < anchor.rowSpan; rowOffset += 1) {
+      for (let colOffset = 0; colOffset < anchor.columnSpan; colOffset += 1) {
+        if (rowOffset === 0 && colOffset === 0) continue;
+        const coveredDay = visibleDays[anchor.row + rowOffset];
+        if (!coveredDay) continue;
+        const coveredSubject = Array.from(subjectColumn.entries()).find(
+          ([, column]) => column === anchor.col + colOffset,
+        )?.[0];
+        if (coveredSubject) mergeCoverage.add(`${coveredDay.key}__${coveredSubject}`);
+      }
+    }
+  });
+
+  const cells = Array.from(itemsByCell.entries()).flatMap(([key, cellItems]) => {
+    const [dayKey, subjectKey] = key.split("__");
+    const row = dayIndex.get(dayKey);
+    const col = subjectColumn.get(subjectKey);
+    if (row === undefined || col === undefined || !cellItems.length) return [];
+    // Do not render content in cells already occupied by a merged activity.
+    if (mergeCoverage.has(key)) return [];
+
+    const sortedItems = [...cellItems].sort(
+      (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0),
+    );
+    const anchor = sortedItems.find(isSpanMergedItem);
+    const shouldMerge = Boolean(anchor);
+    const requestedRowSpan = shouldMerge ? Math.max(1, Number(anchor?.row_span || 1)) : 1;
+    const rowSpan = Math.min(requestedRowSpan, visibleDays.length - row);
+    const requestedColumnSpan = shouldMerge ? Math.max(1, Number(anchor?.column_span || 1)) : 1;
+    const maxSubjectSpan = Math.max(1, 8 - col);
+    const columnSpan = Math.min(requestedColumnSpan, maxSubjectSpan);
+    return [{ key, row, col, rowSpan, columnSpan, subjectKey, items: sortedItems }];
+  });
+
+  return (
+    <div
+      className="mt-2.5 grid items-stretch gap-2"
+      style={{
+        gridTemplateColumns: "62px repeat(5, minmax(155px, 1fr)) 54px minmax(230px, 1.3fr)",
+        gridTemplateRows: `repeat(${Math.max(visibleDays.length, 1)}, minmax(150px, 180px))`,
+      }}
+    >
+      {visibleDays.map((day, index) => (
+        <div
+          key={`day-${day.key}`}
+          className={`grid min-h-[150px] place-items-center rounded-2xl px-2 py-3 text-center font-black shadow-sm ring-1 ring-white/70 ${day.color}`}
+          style={{ gridRow: `${index + 1} / span 1`, gridColumn: "1 / span 1" }}
+        >
+          <span className="[writing-mode:vertical-rl] rotate-180 text-sm">{day.full}</span>
+        </div>
+      ))}
+
+      {cells.map((cell) => (
+        <div
+          key={cell.key}
+          className={`relative z-0 min-w-0 overflow-y-auto rounded-2xl border border-indigo-100 bg-white/95 p-2 shadow-[0_6px_18px_rgba(57,65,130,0.06)] hover:z-50 focus-within:z-50 ${cell.rowSpan > 1 || cell.columnSpan > 1 ? "ring-1 ring-indigo-100" : ""}`}
+          style={{
+            gridRow: `${cell.row + 1} / span ${cell.rowSpan}`,
+            gridColumn: `${cell.col} / span ${cell.columnSpan}`,
+          }}
+        >
+          <div
+            className={`grid h-full content-start gap-2 ${cell.subjectKey === "LANGUAGE & LITERACY" ? "grid-cols-2" : "grid-cols-1"}`}
+          >
+            {cell.items.map((item) => (
+              <div
+                key={`${cell.key}-${item.id}`}
+                className="min-w-0"
+                style={
+                  cell.subjectKey === "LANGUAGE & LITERACY" && isSpanMergedItem(item)
+                    ? { gridColumn: `span ${Math.min(2, Math.max(1, Number(item.column_span || 1)))}` }
+                    : undefined
+                }
+              >
+                <ActivityMiniCard
+                  item={item}
+                  progress={progressMap[item.id]}
+                  saving={savingItemId === item.id}
+                  onResourceClick={onResourceClick}
+                  onMarkDone={onMarkDone}
+                  progressLoading={progressLoading}
+                  compact
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {visibleDays.map((day, index) => (
+        <div
+          key={`lunch-${day.key}`}
+          className="min-h-[150px] rounded-2xl border border-amber-200 bg-amber-100/80"
+          style={{ gridRow: `${index + 1} / span 1`, gridColumn: "7 / span 1" }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -1372,6 +1537,16 @@ function ActivityCard({
   onMarkDone: (item: WeekAtGlanceItem) => void;
   progressLoading: boolean;
 }) {
+  const [showDescription, setShowDescription] = useState(false);
+  const [descriptionPosition, setDescriptionPosition] = useState({ top: 0, left: 0 });
+  const updateDescriptionPosition = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const tooltipWidth = 256;
+    const left = rect.right + tooltipWidth + 16 < window.innerWidth
+      ? rect.right + 12
+      : Math.max(12, rect.left - tooltipWidth - 12);
+    setDescriptionPosition({ top: rect.top + rect.height / 2, left });
+  };
   const button = getButtonMeta(item.button_type);
   const ButtonIcon = button.icon;
   const completed = progress?.completed === true;
@@ -1380,6 +1555,11 @@ function ActivityCard({
   const isDemo = item.id.startsWith("fallback-");
 
   return (
+    <div
+      className="group relative z-10"
+      onMouseEnter={(event) => { updateDescriptionPosition(event.currentTarget); setShowDescription(true); }}
+      onMouseLeave={() => setShowDescription(false)}
+    >
     <article
       className={`rounded-2xl border p-4 shadow-[0_8px_22px_rgba(57,65,130,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(57,65,130,0.10)] ${
         completed ? "border-emerald-200 bg-emerald-50/40" : "border-indigo-100 bg-white"
@@ -1407,6 +1587,9 @@ function ActivityCard({
             <h4 className="line-clamp-2 text-sm font-black leading-5 text-slate-950">
               {item.title || "Untitled"}
             </h4>
+            <button type="button" aria-label="Show activity description" aria-expanded={showDescription} onClick={(event) => { const wrapper = event.currentTarget.closest(".group"); if (wrapper instanceof HTMLElement) updateDescriptionPosition(wrapper); setShowDescription(window.matchMedia("(hover: none)").matches ? (value) => !value : true); }} className="shrink-0 rounded-full p-1 text-indigo-500 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+              <Info size={16} />
+            </button>
             {completed ? (
               <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-black text-emerald-700">
                 DONE
@@ -1414,11 +1597,12 @@ function ActivityCard({
             ) : null}
           </div>
 
-          {item.description ? (
-            <p className="mt-1 line-clamp-2 text-xs leading-4 text-slate-500">{item.description}</p>
-          ) : null}
-
           <ActivityMeta item={item} />
+          {isSpanMergedItem(item) && Number(item.row_span || 1) > 1 ? (
+            <span className="mt-2 inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-black text-indigo-700">
+              Continues across {Number(item.row_span)} days
+            </span>
+          ) : null}
 
           <div className="mt-4 grid grid-cols-2 gap-2.5">
             {hasLink ? (
@@ -1467,6 +1651,14 @@ function ActivityCard({
         </div>
       </div>
     </article>
+    <div
+      role="tooltip"
+      style={{ top: descriptionPosition.top, left: descriptionPosition.left }}
+      className={`${showDescription ? "visible opacity-100" : "invisible opacity-0"} pointer-events-none fixed z-[9999] w-64 max-w-[85vw] -translate-y-1/2 rounded-2xl border border-indigo-100 bg-white p-3 text-left text-xs leading-5 text-slate-600 shadow-[0_16px_40px_rgba(45,55,120,0.18)] transition-opacity duration-150`}>
+      <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-indigo-500">Activity Description</span>
+      {item.description?.trim() || "No description has been added for this activity yet."}
+    </div>
+    </div>
   );
 }
 
@@ -1486,6 +1678,16 @@ function ActivityMiniCard({
   progressLoading: boolean;
   compact?: boolean;
 }) {
+  const [showDescription, setShowDescription] = useState(false);
+  const [descriptionPosition, setDescriptionPosition] = useState({ top: 0, left: 0 });
+  const updateDescriptionPosition = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const tooltipWidth = 256;
+    const left = rect.right + tooltipWidth + 16 < window.innerWidth
+      ? rect.right + 12
+      : Math.max(12, rect.left - tooltipWidth - 12);
+    setDescriptionPosition({ top: rect.top + rect.height / 2, left });
+  };
   const button = getButtonMeta(item.button_type);
   const ButtonIcon = button.icon;
   const completed = progress?.completed === true;
@@ -1493,6 +1695,11 @@ function ActivityMiniCard({
   const isDemo = item.id.startsWith("fallback-");
 
   return (
+    <div
+      className="group relative z-20 min-w-0"
+      onMouseEnter={(event) => { updateDescriptionPosition(event.currentTarget); setShowDescription(true); }}
+      onMouseLeave={() => setShowDescription(false)}
+    >
     <article
       className={`relative h-fit rounded-2xl border p-2.5 text-center shadow-[0_6px_18px_rgba(57,65,130,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(57,65,130,0.12)] ${
         completed ? "border-emerald-200 bg-emerald-50/50" : "border-indigo-100 bg-white"
@@ -1512,9 +1719,14 @@ function ActivityMiniCard({
         </div>
       )}
 
-      <h4 className="mt-1.5 line-clamp-2 text-xs font-black leading-4 text-slate-950">
-        {item.title || "Untitled"}
-      </h4>
+      <div className="mt-1.5 flex items-start justify-center gap-1">
+        <h4 className="line-clamp-2 min-w-0 text-xs font-black leading-4 text-slate-950">
+          {item.title || "Untitled"}
+        </h4>
+        <button type="button" aria-label="Show activity description" aria-expanded={showDescription} onClick={(event) => { const wrapper = event.currentTarget.closest(".group"); if (wrapper instanceof HTMLElement) updateDescriptionPosition(wrapper); setShowDescription(window.matchMedia("(hover: none)").matches ? (value) => !value : true); }} className="shrink-0 rounded-full p-0.5 text-indigo-500 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+          <Info size={13} />
+        </button>
+      </div>
 
       <ActivityMeta item={item} compact />
 
@@ -1555,6 +1767,14 @@ function ActivityMiniCard({
         )}
       </div>
     </article>
+    <div
+      role="tooltip"
+      style={{ top: descriptionPosition.top, left: descriptionPosition.left }}
+      className={`${showDescription ? "visible opacity-100" : "invisible opacity-0"} pointer-events-none fixed z-[9999] w-64 max-w-[85vw] -translate-y-1/2 rounded-2xl border border-indigo-100 bg-white p-3 text-left text-xs leading-5 text-slate-600 shadow-[0_16px_40px_rgba(45,55,120,0.18)] transition-opacity duration-150`}>
+      <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-indigo-500">Activity Description</span>
+      {item.description?.trim() || "No description has been added for this activity yet."}
+    </div>
+    </div>
   );
 }
 
